@@ -2,8 +2,8 @@
 
 ## Version 1.0
 
-Prepared by: [Your Name/Team Name]
-Date: [Current Date]
+Prepared by: Daniel Biocchi
+Date: 2024-08-26
 
 ---
 
