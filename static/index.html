@@ -3,122 +3,87 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>OxidizedOasis-WebSands - Sign Up/Login</title>
-    <!-- Google Fonts for improved typography -->
-    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;700&display=swap" rel="stylesheet">
+    <title>OxidizedOasis-WebSands</title>
     <style>
-        /* Base styles for the entire page */
         body {
-            font-family: 'Roboto', sans-serif;
-            background-color: #f0f2f5;
-            margin: 0;
-            padding: 0;
+            font-family: Arial, sans-serif;
             display: flex;
             justify-content: center;
             align-items: center;
             height: 100vh;
+            margin: 0;
+            background-color: #f0f0f0;
         }
-        /* Styles for the main container */
         .container {
             background-color: white;
             padding: 2rem;
-            border-radius: 8px;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-            width: 300px;
+            border-radius: 5px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
         }
-        /* Styling for the main heading */
-        h1 {
-            color: #1877f2;
-            text-align: center;
-            margin-bottom: 1.5rem;
-        }
-        /* Form layout */
         form {
             display: flex;
             flex-direction: column;
         }
-        /* Input field styling */
         input {
             margin-bottom: 1rem;
-            padding: 0.8rem;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            font-size: 14px;
+            padding: 0.5rem;
         }
-        /* Button styling */
         button {
-            background-color: #1877f2;
+            padding: 0.5rem;
+            background-color: #007bff;
             color: white;
             border: none;
-            padding: 0.8rem;
-            border-radius: 4px;
             cursor: pointer;
-            font-size: 16px;
-            font-weight: bold;
         }
         button:hover {
-            background-color: #166fe5;
+            background-color: #0056b3;
         }
-        /* Styling for the message below the form */
-        .message {
-            text-align: center;
-            margin-top: 1rem;
-            font-size: 14px;
-        }
-        .message a {
-            color: #1877f2;
-            text-decoration: none;
-            font-weight: bold;
-        }
-        .message a:hover {
-            text-decoration: underline;
-        }
-        /* Styling for the response message */
         #response {
             margin-top: 1rem;
-            text-align: center;
-            font-weight: bold;
+            color: #28a745;
+        }
+        .error {
+            color: #dc3545;
         }
     </style>
 </head>
 <body>
 <div class="container">
-    <!-- Main heading that changes between Sign Up and Log In -->
     <h1 id="authTitle">Sign Up</h1>
-    <!-- Form for user authentication -->
     <form id="authForm">
         <input type="text" id="username" placeholder="Username" required>
         <input type="password" id="password" placeholder="Password" required>
-        <button type="submit" id="submitButton">Sign Up</button>
+        <button type="submit">Submit</button>
     </form>
-    <!-- Message to switch between signup and login -->
-    <p class="message">Already have an account? <a href="#" id="switchAuth">Log in</a></p>
-    <!-- Div to display response messages (errors or success) -->
+    <p id="switchAuth">Already have an account? <a href="#">Log in</a></p>
     <div id="response"></div>
 </div>
 
 <script>
-    // Get references to DOM elements
-    const authForm = document.getElementById('authForm');
-    const responseDiv = document.getElementById('response');
-    const submitButton = document.getElementById('submitButton');
     const authTitle = document.getElementById('authTitle');
-
-    // Flag to track whether we're in login or signup mode
+    const authForm = document.getElementById('authForm');
+    const switchAuth = document.getElementById('switchAuth');
+    const response = document.getElementById('response');
     let isLogin = false;
 
-    // Function to handle form submission
-    async function handleSubmit(e) {
+    switchAuth.addEventListener('click', (e) => {
+        e.preventDefault();
+        isLogin = !isLogin;
+        authTitle.textContent = isLogin ? 'Log In' : 'Sign Up';
+        switchAuth.innerHTML = isLogin
+            ? 'Don\'t have an account? <a href="#">Sign up</a>'
+            : 'Already have an account? <a href="#">Log in</a>';
+    });
+
+    authForm.addEventListener('submit', async (e) => {
         e.preventDefault();
         const username = document.getElementById('username').value;
         const password = document.getElementById('password').value;
 
-        // Determine the endpoint based on whether we're logging in or signing up
-        const endpoint = isLogin ? 'http://localhost:8080/users/login' : 'http://localhost:8080/users';
+        const endpoint = isLogin ? '/users/login' : '/users';
 
         try {
-            // Send POST request to the server
-            const response = await fetch(endpoint, {
+            const res = await fetch(`http://localhost:8080${endpoint}`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -126,71 +91,29 @@
                 body: JSON.stringify({ username, password }),
             });
 
-            // Log response details for debugging
-            console.log('Response status:', response.status);
-            console.log('Response headers:', response.headers);
+            const data = await res.json();
 
-            const contentType = response.headers.get("content-type");
-            if (contentType && contentType.indexOf("application/json") !== -1) {
-                const data = await response.json();
-                console.log('Response data:', data);
-                if (response.ok) {
-                    if (isLogin) {
-                        // For successful login, store user data and redirect to dashboard
-                        localStorage.setItem('user', JSON.stringify(data));
-                        window.location.href = 'dashboard.html';
-                    } else {
-                        // For successful signup, display success message
-                        responseDiv.textContent = `User created successfully! ID: ${data.id}`;
-                        responseDiv.style.color = 'green';
-                    }
+            if (res.ok) {
+                if (isLogin) {
+                    // Store JWT token and user info
+                    localStorage.setItem('token', data.token);
+                    localStorage.setItem('userId', data.user.id);
+                    localStorage.setItem('username', data.user.username);
+
+                    // Redirect to dashboard
+                    window.location.href = '/dashboard.html';
                 } else {
-                    // Display error message
-                    responseDiv.textContent = `Error: ${data.error || 'Unknown error occurred'}`;
-                    responseDiv.style.color = '#d9534f';
+                    response.textContent = 'User created successfully. Please log in.';
+                    response.classList.remove('error');
                 }
             } else {
-                // Handle non-JSON responses
-                const text = await response.text();
-                console.log('Response text:', text);
-                responseDiv.textContent = `Error: ${response.statusText}`;
-                responseDiv.style.color = '#d9534f';
+                throw new Error(data.message || 'An error occurred');
             }
         } catch (error) {
-            // Handle network errors or other exceptions
-            console.error('Fetch error:', error);
-            responseDiv.textContent = `Error: ${error.message}`;
-            responseDiv.style.color = '#d9534f';
+            response.textContent = error.message;
+            response.classList.add('error');
         }
-    }
-
-    // Function to toggle between signup and login modes
-    function toggleAuthMode() {
-        isLogin = !isLogin;
-        authTitle.textContent = isLogin ? 'Log In' : 'Sign Up';
-        submitButton.textContent = isLogin ? 'Log In' : 'Sign Up';
-        const switchAuthLink = document.getElementById('switchAuth');
-        switchAuthLink.textContent = isLogin ? 'Sign up' : 'Log in';
-        document.querySelector('.message').innerHTML = isLogin
-            ? 'Don\'t have an account? <a href="#" id="switchAuth">Sign up</a>'
-            : 'Already have an account? <a href="#" id="switchAuth">Log in</a>';
-        responseDiv.textContent = '';
-
-        // Re-attach event listener to the new switchAuth link
-        document.getElementById('switchAuth').addEventListener('click', handleSwitchAuth);
-    }
-
-    // Function to handle the click event on the switch auth link
-    function handleSwitchAuth(e) {
-        e.preventDefault();
-        toggleAuthMode();
-    }
-
-    // Add event listener for form submission
-    authForm.addEventListener('submit', handleSubmit);
-
-    // Add event listener for switching between signup and login
-    document.getElementById('switchAuth').addEventListener('click', handleSwitchAuth);
+    });
 </script>
 </body>
 </html>

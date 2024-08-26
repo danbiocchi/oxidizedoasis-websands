@@ -3,86 +3,46 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>OxidizedOasis-WebSands Dashboard</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <title>Dashboard - OxidizedOasis-WebSands</title>
     <style>
-        :root {
-            --primary-color: #3498db;
-            --secondary-color: #2ecc71;
-            --background-color: #f0f3f6;
-            --card-background: #ffffff;
-            --text-color: #333333;
-            --text-light: #777777;
-        }
-
         body {
-            font-family: 'Inter', sans-serif;
-            background-color: var(--background-color);
+            font-family: Arial, sans-serif;
             margin: 0;
-            padding: 20px;
-            color: var(--text-color);
+            padding: 0;
+            background-color: #f0f0f0;
         }
-
         .container {
             max-width: 1200px;
             margin: 0 auto;
+            padding: 2rem;
         }
-
         .header {
             display: flex;
             justify-content: space-between;
             align-items: center;
             margin-bottom: 2rem;
         }
-
-        h1 {
-            color: var(--primary-color);
-        }
-
-        .card {
-            background-color: var(--card-background);
-            border-radius: 8px;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-            padding: 1.5rem;
-            margin-bottom: 2rem;
-        }
-
-        .card h2 {
-            margin-top: 0;
-            color: var(--primary-color);
-        }
-
-        .user-info p {
-            margin: 0.5rem 0;
-        }
-
-        .btn {
-            background-color: var(--primary-color);
-            color: white;
-            border: none;
-            padding: 0.5rem 1rem;
-            border-radius: 4px;
-            cursor: pointer;
-            font-weight: 600;
-        }
-
-        .btn:hover {
-            background-color: #2980b9;
-        }
-
         .grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 2rem;
+            gap: 1rem;
         }
-
-        #notepad {
-            width: 100%;
-            height: 150px;
-            margin-top: 1rem;
-            padding: 0.5rem;
-            border: 1px solid #ddd;
-            border-radius: 4px;
+        .card {
+            background-color: white;
+            padding: 1rem;
+            border-radius: 5px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+        button {
+            padding: 0.5rem 1rem;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            cursor: pointer;
+            border-radius: 3px;
+        }
+        button:hover {
+            background-color: #0056b3;
         }
     </style>
 </head>
@@ -90,7 +50,7 @@
 <div class="container">
     <div class="header">
         <h1>Welcome to Your Dashboard</h1>
-        <button id="logoutBtn" class="btn">Logout</button>
+        <button id="logout">Logout</button>
     </div>
     <div class="grid">
         <div class="card user-info">
@@ -100,8 +60,9 @@
         </div>
         <div class="card">
             <h2>Quick Notepad</h2>
-            <textarea id="notepad" placeholder="Jot down your thoughts here..."></textarea>
-            <button onclick="saveNotes()" class="btn">Save Notes</button>
+            <textarea id="notepad" rows="5" cols="30"></textarea>
+            <br>
+            <button id="saveNotes">Save Notes</button>
         </div>
     </div>
     <div class="card">
@@ -111,45 +72,46 @@
 </div>
 
 <script>
-    // Check if user is logged in
-    const user = JSON.parse(localStorage.getItem('user'));
-    if (!user) {
-        window.location.href = 'index.html';
+    // Check if user is authenticated
+    const token = localStorage.getItem('token');
+    if (!token) {
+        window.location.href = '/index.html';
     }
 
     // Populate user information
-    document.getElementById('username').textContent = user.username;
-    document.getElementById('userId').textContent = user.id;
+    document.getElementById('username').textContent = localStorage.getItem('username');
+    document.getElementById('userId').textContent = localStorage.getItem('userId');
 
     // Logout functionality
-    document.getElementById('logoutBtn').addEventListener('click', () => {
-        localStorage.removeItem('user');
-        window.location.href = 'index.html';
+    document.getElementById('logout').addEventListener('click', () => {
+        localStorage.removeItem('token');
+        localStorage.removeItem('userId');
+        localStorage.removeItem('username');
+        window.location.href = '/index.html';
     });
 
-    // Notepad functionality
-    const notepad = document.getElementById('notepad');
-    notepad.value = localStorage.getItem('userNotes') || '';
-
-    function saveNotes() {
-        localStorage.setItem('userNotes', notepad.value);
-        alert('Notes saved successfully!');
-    }
-
-    // Session timer
+    // Timer functionality
     let seconds = 0;
-    const timerElement = document.getElementById('timer');
-
-    function updateTimer() {
+    setInterval(() => {
         seconds++;
         const hours = Math.floor(seconds / 3600);
         const minutes = Math.floor((seconds % 3600) / 60);
         const secs = seconds % 60;
-        timerElement.textContent =
+        document.getElementById('timer').textContent =
             `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    }, 1000);
+
+    // Notepad functionality
+    const notepad = document.getElementById('notepad');
+    const savedNotes = localStorage.getItem('notes');
+    if (savedNotes) {
+        notepad.value = savedNotes;
     }
 
-    setInterval(updateTimer, 1000);
+    document.getElementById('saveNotes').addEventListener('click', () => {
+        localStorage.setItem('notes', notepad.value);
+        alert('Notes saved successfully!');
+    });
 </script>
 </body>
 </html>

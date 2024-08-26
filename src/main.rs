@@ -5,10 +5,13 @@ use sqlx::postgres::PgPoolOptions;
 use dotenv::dotenv;
 use std::env;
 use log::{info, error};
+use actix_web_httpauth::middleware::HttpAuthentication;
 
 mod models;
 mod handlers;
 mod config;
+mod auth;
+mod middleware;
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
@@ -39,14 +42,20 @@ async fn main() -> std::io::Result<()> {
             .allow_any_method()
             .allow_any_header();
 
+        let auth = HttpAuthentication::bearer(middleware::validator);
+
         App::new()
             .wrap(cors)
             .app_data(web::Data::new(pool.clone()))
             .service(handlers::create_user)
-            .service(handlers::get_user)
-            .service(handlers::update_user)
-            .service(handlers::delete_user)
-            .service(handlers::login_user)  // Add this line
+            .service(handlers::login_user)
+            .service(
+                web::scope("/api")
+                    .wrap(auth)
+                    .service(handlers::get_user)
+                    .service(handlers::update_user)
+                    .service(handlers::delete_user)
+            )
             .service(fs::Files::new("/", "./static").index_file("index.html"))
     })
         .bind("127.0.0.1:8080")?
