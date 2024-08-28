@@ -1,5 +1,6 @@
 use lettre::transport::smtp::authentication::Credentials;
 use lettre::{Message, SmtpTransport, Transport};
+use lettre::message::header::ContentType;
 use log::error;
 
 pub struct EmailService {
@@ -20,11 +21,33 @@ impl EmailService {
     }
 
     pub fn send_verification_email(&self, to_email: &str, verification_token: &str) -> Result<(), Box<dyn std::error::Error>> {
+        let email_body = format!(
+            r#"
+            <html>
+            <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+                <div style="max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f9f9f9; border-radius: 5px;">
+                    <h1 style="color: #3498db;">Verify Your Email</h1>
+                    <p>Thank you for signing up with OxidizedOasis! Please click the button below to verify your email address:</p>
+                    <p style="text-align: center;">
+                        <a href="http://localhost:8080/users/verify?token={}" style="display: inline-block; padding: 10px 20px; background-color: #3498db; color: #ffffff; text-decoration: none; border-radius: 5px;">Verify Email</a>
+                    </p>
+                    <p>If the button doesn't work, you can copy and paste the following link into your browser:</p>
+                    <p><a href="http://localhost:8080/users/verify?token={}">http://localhost:8080/users/verify?token={}</a></p>
+                    <p>This link will expire in 24 hours.</p>
+                    <p>If you didn't sign up for an account, you can safely ignore this email.</p>
+                </div>
+            </body>
+            </html>
+            "#,
+            verification_token, verification_token, verification_token
+        );
+
         let email = Message::builder()
             .from(self.from_email.parse()?)
             .to(to_email.parse()?)
-            .subject("Verify Your Email")
-            .body(format!("Click the following link to verify your email: http://localhost:8080/verify-email?token={}", verification_token))?;
+            .subject("Verify Your Email - OxidizedOasis")
+            .header(ContentType::TEXT_HTML)
+            .body(email_body)?;
 
         let creds = Credentials::new(self.smtp_username.clone(), self.smtp_password.clone());
 

@@ -27,13 +27,14 @@ This project demonstrates the power of Rust in web development, utilizing the Ac
 - **ORM**: SQLx
 - **Frontend**: HTML, CSS, JavaScript
 - **Authentication**: JWT (JSON Web Tokens)
+- **Email**: Lettre for sending verification emails
 - **Styling**: Custom CSS with animations
 
 ## 🚀 Getting Started
 
 1. Clone the repository:
    ```sh
-   git clone https://github.com/danbiocchi/oxidizedoasis-websands.git
+   git clone https://github.com/yourusername/oxidizedoasis-websands.git
    ```
 
 2. Navigate to the project directory:
@@ -60,8 +61,7 @@ This project demonstrates the power of Rust in web development, utilizing the Ac
    SMTP_PASSWORD=your_smtp_password
    SMTP_SERVER=your_smtp_server
    FROM_EMAIL=noreply@yourdomain.com
-   SERVER_HOST=127.0.0.1
-   SERVER_PORT=8080
+   RUST_LOG=debug
    ```
 
 2. Ensure you have PostgreSQL installed and running
@@ -87,8 +87,7 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 ## 🎉 Recent Updates
 
-- Implemented a dynamic login/signup form with smooth transitions
-- Added email verification for new account registrations
+- Implemented email verification for new account registrations
 - Enhanced the UI with a modern, animated design
 - Improved error handling and user feedback
 - Implemented proper CORS configuration

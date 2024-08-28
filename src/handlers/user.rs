@@ -4,10 +4,36 @@ use crate::models::user::{User, UserResponse, CreateUser, LoginUser, UpdateUser}
 use crate::email::EmailService;
 use bcrypt::{hash, verify, DEFAULT_COST};
 use uuid::Uuid;
-use log::{debug, error, info};
+use log::{debug, error, info, warn};
 use chrono::{Utc, Duration};
 use crate::auth;
 use actix_web_httpauth::extractors::bearer::BearerAuth;
+use serde::Deserialize;
+use std::convert::TryFrom;
+
+#[derive(Deserialize)]
+pub struct TokenQuery {
+    token: String,
+}
+
+impl TokenQuery {
+    // Getter method for token
+    pub fn token(&self) -> &str {
+        &self.token
+    }
+}
+
+impl TryFrom<web::Query<TokenQuery>> for TokenQuery {
+    type Error = actix_web::Error;
+
+    fn try_from(query: web::Query<TokenQuery>) -> Result<Self, Self::Error> {
+        // Validate token: ensure it's exactly 32 alphanumeric characters
+        if !query.token.chars().all(|c| c.is_ascii_alphanumeric()) || query.token.len() != 32 {
+            return Err(actix_web::error::ErrorBadRequest("Invalid token format"));
+        }
+        Ok(query.0)
+    }
+}
 
 pub async fn create_user(pool: web::Data<PgPool>, user: web::Json<CreateUser>) -> impl Responder {
     debug!("Received create_user request at /users/register");
@@ -115,8 +141,12 @@ pub async fn login_user(pool: web::Data<PgPool>, user: web::Json<LoginUser>) -> 
 
 pub async fn verify_email(
     pool: web::Data<PgPool>,
-    token: web::Query<String>,
-) -> impl Responder {
+    token_query: web::Query<TokenQuery>,
+) -> Result<impl Responder, actix_web::Error> {
+    let token = TokenQuery::try_from(token_query)?;
+
+    debug!("Received email verification request with token: {}", token.token());
+
     let result = sqlx::query!(
         r#"
         UPDATE users
@@ -124,17 +154,29 @@ pub async fn verify_email(
         WHERE verification_token = $1 AND verification_token_expires_at > CURRENT_TIMESTAMP
         RETURNING id
         "#,
-        token.into_inner()
+        token.token()
     )
         .fetch_optional(pool.get_ref())
         .await;
 
     match result {
-        Ok(Some(_)) => HttpResponse::Ok().json("Email verified successfully"),
-        Ok(None) => HttpResponse::BadRequest().json("Invalid or expired verification token"),
+        Ok(Some(_)) => {
+            info!("Email verified successfully");
+            Ok(HttpResponse::Found()
+                .append_header((actix_web::http::header::LOCATION, "/email_verified.html"))
+                .finish())
+        },
+        Ok(None) => {
+            warn!("Invalid or expired verification token");
+            Ok(HttpResponse::BadRequest().content_type("text/html").body(
+                "<html><body><h1>Invalid or Expired Verification Token</h1><p>Please request a new verification email.</p></body></html>"
+            ))
+        },
         Err(e) => {
             error!("Failed to verify email: {:?}", e);
-            HttpResponse::InternalServerError().json("Failed to verify email")
+            Ok(HttpResponse::InternalServerError().content_type("text/html").body(
+                "<html><body><h1>Error</h1><p>An error occurred while verifying your email. Please try again later.</p></body></html>"
+            ))
         }
     }
 }

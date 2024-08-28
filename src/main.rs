@@ -65,7 +65,7 @@ async fn main() -> std::io::Result<()> {
             .service(fs::Files::new("/", "./static").index_file("index.html"))
             .default_service(web::route().to(|req: actix_web::HttpRequest| async move {
                 error!("Unhandled request: {:?}", req);
-                HttpResponse::NotFound().body("Not Found")
+                HttpResponse::NotFound().content_type("text/html").body("<html><body><h1>404 Not Found</h1><p>The requested resource could not be found.</p></body></html>")
             }))
     })
         .bind(server_addr)?
