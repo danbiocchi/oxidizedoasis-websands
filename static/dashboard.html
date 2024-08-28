@@ -4,45 +4,83 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dashboard - OxidizedOasis-WebSands</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap" rel="stylesheet">
     <style>
+        :root {
+            --primary-color: #3498db;
+            --secondary-color: #2ecc71;
+            --background-color: #f0f3f5;
+            --text-color: #34495e;
+        }
+
         body {
-            font-family: Arial, sans-serif;
+            font-family: 'Poppins', sans-serif;
+            background-color: var(--background-color);
+            color: var(--text-color);
             margin: 0;
             padding: 0;
-            background-color: #f0f0f0;
         }
+
         .container {
             max-width: 1200px;
             margin: 0 auto;
             padding: 2rem;
         }
+
         .header {
             display: flex;
             justify-content: space-between;
             align-items: center;
             margin-bottom: 2rem;
+            background-color: white;
+            padding: 1rem 2rem;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
         }
+
+        h1, h2 {
+            color: var(--primary-color);
+        }
+
         .grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
             gap: 1rem;
         }
+
         .card {
             background-color: white;
-            padding: 1rem;
-            border-radius: 5px;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            padding: 1.5rem;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            transition: all 0.3s ease;
         }
+
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 6px 8px rgba(0, 0, 0, 0.15);
+        }
+
         button {
             padding: 0.5rem 1rem;
-            background-color: #007bff;
+            background-color: var(--primary-color);
             color: white;
             border: none;
             cursor: pointer;
-            border-radius: 3px;
+            border-radius: 5px;
+            transition: background-color 0.3s ease;
         }
+
         button:hover {
-            background-color: #0056b3;
+            background-color: var(--secondary-color);
+        }
+
+        textarea {
+            width: 100%;
+            padding: 0.5rem;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            resize: vertical;
         }
     </style>
 </head>
@@ -60,7 +98,7 @@
         </div>
         <div class="card">
             <h2>Quick Notepad</h2>
-            <textarea id="notepad" rows="5" cols="30"></textarea>
+            <textarea id="notepad" rows="5"></textarea>
             <br>
             <button id="saveNotes">Save Notes</button>
         </div>
@@ -72,10 +110,26 @@
 </div>
 
 <script>
+    // Add this function at the beginning of your script
+    function fetchWithAuth(url, options = {}) {
+        const token = localStorage.getItem('token');
+        console.log('Token being sent:', token); // Add this line
+        return fetch(url, {
+            ...options,
+            headers: {
+                ...options.headers,
+                'Authorization': `Bearer ${token}`,
+            },
+        });
+    }
+
     // Check if user is authenticated
     const token = localStorage.getItem('token');
     if (!token) {
+        console.log('No token found, redirecting to login'); // Add this line
         window.location.href = '/index.html';
+    } else {
+        console.log('Token found:', token); // Add this line
     }
 
     // Populate user information
@@ -112,6 +166,42 @@
         localStorage.setItem('notes', notepad.value);
         alert('Notes saved successfully!');
     });
+
+    // Use this function for all your API calls
+    // For example:
+    fetchWithAuth('http://localhost:8080/api/some-endpoint')
+        .then(response => {
+            console.log('Response status:', response.status); // Add this line
+            return response.json();
+        })
+        .then(data => {
+            console.log('Response data:', data); // Add this line
+        })
+        .catch(error => console.error('Error:', error));
+
+    // Add this function to test the API
+    function testAPI() {
+        console.log('Testing API...');
+        fetchWithAuth('http://localhost:8080/api/users/' + localStorage.getItem('userId'))
+            .then(response => {
+                console.log('Response status:', response.status);
+                console.log('Response headers:', response.headers);
+                return response.text();
+            })
+            .then(text => {
+                console.log('Response text:', text);
+                try {
+                    const data = JSON.parse(text);
+                    console.log('Parsed response data:', data);
+                } catch (e) {
+                    console.log('Failed to parse response as JSON');
+                }
+            })
+            .catch(error => console.error('Error:', error));
+    }
+
+    // Call the testAPI function when the page loads
+    window.addEventListener('load', testAPI);
 </script>
 </body>
 </html>

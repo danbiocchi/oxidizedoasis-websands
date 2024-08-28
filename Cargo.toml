@@ -4,10 +4,10 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-actix-web = "4.3"
+actix-web = "4.9"
 actix-files = "0.6"
 actix-cors = "0.6"
-sqlx = { version = "0.6", features = ["runtime-tokio-rustls", "postgres", "uuid"] }
+sqlx = { version = "0.6", features = ["runtime-tokio-rustls", "postgres", "uuid", "chrono", "time"] }
 tokio = { version = "1", features = ["full"] }
 serde = { version = "1.0", features = ["derive"] }
 dotenv = "0.15"
@@ -20,3 +20,5 @@ chrono = { version = "0.4", features = ["serde"] }
 serde_json = "1.0.127"
 actix-web-httpauth = "0.8"
 futures = "0.3.30"
+lettre = "0.10"
+rand = "0.8.5"

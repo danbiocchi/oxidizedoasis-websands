@@ -4,58 +4,127 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>OxidizedOasis-WebSands</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap" rel="stylesheet">
     <style>
+        :root {
+            --primary-color: #3498db;
+            --secondary-color: #2ecc71;
+            --background-color: #f0f3f5;
+            --text-color: #34495e;
+        }
+
         body {
-            font-family: Arial, sans-serif;
+            font-family: 'Poppins', sans-serif;
+            background-color: var(--background-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 0;
             display: flex;
             justify-content: center;
             align-items: center;
-            height: 100vh;
-            margin: 0;
-            background-color: #f0f0f0;
+            min-height: 100vh;
+            overflow: hidden;
         }
+
         .container {
             background-color: white;
-            padding: 2rem;
-            border-radius: 5px;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            padding: 40px;
+            width: 100%;
+            max-width: 400px;
+            position: relative;
+            overflow: hidden;
         }
+
+        .container::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: linear-gradient(45deg, var(--primary-color), var(--secondary-color));
+            animation: rotate 10s linear infinite;
+            z-index: -1;
+        }
+
+        @keyframes rotate {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        h1, h2 {
+            color: var(--primary-color);
+            text-align: center;
+            margin-bottom: 30px;
+            font-weight: 600;
+        }
+
         form {
             display: flex;
             flex-direction: column;
         }
+
         input {
-            margin-bottom: 1rem;
-            padding: 0.5rem;
+            margin-bottom: 15px;
+            padding: 12px;
+            border: none;
+            border-radius: 5px;
+            background-color: #ecf0f1;
+            font-size: 16px;
+            transition: all 0.3s ease;
         }
+
+        input:focus {
+            outline: none;
+            box-shadow: 0 0 0 2px var(--primary-color);
+        }
+
         button {
-            padding: 0.5rem;
-            background-color: #007bff;
+            background-color: var(--primary-color);
             color: white;
             border: none;
+            padding: 12px;
+            border-radius: 5px;
             cursor: pointer;
+            font-size: 16px;
+            transition: all 0.3s ease;
         }
+
         button:hover {
-            background-color: #0056b3;
+            background-color: var(--secondary-color);
         }
+
+        p {
+            text-align: center;
+            margin-top: 20px;
+        }
+
+        a {
+            color: var(--primary-color);
+            text-decoration: none;
+            font-weight: 600;
+        }
+
         #response {
-            margin-top: 1rem;
-            color: #28a745;
-        }
-        .error {
-            color: #dc3545;
+            margin-top: 20px;
+            text-align: center;
+            font-weight: 300;
         }
     </style>
 </head>
 <body>
 <div class="container">
-    <h1 id="authTitle">Sign Up</h1>
+    <h1 id="authTitle">Welcome to OxidizedOasis</h1>
+    <h2>Sign Up</h2>
     <form id="authForm">
-        <input type="text" id="username" placeholder="Username" required>
-        <input type="password" id="password" placeholder="Password" required>
-        <button type="submit">Submit</button>
+        <input type="text" id="username" name="username" placeholder="Username" required>
+        <input type="email" id="email" name="email" placeholder="Email" required>
+        <input type="password" id="password" name="password" placeholder="Password" required>
+        <button type="submit">Sign Up</button>
     </form>
-    <p id="switchAuth">Already have an account? <a href="#">Log in</a></p>
+    <p>Already have an account? <a href="#" id="switchAuth">Log in</a></p>
     <div id="response"></div>
 </div>
 
@@ -63,55 +132,59 @@
     const authTitle = document.getElementById('authTitle');
     const authForm = document.getElementById('authForm');
     const switchAuth = document.getElementById('switchAuth');
-    const response = document.getElementById('response');
-    let isLogin = false;
+    const responseDiv = document.getElementById('response');
+    let isSignUp = true;
 
     switchAuth.addEventListener('click', (e) => {
         e.preventDefault();
-        isLogin = !isLogin;
-        authTitle.textContent = isLogin ? 'Log In' : 'Sign Up';
-        switchAuth.innerHTML = isLogin
-            ? 'Don\'t have an account? <a href="#">Sign up</a>'
-            : 'Already have an account? <a href="#">Log in</a>';
+        isSignUp = !isSignUp;
+        authTitle.textContent = isSignUp ? 'Sign Up' : 'Log In';
+        switchAuth.textContent = isSignUp ? 'Log in' : 'Sign up';
+        authForm.email.style.display = isSignUp ? 'block' : 'none';
+        authForm.querySelector('button').textContent = isSignUp ? 'Sign Up' : 'Log In';
     });
 
     authForm.addEventListener('submit', async (e) => {
         e.preventDefault();
-        const username = document.getElementById('username').value;
-        const password = document.getElementById('password').value;
+        const username = authForm.username.value;
+        const password = authForm.password.value;
+        const email = authForm.email.value;
 
-        const endpoint = isLogin ? '/users/login' : '/users';
+        const endpoint = isSignUp ? '/users/register' : '/users/login';
+        const data = isSignUp ? { username, email, password } : { username, password };
+
+        console.log(`Sending ${isSignUp ? 'registration' : 'login'} request to ${endpoint}`);
+        console.log('Request data:', data);
 
         try {
-            const res = await fetch(`http://localhost:8080${endpoint}`, {
+            const response = await fetch(endpoint, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({ username, password }),
+                body: JSON.stringify(data),
             });
 
-            const data = await res.json();
+            console.log('Response status:', response.status);
+            console.log('Response headers:', Object.fromEntries(response.headers));
 
-            if (res.ok) {
-                if (isLogin) {
-                    // Store JWT token and user info
-                    localStorage.setItem('token', data.token);
-                    localStorage.setItem('userId', data.user.id);
-                    localStorage.setItem('username', data.user.username);
+            const responseText = await response.text();
+            console.log('Response text:', responseText);
 
-                    // Redirect to dashboard
-                    window.location.href = '/dashboard.html';
+            if (response.ok) {
+                const result = JSON.parse(responseText);
+                if (isSignUp) {
+                    responseDiv.textContent = `User created successfully. Please check your email to verify your account.`;
                 } else {
-                    response.textContent = 'User created successfully. Please log in.';
-                    response.classList.remove('error');
+                    localStorage.setItem('token', result.token);
+                    window.location.href = '/dashboard.html';
                 }
             } else {
-                throw new Error(data.message || 'An error occurred');
+                responseDiv.textContent = `Error: ${response.status} ${response.statusText}. ${responseText}`;
             }
         } catch (error) {
-            response.textContent = error.message;
-            response.classList.add('error');
+            console.error('Error:', error);
+            responseDiv.textContent = `Error: ${error.message}`;
         }
     });
 </script>
