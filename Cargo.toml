@@ -6,19 +6,19 @@ edition = "2021"
 [dependencies]
 actix-web = "4.9"
 actix-files = "0.6"
-actix-cors = "0.6"
-sqlx = { version = "0.6", features = ["runtime-tokio-rustls", "postgres", "uuid", "chrono", "time"] }
+actix-cors = "0.7"
+sqlx = { version = "0.8", features = ["runtime-tokio-rustls", "postgres", "uuid", "chrono"] }
 tokio = { version = "1", features = ["full"] }
 serde = { version = "1.0", features = ["derive"] }
 dotenv = "0.15"
-env_logger = "0.10"
+env_logger = "0.11.5"
 log = "0.4"
-bcrypt = "0.13"
+bcrypt = "0.15.1"
 uuid = { version = "1.3", features = ["v4", "serde"] }
-jsonwebtoken = "8.3"
-chrono = { version = "0.4", features = ["serde"] }
+jsonwebtoken = "9.3"
 serde_json = "1.0.127"
 actix-web-httpauth = "0.8"
 futures = "0.3.30"
-lettre = "0.10"
+lettre = "0.11.7"
 rand = "0.8.5"
+chrono = { version = "0.4", features = ["serde"] }
