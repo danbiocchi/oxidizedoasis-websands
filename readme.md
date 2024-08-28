@@ -3,7 +3,7 @@
 OxidizedOasis-WebSands is a robust web application built with Rust, focusing on efficient user management and authentication.
 
 <p align="center">
-  <img src="static/images/login-page-screenshot.png" alt="Login Page Screenshot" width="600">
+  <img src="static/images/signup-page-screenshot.png" alt="Login Page Screenshot" width="600">
 </p>
 
 ## 🌟 About This Project

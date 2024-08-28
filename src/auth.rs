@@ -4,13 +4,22 @@ use chrono::{Utc, Duration};
 use uuid::Uuid;
 use log::{debug, error};
 
+/// Represents the claims in a JWT token
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Claims {
-    pub sub: Uuid,  // Change this to pub
-    pub exp: i64,   // Change this to pub
-    pub iat: i64,   // Change this to pub
+    pub sub: Uuid,  // Subject (user ID)
+    pub exp: i64,   // Expiration time
+    pub iat: i64,   // Issued at
 }
 
+/// Create a new JWT token for a user
+///
+/// # Arguments
+/// * `user_id` - The ID of the user
+/// * `secret` - The secret key used to sign the token
+///
+/// # Returns
+/// * `Result<String, jsonwebtoken::errors::Error>` - The JWT token if successful, or an error
 pub fn create_jwt(user_id: Uuid, secret: &str) -> Result<String, jsonwebtoken::errors::Error> {
     let expiration = Utc::now()
         .checked_add_signed(Duration::hours(24))
@@ -26,6 +35,14 @@ pub fn create_jwt(user_id: Uuid, secret: &str) -> Result<String, jsonwebtoken::e
     encode(&Header::default(), &claims, &EncodingKey::from_secret(secret.as_ref()))
 }
 
+/// Validate a JWT token
+///
+/// # Arguments
+/// * `token` - The JWT token to validate
+/// * `secret` - The secret key used to sign the token
+///
+/// # Returns
+/// * `Result<Claims, jsonwebtoken::errors::Error>` - The claims if the token is valid, or an error
 pub fn validate_jwt(token: &str, secret: &str) -> Result<Claims, jsonwebtoken::errors::Error> {
     debug!("Attempting to validate JWT");
     let validation = Validation::default();

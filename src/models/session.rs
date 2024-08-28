@@ -3,6 +3,7 @@ use sqlx::FromRow;
 use uuid::Uuid;
 use chrono::{DateTime, Utc};
 
+/// Represents a user session in the database
 #[derive(Debug, Serialize, Deserialize, FromRow)]
 pub struct Session {
     pub id: Uuid,

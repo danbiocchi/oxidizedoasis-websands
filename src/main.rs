@@ -13,28 +13,35 @@ mod auth;
 mod email;
 mod middleware;
 
+/// Main function to start the OxidizedOasis-WebSands application
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
+    // Load environment variables from .env file
     dotenv().ok();
+    // Initialize logger
     env_logger::Builder::from_env(Env::default().default_filter_or("debug")).init();
 
     info!("Starting OxidizedOasis-WebSands application");
 
+    // Get database URL from environment variables
     let database_url = std::env::var("DATABASE_URL")
         .expect("DATABASE_URL must be set in environment variables");
 
+    // Create database connection pool
     let pool = PgPoolOptions::new()
         .max_connections(5)
         .connect(&database_url)
         .await
         .expect("Failed to create database connection pool");
 
+    // Get server host and port from environment variables or use defaults
     let host = std::env::var("SERVER_HOST").unwrap_or_else(|_| "127.0.0.1".to_string());
     let port = std::env::var("SERVER_PORT").unwrap_or_else(|_| "8080".to_string());
     let server_addr = format!("{}:{}", host, port);
 
     debug!("Server will be listening on: {}", server_addr);
 
+    // Start HTTP server
     HttpServer::new(move || {
         debug!("Configuring HTTP server");
         let auth = HttpAuthentication::bearer(crate::middleware::validator);

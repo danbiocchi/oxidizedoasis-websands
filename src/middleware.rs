@@ -4,6 +4,14 @@ use actix_web_httpauth::extractors::bearer::BearerAuth;
 use crate::auth;
 use log::{error, debug, info};
 
+/// Middleware function to validate JWT tokens
+///
+/// # Arguments
+/// * `req` - The incoming service request
+/// * `credentials` - The bearer authentication credentials
+///
+/// # Returns
+/// * `Result<ServiceRequest, (Error, ServiceRequest)>` - Ok if token is valid, Err otherwise
 pub async fn validator(req: ServiceRequest, credentials: BearerAuth) -> Result<ServiceRequest, (Error, ServiceRequest)> {
     let jwt_secret = std::env::var("JWT_SECRET").expect("JWT_SECRET must be set");
     let token = credentials.token();
