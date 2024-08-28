@@ -1,9 +1,9 @@
 # OxidizedOasis-WebSands Software Development Document
 
-## Version 1.0
+## Version 1.1
 
 Prepared by: Daniel Biocchi
-Date: 2024-08-26
+Date: 2024-08-28
 
 ---
 
@@ -380,16 +380,11 @@ The User Management feature is a core component of OxidizedOasis-WebSands, provi
 
 #### 3.1.1 User Registration
 
-The system allows new users to create an account by providing essential information.
+The system now includes email verification for new user registrations.
 
-**Requirements:**
-- Users must provide a unique username and a secure password.
-- Email addresses must be validated for format correctness.
-- Passwords must meet minimum security requirements (e.g., length, complexity).
+**Updated Implementation:**
 
-**Implementation:**
-
-```rust
+```
 #[post("/users")]
 pub async fn create_user(pool: web::Data<PgPool>, user: web::Json<CreateUser>) -> impl Responder {
     let password_hash = match hash(user.password.as_bytes(), DEFAULT_COST) {
@@ -434,7 +429,7 @@ The system provides secure authentication using JWT (JSON Web Tokens).
 
 **Implementation:**
 
-```rust
+```
 #[post("/users/login")]
 pub async fn login_user(pool: web::Data<PgPool>, user: web::Json<LoginUser>) -> impl Responder {
     let user_result = sqlx::query_as!(
@@ -492,7 +487,7 @@ Users can view and update their profile information.
 
 **Implementation:**
 
-```rust
+```
 #[get("/users/{id}")]
 pub async fn get_user(pool: web::Data<PgPool>, id: web::Path<Uuid>, _: BearerAuth) -> impl Responder {
     let result = sqlx::query_as!(
@@ -533,7 +528,7 @@ All user passwords are securely hashed using the bcrypt algorithm before storage
 
 **Implementation:**
 
-```rust
+```
 use bcrypt::{hash, verify, DEFAULT_COST};
 
 // In user creation
@@ -549,7 +544,7 @@ JSON Web Tokens are used for stateless authentication.
 
 **Implementation:**
 
-```rust
+```
 use jsonwebtoken::{encode, decode, Header, Validation, EncodingKey, DecodingKey};
 
 pub fn create_jwt(user_id: Uuid, secret: &str) -> Result<String, jsonwebtoken::errors::Error> {
@@ -580,7 +575,7 @@ Cross-Origin Resource Sharing is configured to control which domains can access 
 
 **Implementation:**
 
-```rust
+```
 use actix_cors::Cors;
 
 let cors = Cors::default()
@@ -774,1067 +769,330 @@ pub struct User {
     pub created_at: chrono::DateTime<chrono::Utc>,
     pub updated_at: chrono::DateTime<chrono::Utc>,
 }
-
-impl User {
-    pub async fn find_by_id(pool: &PgPool, id: Uuid) -> Result<Option<Self>, sqlx::Error> {
-        sqlx::query_as!(
-            Self,
-            "SELECT * FROM users WHERE id = $1",
-            id
-        )
-        .fetch_optional(pool)
-        .await
-    }
-
-    pub async fn create(pool: &PgPool, username: &str, password_hash: &str, email: Option<&str>) -> Result<Self, sqlx::Error> {
-        sqlx::query_as!(
-            Self,
-            "INSERT INTO users (id, username, password_hash, email) VALUES ($1, $2, $3, $4) RETURNING *",
-            Uuid::new_v4(),
-            username,
-            password_hash,
-            email
-        )
-        .fetch_one(pool)
-        .await
-    }
-
-    // Additional methods for update, delete, etc.
-}
 ```
-
-This structure allows for type-safe database queries and seamless integration with the Rust application code.
-
-### 4.4 Data Validation and Integrity
-
-To maintain data integrity and consistency, the following measures are implemented:
-
-1. **Unique Constraints**: The `username` and `email` fields in the `users` table have unique constraints to prevent duplicate entries.
-
-2. **Foreign Key Constraints**: The `sessions` and `user_profiles` tables have foreign key constraints to ensure referential integrity with the `users` table.
-
-3. **Input Validation**: Before inserting or updating data, the application performs validation checks to ensure data meets the required format and constraints.
-
-4. **Indexing**: Appropriate indexes are created on frequently queried fields to improve query performance.
-
-### 4.5 Future Enhancements
-
-As the application evolves, the following enhancements to the data model are being considered:
-
-1. **Role-based Access Control**: Introducing a `roles` table to support different user roles and permissions.
-
-2. **Audit Logging**: Implementing an `audit_logs` table to track important user actions for security and compliance purposes.
-
-3. **Password Reset**: Adding a `password_reset_tokens` table to support secure password reset functionality.
-
-4. **User Preferences**: Extending the `user_profiles` table or creating a separate `user_preferences` table to store user-specific application settings.
-
-These future enhancements will be designed and implemented with backward compatibility in mind to minimize disruption to existing functionality.
 
 ## 5. External Interfaces
 
-This section describes the various interfaces through which OxidizedOasis-WebSands interacts with external entities, including users, hardware, software, and communication systems.
-
 ### 5.1 User Interfaces
 
-OxidizedOasis-WebSands provides a web-based user interface for end-users to interact with the system. While the primary focus is on the backend API, a basic frontend is included for demonstration and testing purposes.
+The OxidizedOasis-WebSands system provides a user-friendly interface for users to interact with the application. The interface is designed to be intuitive, responsive, and accessible.
 
-#### 5.1.1 Web Interface
+#### 5.1.1 Sign-up Page
 
-The web interface consists of the following main pages:
+The sign-up page allows new users to create an account by providing essential information.
 
-1. **Sign-up Page**
-   - URL: `/signup`
-   - Purpose: Allows new users to create an account
-   - Key Elements:
-      - Username input field
-      - Password input field
-      - Email input field (optional)
-      - Submit button
+**Requirements:**
+- Users must provide a unique username and a secure password.
+- Email addresses must be validated for format correctness.
+- Passwords must meet minimum security requirements (e.g., length, complexity).
 
-2. **Login Page**
-   - URL: `/login`
-   - Purpose: Authenticates existing users
-   - Key Elements:
-      - Username input field
-      - Password input field
-      - Submit button
-      - "Forgot Password" link (for future implementation)
+**Implementation:**
 
-3. **User Dashboard**
-   - URL: `/dashboard`
-   - Purpose: Displays user information and provides access to account management features
-   - Key Elements:
-      - User profile information display
-      - Account settings link
-      - Logout button
+```
+<form id="signupForm">
+    <input type="text" id="username" name="username" required>
+    <input type="password" id="password" name="password" required>
+    <button type="submit">Sign Up</button>
+</form>
 
-4. **Profile Edit Page**
-   - URL: `/profile/edit`
-   - Purpose: Allows users to update their profile information
-   - Key Elements:
-      - Form fields for editable profile information
-      - Save changes button
+<script>
+document.getElementById('signupForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const username = document.getElementById('username').value;
+    const password = document.getElementById('password').value;
+    
+    try {
+        const response = await fetch('/users', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ username, password }),
+        });
+        const data = await response.json();
+        console.log('User created:', data);
+    } catch (error) {
+        console.error('Error:', error);
+    }
+});
+</script>
+```
 
-#### 5.1.2 API Documentation Interface
+#### 5.1.2 Login Page
 
-For developers integrating with the OxidizedOasis-WebSands API, an interactive API documentation interface is provided:
+The login page allows registered users to authenticate themselves and access the application.
 
-- URL: `/api-docs`
-- Technology: Swagger UI
-- Purpose: Allows developers to explore and test API endpoints
-- Key Features:
-   - Interactive endpoint documentation
-   - Request/response examples
-   - Try-it-out functionality for live API testing
+**Requirements:**
+- Users must be able to log in with their username and password.
+- The system must validate credentials and grant access upon successful authentication.
+
+**Implementation:**
+
+```
+<form id="loginForm">
+    <input type="text" id="username" name="username" required>
+    <input type="password" id="password" name="password" required>
+    <button type="submit">Log In</button>
+</form>
+
+<script>
+document.getElementById('loginForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const username = document.getElementById('username').value;
+    const password = document.getElementById('password').value;
+    
+    try {
+        const response = await fetch('/users/login', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ username, password }),
+        });
+        const data = await response.json();
+        console.log('Login successful:', data);
+    } catch (error) {
+        console.error('Error:', error);
+    }
+});
+</script>
+```
+
+#### 5.1.3 Dashboard Page
+
+The dashboard page is a protected area where authenticated users can view and manage their account information.
+
+**Requirements:**
+- Authenticated users must be able to view their profile details.
+- Users should be able to update certain profile fields (e.g., email, display name).
+- Profile updates must be validated before being saved to the database.
+
+**Implementation:**
+
+```
+<div id="dashboard">
+    <h1>Welcome, <span id="username"></span></h1>
+    <button id="logout">Log Out</button>
+</div>
+
+<script>
+const token = localStorage.getItem('token');
+if (!token) {
+    window.location.href = '/login';
+}
+
+async function fetchUserData() {
+    try {
+        const response = await fetch('/users/me', {
+            headers: {
+                'Authorization': `Bearer ${token}`,
+            },
+        });
+        const user = await response.json();
+        document.getElementById('username').textContent = user.username;
+    } catch (error) {
+        console.error('Error fetching user data:', error);
+    }
+}
+
+fetchUserData();
+
+document.getElementById('logout').addEventListener('click', () => {
+    localStorage.removeItem('token');
+    window.location.href = '/login';
+});
+</script>
+```
 
 ### 5.2 Hardware Interfaces
 
-OxidizedOasis-WebSands is a web-based application and does not directly interface with specific hardware components. However, it relies on the following general hardware requirements:
-
-1. **Server Hardware**
-   - CPU: 2+ cores, 2.0 GHz or higher
-   - RAM: 4GB minimum, 8GB or more recommended
-   - Storage: 20GB minimum, SSD preferred for database operations
-   - Network Interface: Gigabit Ethernet adapter
-
-2. **Client Hardware**
-   - Any device capable of running a modern web browser
-   - Minimum screen resolution: 1280x720 pixels
+The OxidizedOasis-WebSands system does not have any specific hardware interfaces. It is a web-based application that runs on standard web browsers and servers.
 
 ### 5.3 Software Interfaces
 
-OxidizedOasis-WebSands interacts with various software components and external systems:
+The OxidizedOasis-WebSands system interacts with various software components to provide its functionality.
 
-#### 5.3.1 Database Management System
+#### 5.3.1 Database Interface
 
-- Software: PostgreSQL
-- Version: 13 or later
-- Purpose: Persistent data storage
-- Interface Method: SQLx ORM
-- Data Exchanged: User data, session information, and other application-specific data
+The system uses a PostgreSQL database to store and manage data. The database interface is implemented using SQLx, which provides type-safe database interactions.
 
-Example connection code:
-```rust
-use sqlx::postgres::PgPoolOptions;
+**Implementation:**
 
-let pool = PgPoolOptions::new()
-    .max_connections(5)
-    .connect(&database_url)
-    .await?;
 ```
+use sqlx::FromRow;
+use uuid::Uuid;
 
-#### 5.3.2 Web Server
-
-- Software: Built-in Actix web server
-- Version: Determined by Actix-web framework version (4.3.1 or later)
-- Purpose: Serves the web application and API endpoints
-- Interface Method: Direct integration with Rust code
-- Data Exchanged: HTTP requests and responses
-
-Example server setup code:
-```rust
-use actix_web::{App, HttpServer};
-
-#[actix_web::main]
-async fn main() -> std::io::Result<()> {
-    HttpServer::new(|| {
-        App::new()
-            .service(handlers::create_user)
-            .service(handlers::login_user)
-            // ... other services
-    })
-    .bind("127.0.0.1:8080")?
-    .run()
-    .await
+#[derive(Serialize, Deserialize, FromRow)]
+pub struct User {
+    pub id: Uuid,
+    pub username: String,
+    pub password_hash: String,
+    pub email: Option<String>,
+    pub created_at: chrono::DateTime<chrono::Utc>,
+    pub updated_at: chrono::DateTime<chrono::Utc>,
 }
 ```
 
-#### 5.3.3 Frontend Framework (Future Enhancement)
+#### 5.3.2 Email Service Interface
 
-- Software: To be determined (e.g., React, Vue.js)
-- Version: To be determined
-- Purpose: Enhance user interface and experience
-- Interface Method: API calls to backend services
-- Data Exchanged: JSON payloads for user data and application state
+The system may integrate with an email service for user notifications and communication. This feature is planned for future enhancements.
 
 ### 5.4 Communication Interfaces
 
-OxidizedOasis-WebSands uses the following communication protocols and methods:
-
-#### 5.4.1 HTTP/HTTPS
-
-- Protocol: HTTP/1.1, HTTP/2
-- Port: 80 (HTTP), 443 (HTTPS)
-- Purpose: Primary communication protocol for web interface and API
-- Security: HTTPS with TLS 1.2 or later required for production environments
-
-#### 5.4.2 WebSocket (Future Enhancement)
-
-- Protocol: WebSocket (RFC 6455)
-- Port: Same as HTTP/HTTPS
-- Purpose: Real-time updates and notifications
-- Libraries: To be determined (e.g., `tokio-tungstenite` for Rust)
-
-#### 5.4.3 Database Communication
-
-- Protocol: PostgreSQL wire protocol
-- Port: 5432 (default for PostgreSQL)
-- Purpose: Communication between the application server and the database
-- Security: SSL/TLS encryption for production environments
-
-#### 5.4.4 API Communication
-
-- Protocol: RESTful API over HTTP/HTTPS
-- Data Format: JSON
-- Authentication: JWT (JSON Web Tokens)
-
-Example API request:
-```http
-POST /api/users HTTP/1.1
-Host: api.oxidizedoasis.com
-Content-Type: application/json
-Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
-
-{
-  "username": "newuser",
-  "email": "newuser@example.com",
-  "password": "securepassword123"
-}
-```
-
-Example API response:
-```http
-HTTP/1.1 201 Created
-Content-Type: application/json
-
-{
-  "id": "123e4567-e89b-12d3-a456-426614174000",
-  "username": "newuser",
-  "email": "newuser@example.com",
-  "created_at": "2023-04-01T12:00:00Z"
-}
-```
-
-### 5.5 Third-Party Integrations (Future Enhancements)
-
-While not currently implemented, the following third-party integrations are being considered for future enhancements:
-
-1. **Email Service Provider**
-   - Purpose: Sending transactional emails (e.g., account verification, password reset)
-   - Potential Options: SendGrid, Amazon SES
-   - Interface Method: REST API
-
-2. **OAuth Providers**
-   - Purpose: Allow sign-in with third-party accounts
-   - Potential Options: Google, Facebook, GitHub
-   - Interface Method: OAuth 2.0 protocol
-
-3. **Content Delivery Network (CDN)**
-   - Purpose: Serve static assets and improve global performance
-   - Potential Options: Cloudflare, Amazon CloudFront
-   - Interface Method: Origin server configuration
-
-These future integrations will be designed with modularity in mind, allowing for easy addition or replacement of services as needed.
+The OxidizedOasis-WebSands system communicates with clients using the HTTP/HTTPS protocol. It exposes a RESTful API for client applications to interact with the system.
 
 ## 6. Non-functional Requirements
 
-This section outlines the non-functional requirements for OxidizedOasis-WebSands, which define the overall qualities and characteristics of the system. These requirements are crucial for ensuring that the application not only functions correctly but also meets the expected standards of performance, security, and reliability.
-
 ### 6.1 Performance Requirements
 
-Performance is a key focus of OxidizedOasis-WebSands, leveraging Rust's capabilities for high-performance web applications.
+The OxidizedOasis-WebSands system must meet the following performance requirements:
 
-#### 6.1.1 Response Time
-
-- The system shall respond to API requests within 100ms for 95% of requests under normal load conditions.
-- Page load time for the web interface shall not exceed 2 seconds for 90% of page loads.
-
-#### 6.1.2 Throughput
-
-- The system shall be capable of handling at least 1000 concurrent users without significant degradation in performance.
-- The API shall be able to process at least 500 requests per second.
-
-#### 6.1.3 Scalability
-
-- The application architecture shall support horizontal scaling to handle increased load.
-- Database queries shall be optimized to maintain performance as the data volume grows.
-
-#### 6.1.4 Resource Utilization
-
-- The application server shall not consume more than 2GB of RAM under normal operating conditions.
-- CPU utilization shall remain below 70% during peak loads.
-
-Implementation consideration:
-```rust
-use actix_web::web::Data;
-use std::sync::Arc;
-
-// Use of Arc for efficient resource sharing
-let shared_resource = Arc::new(ExpensiveResource::new());
-
-App::new()
-    .app_data(Data::new(shared_resource.clone()))
-    // ... other app configurations
-```
+1. **Response Time**: API responses should be returned within 100ms for 95% of requests under normal load.
+2. **Concurrency**: The system should be able to handle at least 1000 concurrent users without significant performance degradation.
+3. **Scalability**: The architecture should allow for horizontal scaling by adding more application servers behind a load balancer.
 
 ### 6.2 Safety Requirements
 
-While OxidizedOasis-WebSands is not a safety-critical system, it must ensure the safety of user data and system integrity.
+The OxidizedOasis-WebSands system must meet the following safety requirements:
 
-#### 6.2.1 Data Integrity
-
-- The system shall prevent data corruption during concurrent operations.
-- All database transactions shall be atomic to ensure data consistency.
-
-#### 6.2.2 Error Handling
-
-- The system shall gracefully handle and log all errors without exposing sensitive information to end-users.
-- In case of critical errors, the system shall fail safely without corrupting or losing user data.
-
-Example error handling:
-```rust
-#[derive(Debug, Serialize)]
-struct ErrorResponse {
-    message: String,
-}
-
-impl ResponseError for CustomError {
-    fn error_response(&self) -> HttpResponse {
-        let error_response = ErrorResponse {
-            message: "An unexpected error occurred".to_string(),
-        };
-        HttpResponse::InternalServerError().json(error_response)
-    }
-}
-```
-
-#### 6.2.3 Input Validation
-
-- All user inputs shall be validated and sanitized to prevent injection attacks and data corruption.
+1. **Data Integrity**: All data stored in the database must be accurate, consistent, and reliable.
+2. **Availability**: The system must be available 99.9% of the time, with minimal downtime for maintenance or updates.
+3. **Security**: The system must implement appropriate security measures to protect user data and prevent unauthorized access.
 
 ### 6.3 Security Requirements
 
-Security is paramount for OxidizedOasis-WebSands, especially considering its role in user authentication and data management.
+The OxidizedOasis-WebSands system must meet the following security requirements:
 
-#### 6.3.1 Authentication
-
-- The system shall use JWT (JSON Web Tokens) for user authentication.
-- JWTs shall expire after 24 hours to limit the window of opportunity for token misuse.
-- Refresh tokens shall be implemented to allow for seamless re-authentication.
-
-#### 6.3.2 Authorization
-
-- The system shall implement role-based access control (RBAC) to manage user permissions.
-- All API endpoints shall require appropriate authorization checks.
-
-#### 6.3.3 Data Encryption
-
-- All passwords shall be hashed using bcrypt with a cost factor of at least 10.
-- Sensitive data in transit shall be encrypted using TLS 1.2 or higher.
-- Database connections shall use SSL/TLS encryption.
-
-Example of password hashing:
-```rust
-use bcrypt::{hash, verify, DEFAULT_COST};
-
-let password = "user_password";
-let hashed = hash(password, DEFAULT_COST)?;
-```
-
-#### 6.3.4 Protection Against Common Vulnerabilities
-
-- The system shall implement protection against OWASP Top 10 vulnerabilities.
-- Regular security audits and penetration testing shall be conducted.
-
-#### 6.3.5 Rate Limiting
-
-- API endpoints shall implement rate limiting to prevent abuse and DDoS attacks.
-
-Example rate limiting middleware:
-```rust
-use actix_web::middleware::DefaultHeaders;
-use actix_governor::{Governor, GovernorConfigBuilder};
-
-let governor_conf = GovernorConfigBuilder::default()
-    .per_second(2)
-    .burst_size(5)
-    .finish()
-    .unwrap();
-
-App::new()
-    .wrap(Governor::new(&governor_conf))
-    // ... other app configurations
-```
+1. **Authentication**: Users must be authenticated using a secure authentication mechanism (e.g., JWT).
+2. **Authorization**: Access to system resources must be controlled based on user roles and privileges.
+3. **Data Protection**: All sensitive data must be encrypted at rest and in transit.
+4. **Input Validation**: All user input must be validated to prevent injection attacks and other security vulnerabilities.
 
 ### 6.4 Software Quality Attributes
 
-#### 6.4.1 Reliability
+The OxidizedOasis-WebSands system must meet the following software quality attributes:
 
-- The system shall have an uptime of at least 99.9% (excluding planned maintenance).
-- The mean time between failures (MTBF) shall be at least 720 hours (30 days).
-
-#### 6.4.2 Availability
-
-- Planned maintenance shall not exceed 4 hours per month.
-- The system shall support rolling updates to minimize downtime during deployments.
-
-#### 6.4.3 Maintainability
-
-- The codebase shall adhere to Rust's official style guide.
-- All public functions and modules shall have comprehensive documentation.
-- The system shall use dependency injection to facilitate easier testing and component replacement.
-
-Example of documented public function:
-```rust
-/// Creates a new user in the system.
-///
-/// # Arguments
-///
-/// * `pool` - A reference to the database connection pool.
-/// * `username` - The username for the new user.
-/// * `password` - The password for the new user.
-///
-/// # Returns
-///
-/// A `Result` containing the created `User` if successful, or a `sqlx::Error` if not.
-pub async fn create_user(
-    pool: &PgPool,
-    username: &str,
-    password: &str,
-) -> Result<User, sqlx::Error> {
-    // Implementation details...
-}
-```
-
-#### 6.4.4 Portability
-
-- The system shall be deployable on major cloud platforms (AWS, Google Cloud, Azure).
-- Containerization using Docker shall be supported to ensure consistent deployment across different environments.
-
-#### 6.4.5 Usability
-
-- The web interface shall be responsive and compatible with major browsers (Chrome, Firefox, Safari, Edge).
-- The API shall provide clear and consistent error messages to facilitate easy debugging for client applications.
-
-#### 6.4.6 Testability
-
-- The system shall maintain a test coverage of at least 80% for all non-trivial code.
-- Integration tests shall be implemented for all API endpoints.
-- Property-based testing shall be used for critical components to ensure robustness.
-
-Example of a unit test:
-```rust
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[tokio::test]
-    async fn test_create_user() {
-        let pool = establish_connection().await.unwrap();
-        let username = "testuser";
-        let password = "testpassword";
-
-        let result = create_user(&pool, username, password).await;
-        assert!(result.is_ok());
-
-        let user = result.unwrap();
-        assert_eq!(user.username, username);
-    }
-}
-```
-
-These non-functional requirements provide a comprehensive set of criteria that OxidizedOasis-WebSands must meet to ensure it is a high-quality, secure, and performant system. They serve as guidelines for development, testing, and ongoing maintenance of the application.
+1. **Maintainability**: The codebase must be well-documented, modular, and easy to maintain.
+2. **Reliability**: The system must be able to recover from failures and continue operating without data loss.
+3. **Usability**: The user interface must be intuitive, responsive, and accessible.
+4. **Performance**: The system must meet the performance requirements outlined in Section 6.1.
+5. **Scalability**: The system must be able to scale horizontally to accommodate increased user load.
+6. **Testability**: The codebase must be designed to facilitate automated testing and code coverage analysis.
 
 ## 7. Implementation Details
 
-This section outlines the technical specifications, tools, and practices used in the development of OxidizedOasis-WebSands. It serves as a guide for developers working on the project and ensures consistency across the development process.
-
 ### 7.1 Programming Languages and Frameworks
 
-#### 7.1.1 Backend
+The OxidizedOasis-WebSands system is implemented using the following programming languages and frameworks:
 
-- **Language**: Rust
-   - Version: 1.68.0 or later
-   - Rationale: Rust's performance, safety, and concurrency features make it ideal for building a robust web backend.
-
-- **Web Framework**: Actix-web
-   - Version: 4.3.1
-   - Rationale: Actix-web is known for its high performance and is well-suited for building asynchronous web applications in Rust.
-
-Example of basic Actix-web setup:
-```rust
-use actix_web::{web, App, HttpServer, Responder};
-
-async fn hello() -> impl Responder {
-    "Hello, OxidizedOasis-WebSands!"
-}
-
-#[actix_web::main]
-async fn main() -> std::io::Result<()> {
-    HttpServer::new(|| {
-        App::new()
-            .route("/", web::get().to(hello))
-    })
-    .bind("127.0.0.1:8080")?
-    .run()
-    .await
-}
-```
-
-#### 7.1.2 Database Interaction
-
-- **ORM**: SQLx
-   - Version: 0.6.3
-   - Rationale: SQLx provides compile-time checked queries and async support, aligning well with Rust's safety principles.
-
-Example of SQLx query:
-```rust
-use sqlx::postgres::PgPool;
-
-async fn get_user(pool: &PgPool, user_id: i32) -> Result<User, sqlx::Error> {
-    sqlx::query_as!(
-        User,
-        "SELECT * FROM users WHERE id = $1",
-        user_id
-    )
-    .fetch_one(pool)
-    .await
-}
-```
-
-#### 7.1.3 Frontend (for demo interface)
-
-- **Languages**: HTML5, CSS3, JavaScript (ES6+)
-- **Framework**: None (vanilla JS for simplicity in the demo interface)
-   - Future consideration: Potential integration with a Rust-based frontend framework like Yew or a popular JavaScript framework like React.
+1. **Rust**: The backend is built using the Rust programming language, which provides safety, performance, and concurrency features.
+2. **Actix-web**: The Actix-web framework is used to build the HTTP server and handle incoming requests.
+3. **SQLx**: SQLx is used to interact with the PostgreSQL database and execute SQL queries.
+4. **JSON Web Tokens (JWT)**: JWTs are used for stateless authentication and authorization.
+5. **Bcrypt**: Bcrypt is used to hash and verify user passwords.
+6. **CORS**: Cross-Origin Resource Sharing is configured to control which domains can access the API.
+7. **Logging**: The `log` and `env_logger` crates are used for application logging.
+8. **Serialization**: The `serde` crate is used for data serialization and deserialization.
+9. **Environment Variables**: The `dotenv` crate is used to manage environment variables.
 
 ### 7.2 Development Tools and Environment
 
-#### 7.2.1 Integrated Development Environment (IDE)
+The OxidizedOasis-WebSands system is developed using the following tools and environment:
 
-- **Recommended IDE**: Visual Studio Code with Rust Analyzer extension
-   - Rationale: Provides excellent Rust support and integrates well with other tools in the ecosystem.
-
-#### 7.2.2 Version Control
-
-- **System**: Git
-- **Repository Hosting**: GitHub
-- **Branching Strategy**: GitHub Flow
-   - Main branch: `main`
-   - Feature branches: `feature/<feature-name>`
-   - Bugfix branches: `bugfix/<bug-description>`
-
-#### 7.2.3 Build Tool
-
-- **Tool**: Cargo (Rust's built-in package manager and build tool)
-   - Used for dependency management, building, testing, and running the application.
-
-Example `Cargo.toml`:
-```toml
-[package]
-name = "oxidizedoasis-websands"
-version = "0.1.0"
-edition = "2021"
-
-[dependencies]
-actix-web = "4.3.1"
-sqlx = { version = "0.6.3", features = ["runtime-tokio-rustls", "postgres", "uuid", "chrono"] }
-tokio = { version = "1.28", features = ["full"] }
-serde = { version = "1.0", features = ["derive"] }
-dotenv = "0.15.0"
-env_logger = "0.10.0"
-log = "0.4.17"
-```
-
-#### 7.2.4 Database Management
-
-- **DBMS**: PostgreSQL 13 or later
-- **GUI Tool**: pgAdmin 4 (for database administration and query testing)
-
-#### 7.2.5 API Testing
-
-- **Tool**: Postman
-   - Used for testing and documenting API endpoints.
-
-#### 7.2.6 Continuous Integration/Continuous Deployment (CI/CD)
-
-- **Service**: GitHub Actions
-   - Automates testing, building, and deployment processes.
-
-Example GitHub Actions workflow (`.github/workflows/ci.yml`):
-```yaml
-name: Rust CI
-
-on:
-  push:
-    branches: [ main ]
-  pull_request:
-    branches: [ main ]
-
-env:
-  CARGO_TERM_COLOR: always
-
-jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v2
-    - name: Build
-      run: cargo build --verbose
-    - name: Run tests
-      run: cargo test --verbose
-```
+1. **Cargo**: Cargo is used as the package manager and build system for Rust projects.
+2. **Git**: Git is used for version control and collaboration.
+3. **Docker**: Docker is used for containerization and deployment (planned for future enhancements).
+4. **PostgreSQL**: PostgreSQL is used as the database system.
+5. **SQLx**: SQLx is used for database migrations and schema management.
+6. **Visual Studio Code**: Visual Studio Code is used as the primary IDE for development.
+7. **Rust Analyzer**: Rust Analyzer is used as the Rust language server for Visual Studio Code.
 
 ### 7.3 Coding Standards and Best Practices
 
-#### 7.3.1 Rust Code Style
+The OxidizedOasis-WebSands system follows the following coding standards and best practices:
 
-- Follow the official Rust style guide as outlined in the Rust Book.
-- Use `rustfmt` for consistent code formatting.
-- Adhere to Rust naming conventions:
-   - `snake_case` for variables and functions
-   - `CamelCase` for types and traits
-   - `SCREAMING_SNAKE_CASE` for constants
-
-#### 7.3.2 Documentation
-
-- Use rustdoc comments (`///`) for public APIs.
-- Include examples in documentation where appropriate.
-
-Example of well-documented function:
-```rust
-/// Authenticates a user and returns a JWT if successful.
-///
-/// # Arguments
-///
-/// * `pool` - A reference to the database connection pool.
-/// * `username` - The username of the user trying to authenticate.
-/// * `password` - The password of the user trying to authenticate.
-///
-/// # Returns
-///
-/// A `Result` containing the JWT string if authentication is successful,
-/// or an `AuthError` if authentication fails.
-///
-/// # Examples
-///
-/// ```
-/// let pool = establish_connection().await?;
-/// let jwt = authenticate_user(&pool, "johndoe", "password123").await?;
-/// ```
-pub async fn authenticate_user(
-    pool: &PgPool,
-    username: &str,
-    password: &str,
-) -> Result<String, AuthError> {
-    // Implementation details...
-}
-```
-
-#### 7.3.3 Error Handling
-
-- Use Rust's `Result` type for error handling.
-- Create custom error types for different modules or concerns.
-- Provide context when propagating errors using the `?` operator.
-
-Example of custom error type:
-```rust
-use thiserror::Error;
-
-#[derive(Error, Debug)]
-pub enum AuthError {
-    #[error("Invalid credentials")]
-    InvalidCredentials,
-    #[error("Database error: {0}")]
-    DatabaseError(#[from] sqlx::Error),
-    #[error("Token creation error: {0}")]
-    TokenCreationError(#[from] jsonwebtoken::errors::Error),
-}
-```
-
-#### 7.3.4 Testing
-
-- Write unit tests for all non-trivial functions.
-- Use integration tests for testing API endpoints.
-- Aim for at least 80% code coverage.
-
-Example of a test module:
-```rust
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use tokio;
-
-    #[tokio::test]
-    async fn test_authenticate_user_valid_credentials() {
-        let pool = establish_test_connection().await;
-        let result = authenticate_user(&pool, "testuser", "correctpassword").await;
-        assert!(result.is_ok());
-    }
-
-    #[tokio::test]
-    async fn test_authenticate_user_invalid_credentials() {
-        let pool = establish_test_connection().await;
-        let result = authenticate_user(&pool, "testuser", "wrongpassword").await;
-        assert!(matches!(result, Err(AuthError::InvalidCredentials)));
-    }
-}
-```
-
-#### 7.3.5 Security Practices
-
-- Never store plain-text passwords; always use strong hashing algorithms (e.g., bcrypt).
-- Use parameterized queries to prevent SQL injection.
-- Validate and sanitize all user inputs.
-
-Example of secure password hashing:
-```rust
-use bcrypt::{hash, verify, DEFAULT_COST};
-
-pub fn hash_password(password: &str) -> Result<String, bcrypt::BcryptError> {
-    hash(password, DEFAULT_COST)
-}
-
-pub fn verify_password(password: &str, hash: &str) -> Result<bool, bcrypt::BcryptError> {
-    verify(password, hash)
-}
-```
-
-#### 7.3.6 Performance Considerations
-
-- Use asynchronous programming with `async`/`await` for I/O-bound operations.
-- Implement caching for frequently accessed, rarely changing data.
-- Use connection pooling for database connections.
-
-Example of database connection pooling:
-```rust
-use sqlx::postgres::PgPoolOptions;
-
-pub async fn establish_connection() -> Result<PgPool, sqlx::Error> {
-    let database_url = std::env::var("DATABASE_URL")
-        .expect("DATABASE_URL must be set");
-    
-    PgPoolOptions::new()
-        .max_connections(5)
-        .connect(&database_url)
-        .await
-}
-```
-
-By adhering to these implementation details, coding standards, and best practices, the OxidizedOasis-WebSands project aims to maintain a high-quality, performant, and secure codebase that is easy to understand and maintain.
+1. **Rust Style Guide**: The Rust style guide is followed for code formatting and style.
+2. **Error Handling**: Errors are handled gracefully, with appropriate error messages and logging.
+3. **Logging**: Logging is used to track system events and errors.
+4. **Documentation**: Code is well-documented using comments and docstrings.
+5. **Testing**: Unit tests are written for critical components and functions.
+6. **Code Review**: Code is reviewed by peers before merging into the main branch.
+7. **Security**: Security best practices are followed to protect user data and prevent vulnerabilities.
 
 ## 8. Testing
 
-This section outlines the testing strategies and methodologies employed in the OxidizedOasis-WebSands project to ensure software quality, reliability, and performance.
-
 ### 8.1 Test Approach
 
-The testing approach for OxidizedOasis-WebSands follows these key principles:
-
-1. **Continuous Testing**: Tests are integrated into the development process and run automatically on each code commit.
-2. **Test-Driven Development (TDD)**: Where applicable, tests are written before the implementation code.
-3. **Comprehensive Coverage**: Aim for high test coverage across all layers of the application.
-4. **Automation**: Emphasis on automated testing to ensure consistency and enable frequent execution.
+The OxidizedOasis-WebSands system follows a test-driven development approach, with a focus on writing automated tests to ensure the correctness and reliability of the system.
 
 ### 8.2 Test Categories
 
-#### 8.2.1 Unit Testing
+The following types of tests are implemented for the OxidizedOasis-WebSands system:
 
-Unit tests focus on testing individual components or functions in isolation.
-
-**Tools**:
-- Rust's built-in testing framework
-- `tokio` for asynchronous test cases
-
-**Example Unit Test**:
-
-```rust
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use tokio;
-
-    #[tokio::test]
-    async fn test_hash_password() {
-        let password = "secure_password123";
-        let hashed = hash_password(password).await.unwrap();
-        
-        assert!(verify_password(password, &hashed).await.unwrap());
-        assert!(!verify_password("wrong_password", &hashed).await.unwrap());
-    }
-}
-```
-
-#### 8.2.2 Integration Testing
-
-Integration tests verify the interaction between different components of the system.
-
-**Tools**:
-- `actix-rt` for testing Actix-based services
-- `reqwest` for HTTP client in tests
-
-**Example Integration Test**:
-
-```rust
-#[actix_rt::test]
-async fn test_user_registration() {
-    let app = test::init_service(
-        App::new()
-            .service(web::resource("/register").route(web::post().to(register_user)))
-    ).await;
-
-    let req = test::TestRequest::post()
-        .uri("/register")
-        .set_json(&json!({
-            "username": "testuser",
-            "password": "password123"
-        }))
-        .to_request();
-
-    let resp = test::call_service(&app, req).await;
-    assert_eq!(resp.status(), StatusCode::OK);
-
-    let result: Value = test::read_body_json(resp).await;
-    assert_eq!(result["username"], "testuser");
-}
-```
-
-#### 8.2.3 API Testing
-
-API tests ensure that the exposed endpoints behave correctly.
-
-**Tools**:
-- Postman for manual API testing and documentation
-- `actix-rt` for automated API testing
-
-**Example API Test**:
-
-```rust
-#[actix_rt::test]
-async fn test_login_api() {
-    let app = test::init_service(
-        App::new()
-            .service(web::resource("/login").route(web::post().to(login)))
-    ).await;
-
-    let req = test::TestRequest::post()
-        .uri("/login")
-        .set_json(&json!({
-            "username": "existinguser",
-            "password": "correctpassword"
-        }))
-        .to_request();
-
-    let resp = test::call_service(&app, req).await;
-    assert_eq!(resp.status(), StatusCode::OK);
-
-    let result: Value = test::read_body_json(resp).await;
-    assert!(result.get("token").is_some());
-}
-```
-
-#### 8.2.4 Performance Testing
-
-Performance tests evaluate the system's responsiveness and stability under various load conditions.
-
-**Tools**:
-- Apache JMeter for load testing
-- `criterion` crate for Rust micro-benchmarking
-
-**Example Performance Test Configuration (JMeter)**:
-
-```xml
-<?xml version="1.0" encoding="UTF-8"?>
-<jmeterTestPlan version="1.2" properties="5.0" jmeter="5.4.1">
-  <hashTree>
-    <TestPlan guiclass="TestPlanGui" testclass="TestPlan" testname="OxidizedOasis Load Test" enabled="true">
-      <stringProp name="TestPlan.comments"></stringProp>
-      <boolProp name="TestPlan.functional_mode">false</boolProp>
-      <boolProp name="TestPlan.tearDown_on_shutdown">true</boolProp>
-      <boolProp name="TestPlan.serialize_threadgroups">false</boolProp>
-      <elementProp name="TestPlan.user_defined_variables" elementType="Arguments" guiclass="ArgumentsPanel" testclass="Arguments" testname="User Defined Variables" enabled="true">
-        <collectionProp name="Arguments.arguments"/>
-      </elementProp>
-      <stringProp name="TestPlan.user_define_classpath"></stringProp>
-    </TestPlan>
-    <hashTree>
-      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="User Login Scenario" enabled="true">
-        <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
-        <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="Loop Controller" enabled="true">
-          <boolProp name="LoopController.continue_forever">false</boolProp>
-          <intProp name="LoopController.loops">-1</intProp>
-        </elementProp>
-        <stringProp name="ThreadGroup.num_threads">100</stringProp>
-        <stringProp name="ThreadGroup.ramp_time">10</stringProp>
-        <boolProp name="ThreadGroup.scheduler">true</boolProp>
-        <stringProp name="ThreadGroup.duration">300</stringProp>
-        <stringProp name="ThreadGroup.delay"></stringProp>
-        <boolProp name="ThreadGroup.same_user_on_next_iteration">false</boolProp>
-      </ThreadGroup>
-      <hashTree>
-        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="Login Request" enabled="true">
-          <boolProp name="HTTPSampler.postBodyRaw">true</boolProp>
-          <elementProp name="HTTPsampler.Arguments" elementType="Arguments">
-            <collectionProp name="Arguments.arguments">
-              <elementProp name="" elementType="HTTPArgument">
-                <boolProp name="HTTPArgument.always_encode">false</boolProp>
-                <stringProp name="Argument.value">{
-  "username": "${username}",
-  "password": "${password}"
-}</stringProp>
-                <stringProp name="Argument.metadata">=</stringProp>
-              </elementProp>
-            </collectionProp>
-          </elementProp>
-          <stringProp name="HTTPSampler.domain">api.oxidizedoasis.com</stringProp>
-          <stringProp name="HTTPSampler.port"></stringProp>
-          <stringProp name="HTTPSampler.protocol">https</stringProp>
-          <stringProp name="HTTPSampler.contentEncoding"></stringProp>
-          <stringProp name="HTTPSampler.path">/login</stringProp>
-          <stringProp name="HTTPSampler.method">POST</stringProp>
-          <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
-          <boolProp name="HTTPSampler.auto_redirects">false</boolProp>
-          <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
-          <boolProp name="HTTPSampler.DO_MULTIPART_POST">false</boolProp>
-          <stringProp name="HTTPSampler.embedded_url_re"></stringProp>
-          <stringProp name="HTTPSampler.connect_timeout"></stringProp>
-          <stringProp name="HTTPSampler.response_timeout"></stringProp>
-        </HTTPSamplerProxy>
-        <hashTree/>
-      </hashTree>
-    </hashTree>
-  </hashTree>
-</jmeterTestPlan>
-```
-
-#### 8.2.5 Security Testing
-
-Security tests aim to identify vulnerabilities in the system.
-
-**Tools**:
-- OWASP ZAP for automated security scanning
-- Manual penetration testing
-
-**Example Security Test (SQL Injection)**:
-
-```rust
-#[actix_rt::test]
-async fn test_sql_injection_prevention() {
-    let app = test::init_service(
-        App::new()
-            .service(web::resource("/user").route(web::get().to(get_user)))
-    ).await;
-
-    let req = test::TestRequest::get()
-        .uri("/user?id=1 OR 1=1")
-        .to_request();
-
-    let resp = test::call_service(&app, req).await;
-    assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
-}
-```
+1. **Unit Tests**: Unit tests are written for critical components and functions to ensure they behave as expected in isolation.
+2. **Integration Tests**: Integration tests are written to test the interaction between different components and ensure they work together correctly.
+3. **End-to-End Tests**: End-to-End tests are written to test the system as a whole, from the user interface to the database.
+4. **Performance Tests**: Performance tests are written to ensure the system meets the performance requirements outlined in Section 6.1.
+5. **Security Tests**: Security tests are written to ensure the system implements appropriate security measures and is resistant to common attacks.
 
 ### 8.3 Test Environment
 
-#### 8.3.1 Development Environment
+The OxidizedOasis-WebSands system is tested in the following environment:
 
-- Local development machines
-- Docker containers for consistent testing environments
-
-#### 8.3.2 Continuous Integration Environment
-
-- GitHub Actions for automated testing on each push and pull request
-
-**Example GitHub Actions Workflow**:
-
-```yaml
-name: Rust CI
-
-on:
-  push:
-    branches: [ main ]
-  pull_request:
-    branches: [ main ]
-
-env:
-  CARGO_TERM_COLOR: always
-
-jobs:
-  test:
-    runs-on: ubuntu-latest
-
-    services:
-      postgres:
-        image: postgres:13
-        env:
-          POSTGRES_PASSWORD: testpassword
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-
-    steps:
-    - uses: actions/checkout@v2
-    - name: Install latest nightly
-      uses: actions-rs/toolchain@v1
-      with:
-        toolchain: nightly
-        override: true
-        components: rustfmt, clippy
-    
-    - name: Run tests
-      run: cargo test --verbose
-      env:
-        DATABASE_URL: postgres://postgres:testpassword@localhost/postgres
-
-    - name: Run clippy
-      run: cargo clippy -- -D warnings
-
-    - name: Run rustfmt
-      run: cargo fmt -- --check
-```
-
-#### 8.3.3 Staging Environment
-
-- Cloud-based environment mimicking production
-- Used for final integration testing and performance testing before production deployment
-
-### 8.4 Test Data Management
-
-- Use of factories or fixtures to generate test data
-- Separate test database with known state for integration tests
-- Data cleanup after each test to ensure isolation
-
-### 8.5 Test Reporting
-
-- Automated test results published as part of CI/CD pipeline
-- JUnit-compatible XML output for integration with CI tools
-- Coverage reports generated using `tarpaulin`
-
-**Example tarpaulin command**:
-
-```sh
-cargo tarpaulin --out Xml
-```
-
-### 8.6 Continuous Improvement
-
-- Regular review of test results and coverage metrics
-- Updating and expanding test suite as new features are added or bugs are discovered
-- Periodic review and update of testing strategies and tools
-
-By implementing this comprehensive testing strategy, OxidizedOasis-WebSands aims to maintain high software quality, catch issues early in the development process, and ensure a robust and reliable application.
+1. **Development Environment**: Tests are run locally during development to ensure functionality and correctness.
+2. **Staging Environment**: Tests are run in a staging environment before deployment to ensure the system works correctly in a production-like environment.
+3. **Production Environment**: Tests are run in the production environment to ensure the system continues to function correctly after deployment.
 
 ## 9. Deployment
 
-This section outlines the deployment strategy for OxidizedOasis-WebSands, ensuring a smooth transition from development to production environments.
-
 ### 9.1 Deployment Architecture
 
+The OxidizedOasis-WebSands system is deployed using the following architecture:
+
+```
+[Client Applications]
+         │
+         ▼
+   [Load Balancer]
+         │
+         ▼
+[Application Servers]
+         │
+         ▼
+  [Database Server]
+```
+
+Detailed component breakdown:
+
+1. **Frontend Layer**:
+   - Static HTML, CSS, and JavaScript files
+   - Communicates with the backend via RESTful API calls
+
+2. **Application Layer**:
+   - Rust-based backend using Actix-web framework
+   - Handles HTTP requests, business logic, and database interactions
+   - Components:
+      - HTTP Server (Actix-web)
+      - Routing Module
+      - Authentication Middleware
+      - Request Handlers
+      - Business Logic Services
+      - Data Access Layer (using SQLx)
+
+3. **Database Layer**:
+   - PostgreSQL database for persistent data storage
+   - Stores user information, authentication data, and other application-specific data
+
+4. **External Services**:
+   - Potential integration points for future enhancements (e.g., email services, analytics)
+
+### 9.2 Deployment Process
+
+The deployment process for the OxidizedOasis-WebSands system is as follows:
+
+1. **Build**: The Rust code is built using Cargo, generating an executable binary.
+2. **Containerization**: The executable binary is containerized using Docker, creating a Docker image.
+3. **Deployment**: The Docker image is deployed to a container orchestration platform (e.g., Kubernetes, Docker Swarm) or a cloud provider (e.g., AWS, Azure, Google Cloud).
 OxidizedOasis-WebSands follows a containerized microservices architecture for deployment, utilizing Docker and Kubernetes for orchestration.
 
 #### 9.1.1 High-Level Architecture
