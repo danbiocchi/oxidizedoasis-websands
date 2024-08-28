@@ -140,7 +140,14 @@
         isSignUp = !isSignUp;
         authTitle.textContent = isSignUp ? 'Sign Up' : 'Log In';
         switchAuth.textContent = isSignUp ? 'Log in' : 'Sign up';
-        authForm.email.style.display = isSignUp ? 'block' : 'none';
+        const emailInput = authForm.email;
+        if (isSignUp) {
+            emailInput.style.display = 'block';
+            emailInput.required = true;
+        } else {
+            emailInput.style.display = 'none';
+            emailInput.required = false;
+        }
         authForm.querySelector('button').textContent = isSignUp ? 'Sign Up' : 'Log In';
     });
 
@@ -148,7 +155,7 @@
         e.preventDefault();
         const username = authForm.username.value;
         const password = authForm.password.value;
-        const email = authForm.email.value;
+        const email = isSignUp ? authForm.email.value : undefined;
 
         const endpoint = isSignUp ? '/users/register' : '/users/login';
         const data = isSignUp ? { username, email, password } : { username, password };
@@ -177,6 +184,13 @@
                     responseDiv.textContent = `User created successfully. Please check your email to verify your account.`;
                 } else {
                     localStorage.setItem('token', result.token);
+                    localStorage.setItem('userId', result.user.id);
+                    localStorage.setItem('username', result.user.username);
+                    console.log('Stored user data:', {
+                        token: result.token,
+                        userId: result.user.id,
+                        username: result.user.username
+                    });
                     window.location.href = '/dashboard.html';
                 }
             } else {

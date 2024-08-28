@@ -46,6 +46,7 @@
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
             gap: 1rem;
+            margin-bottom: 2rem; /* Add space below the grid */
         }
 
         .card {
@@ -59,6 +60,10 @@
         .card:hover {
             transform: translateY(-5px);
             box-shadow: 0 6px 8px rgba(0, 0, 0, 0.15);
+        }
+
+        .session-timer {
+            margin-top: 2rem; /* Add space above the session timer */
         }
 
         button {
@@ -82,6 +87,15 @@
             border-radius: 5px;
             resize: vertical;
         }
+
+        .error-message {
+            background-color: #f8d7da;
+            color: #721c24;
+            padding: 10px;
+            margin-bottom: 15px;
+            border: 1px solid #f5c6cb;
+            border-radius: 4px;
+        }
     </style>
 </head>
 <body>
@@ -95,6 +109,10 @@
             <h2>User Information</h2>
             <p><strong>Username:</strong> <span id="username"></span></p>
             <p><strong>User ID:</strong> <span id="userId"></span></p>
+            <p><strong>Email:</strong> <span id="userEmail"></span></p>
+            <p><strong>Email Verified:</strong> <span id="emailVerified"></span></p>
+            <p><strong>Account Created:</strong> <span id="accountCreated"></span></p>
+            <button id="refreshUserInfo">Refresh User Info</button>
         </div>
         <div class="card">
             <h2>Quick Notepad</h2>
@@ -103,17 +121,16 @@
             <button id="saveNotes">Save Notes</button>
         </div>
     </div>
-    <div class="card">
+    <div class="card session-timer">
         <h2>Session Timer</h2>
         <p>Time elapsed: <span id="timer">00:00:00</span></p>
     </div>
 </div>
 
 <script>
-    // Add this function at the beginning of your script
     function fetchWithAuth(url, options = {}) {
         const token = localStorage.getItem('token');
-        console.log('Token being sent:', token); // Add this line
+        console.log('Token being sent:', token);
         return fetch(url, {
             ...options,
             headers: {
@@ -125,16 +142,21 @@
 
     // Check if user is authenticated
     const token = localStorage.getItem('token');
-    if (!token) {
-        console.log('No token found, redirecting to login'); // Add this line
+    const userId = localStorage.getItem('userId');
+    const username = localStorage.getItem('username');
+    
+    console.log('Stored user data:', { token, userId, username });
+
+    if (!token || !userId) {
+        console.log('No token or userId found, redirecting to login');
         window.location.href = '/index.html';
     } else {
-        console.log('Token found:', token); // Add this line
+        console.log('Token and userId found');
     }
 
     // Populate user information
-    document.getElementById('username').textContent = localStorage.getItem('username');
-    document.getElementById('userId').textContent = localStorage.getItem('userId');
+    document.getElementById('username').textContent = username || 'Unknown';
+    document.getElementById('userId').textContent = userId || 'Unknown';
 
     // Logout functionality
     document.getElementById('logout').addEventListener('click', () => {
@@ -167,41 +189,55 @@
         alert('Notes saved successfully!');
     });
 
-    // Use this function for all your API calls
-    // For example:
-    fetchWithAuth('http://localhost:8080/api/some-endpoint')
-        .then(response => {
-            console.log('Response status:', response.status); // Add this line
-            return response.json();
-        })
-        .then(data => {
-            console.log('Response data:', data); // Add this line
-        })
-        .catch(error => console.error('Error:', error));
+    // Function to show error message
+    function showError(message) {
+        const errorDiv = document.createElement('div');
+        errorDiv.className = 'error-message';
+        errorDiv.textContent = message;
+        document.querySelector('.container').prepend(errorDiv);
+        setTimeout(() => errorDiv.remove(), 5000);  // Remove after 5 seconds
+    }
 
-    // Add this function to test the API
+    // Function to test the API and update user information
     function testAPI() {
         console.log('Testing API...');
-        fetchWithAuth('http://localhost:8080/api/users/' + localStorage.getItem('userId'))
+        if (!userId) {
+            console.error('User ID not found in localStorage');
+            return;
+        }
+        console.log('Fetching user data for ID:', userId);
+        fetchWithAuth(`http://localhost:8080/api/users/${userId}`)
             .then(response => {
                 console.log('Response status:', response.status);
-                console.log('Response headers:', response.headers);
-                return response.text();
+                console.log('Response headers:', Object.fromEntries(response.headers));
+                return response.json();
             })
-            .then(text => {
-                console.log('Response text:', text);
-                try {
-                    const data = JSON.parse(text);
-                    console.log('Parsed response data:', data);
-                } catch (e) {
-                    console.log('Failed to parse response as JSON');
+            .then(data => {
+                console.log('Parsed response data:', data);
+                // Update user information on the page
+                document.getElementById('username').textContent = data.username;
+                document.getElementById('userId').textContent = data.id;
+                document.getElementById('userEmail').textContent = data.email;
+                document.getElementById('emailVerified').textContent = data.is_email_verified ? 'Yes' : 'No';
+                document.getElementById('accountCreated').textContent = new Date(data.created_at).toLocaleString();
+            })
+            .catch(error => {
+                console.error('Fetch error:', error);
+                showError('Failed to fetch user data. Please try again later.');
+                if (error.message.includes('401')) {
+                    localStorage.removeItem('token');
+                    localStorage.removeItem('userId');
+                    localStorage.removeItem('username');
+                    window.location.href = '/index.html';
                 }
-            })
-            .catch(error => console.error('Error:', error));
+            });
     }
 
     // Call the testAPI function when the page loads
     window.addEventListener('load', testAPI);
+
+    // Add event listener for refresh button
+    document.getElementById('refreshUserInfo').addEventListener('click', testAPI);
 </script>
 </body>
 </html>

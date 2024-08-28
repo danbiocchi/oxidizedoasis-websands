@@ -6,6 +6,7 @@ use actix_files as fs;
 use actix_cors::Cors;
 use actix_web_httpauth::middleware::HttpAuthentication;
 use env_logger::Env;
+use serde_json;
 
 mod handlers;
 mod models;
@@ -72,7 +73,10 @@ async fn main() -> std::io::Result<()> {
             .service(fs::Files::new("/", "./static").index_file("index.html"))
             .default_service(web::route().to(|req: actix_web::HttpRequest| async move {
                 error!("Unhandled request: {:?}", req);
-                HttpResponse::NotFound().content_type("text/html").body("<html><body><h1>404 Not Found</h1><p>The requested resource could not be found.</p></body></html>")
+                HttpResponse::NotFound().json(serde_json::json!({
+                    "error": "Not Found",
+                    "message": "The requested resource could not be found."
+                }))
             }))
     })
         .bind(server_addr)?

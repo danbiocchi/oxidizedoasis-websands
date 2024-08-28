@@ -260,25 +260,38 @@ pub async fn verify_email(
 ///     "is_email_verified": true,
 ///     "created_at": "2023-04-19T10:30:00Z"
 /// }
-#[get("/{id}")]
+#[get("/users/{id}")]
 pub async fn get_user(pool: web::Data<PgPool>, id: web::Path<Uuid>, _: BearerAuth) -> impl Responder {
+    let user_id = id.into_inner();
+    info!("Attempting to fetch user with ID: {}", user_id);
+    
     let result = sqlx::query_as!(
         User,
         "SELECT * FROM users WHERE id = $1",
-        id.into_inner()
+        user_id
     )
-        .fetch_optional(pool.get_ref())
-        .await;
+    .fetch_optional(pool.get_ref())
+    .await;
 
     match result {
         Ok(Some(user)) => {
+            info!("User found: {:?}", user);
             let user_response: UserResponse = user.into();
             HttpResponse::Ok().json(user_response)
         },
-        Ok(None) => HttpResponse::NotFound().json("User not found"),
+        Ok(None) => {
+            warn!("User not found for ID: {}", user_id);
+            HttpResponse::NotFound().json(serde_json::json!({
+                "error": "Not Found",
+                "message": "User not found"
+            }))
+        },
         Err(e) => {
             error!("Failed to get user: {:?}", e);
-            HttpResponse::InternalServerError().json("Failed to get user")
+            HttpResponse::InternalServerError().json(serde_json::json!({
+                "error": "Internal Server Error",
+                "message": "Failed to get user"
+            }))
         }
     }
 }
