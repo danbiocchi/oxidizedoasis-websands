@@ -11,18 +11,20 @@ use actix_web_httpauth::extractors::bearer::BearerAuth;
 use serde::Deserialize;
 use std::convert::TryFrom;
 
+/// Struct to represent the token query parameter
 #[derive(Deserialize)]
 pub struct TokenQuery {
     token: String,
 }
 
 impl TokenQuery {
-    // Getter method for token
+    /// Getter method for token
     pub fn token(&self) -> &str {
         &self.token
     }
 }
 
+/// Implementation of TryFrom for TokenQuery to validate the token format
 impl TryFrom<web::Query<TokenQuery>> for TokenQuery {
     type Error = actix_web::Error;
 
@@ -35,6 +37,27 @@ impl TryFrom<web::Query<TokenQuery>> for TokenQuery {
     }
 }
 
+/// Handler for user registration
+///
+/// # API Example
+/// POST /users/register
+/// Content-Type: application/json
+///
+/// {
+///     "username": "newuser",
+///     "email": "newuser@example.com",
+///     "password": "securepassword123"
+/// }
+///
+/// # Response
+/// 201 Created
+/// {
+///     "id": "123e4567-e89b-12d3-a456-426614174000",
+///     "username": "newuser",
+///     "email": "newuser@example.com",
+///     "is_email_verified": false,
+///     "created_at": "2023-04-20T12:00:00Z"
+/// }
 pub async fn create_user(pool: web::Data<PgPool>, user: web::Json<CreateUser>) -> impl Responder {
     debug!("Received create_user request at /users/register");
     info!("Attempting to create user: {:?}", user);
@@ -42,6 +65,7 @@ pub async fn create_user(pool: web::Data<PgPool>, user: web::Json<CreateUser>) -
     // Log the raw request
     debug!("Raw request: {:?}", &user);
 
+    // Hash the password
     let password_hash = match hash(user.password.as_bytes(), DEFAULT_COST) {
         Ok(hash) => hash,
         Err(e) => {
@@ -50,9 +74,11 @@ pub async fn create_user(pool: web::Data<PgPool>, user: web::Json<CreateUser>) -
         }
     };
 
+    // Generate verification token and expiration
     let verification_token = generate_verification_token();
     let verification_token_expires_at = Utc::now() + Duration::hours(24);
 
+    // Insert new user into the database
     let result = sqlx::query_as!(
         User,
         r#"INSERT INTO users (id, username, email, password_hash, is_email_verified, verification_token, verification_token_expires_at)
@@ -71,6 +97,7 @@ pub async fn create_user(pool: web::Data<PgPool>, user: web::Json<CreateUser>) -
 
     match result {
         Ok(user) => {
+            // Send verification email
             let email_service = EmailService::new();
             match email_service.send_verification_email(user.email.as_deref().unwrap_or_default(), &verification_token) {
                 Ok(_) => {
@@ -91,7 +118,32 @@ pub async fn create_user(pool: web::Data<PgPool>, user: web::Json<CreateUser>) -
     }
 }
 
+/// Handler for user login
+///
+/// # API Example
+/// POST /users/login
+/// Content-Type: application/json
+///
+/// {
+///     "username": "existinguser",
+///     "password": "correctpassword123"
+/// }
+///
+/// # Response
+/// 200 OK
+/// {
+///     "message": "Login successful",
+///     "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+///     "user": {
+///         "id": "123e4567-e89b-12d3-a456-426614174000",
+///         "username": "existinguser",
+///         "email": "existinguser@example.com",
+///         "is_email_verified": true,
+///         "created_at": "2023-04-19T10:30:00Z"
+///     }
+/// }
 pub async fn login_user(pool: web::Data<PgPool>, user: web::Json<LoginUser>) -> impl Responder {
+    // Fetch user from database
     let user_result = sqlx::query_as!(
         User,
         "SELECT * FROM users WHERE username = $1",
@@ -102,12 +154,15 @@ pub async fn login_user(pool: web::Data<PgPool>, user: web::Json<LoginUser>) -> 
 
     match user_result {
         Ok(Some(db_user)) => {
+            // Check if email is verified
             if !db_user.is_email_verified {
                 return HttpResponse::Unauthorized().json("Email not verified");
             }
 
+            // Verify password
             match verify(&user.password, &db_user.password_hash) {
                 Ok(true) => {
+                    // Generate JWT token
                     let jwt_secret = std::env::var("JWT_SECRET").expect("JWT_SECRET must be set");
                     match auth::create_jwt(db_user.id, &jwt_secret) {
                         Ok(token) => {
@@ -139,6 +194,14 @@ pub async fn login_user(pool: web::Data<PgPool>, user: web::Json<LoginUser>) -> 
     }
 }
 
+/// Handler for email verification
+///
+/// # API Example
+/// GET /users/verify?token=abcdef1234567890abcdef1234567890
+///
+/// # Response
+/// 302 Found
+/// Location: /email_verified.html
 pub async fn verify_email(
     pool: web::Data<PgPool>,
     token_query: web::Query<TokenQuery>,
@@ -147,6 +210,7 @@ pub async fn verify_email(
 
     debug!("Received email verification request with token: {}", token.token());
 
+    // Update user's email verification status
     let result = sqlx::query!(
         r#"
         UPDATE users
@@ -181,6 +245,21 @@ pub async fn verify_email(
     }
 }
 
+/// Handler for getting user information
+///
+/// # API Example
+/// GET /api/users/123e4567-e89b-12d3-a456-426614174000
+/// Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+///
+/// # Response
+/// 200 OK
+/// {
+///     "id": "123e4567-e89b-12d3-a456-426614174000",
+///     "username": "existinguser",
+///     "email": "existinguser@example.com",
+///     "is_email_verified": true,
+///     "created_at": "2023-04-19T10:30:00Z"
+/// }
 #[get("/{id}")]
 pub async fn get_user(pool: web::Data<PgPool>, id: web::Path<Uuid>, _: BearerAuth) -> impl Responder {
     let result = sqlx::query_as!(
@@ -204,6 +283,27 @@ pub async fn get_user(pool: web::Data<PgPool>, id: web::Path<Uuid>, _: BearerAut
     }
 }
 
+/// Handler for updating user information
+///
+/// # API Example
+/// PUT /api/users/123e4567-e89b-12d3-a456-426614174000
+/// Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+/// Content-Type: application/json
+///
+/// {
+///     "username": "updatedusername",
+///     "password": "newpassword123"
+/// }
+///
+/// # Response
+/// 200 OK
+/// {
+///     "id": "123e4567-e89b-12d3-a456-426614174000",
+///     "username": "updatedusername",
+///     "email": "existinguser@example.com",
+///     "is_email_verified": true,
+///     "created_at": "2023-04-19T10:30:00Z"
+/// }
 #[put("/{id}")]
 pub async fn update_user(
     pool: web::Data<PgPool>,
@@ -257,6 +357,14 @@ pub async fn update_user(
     }
 }
 
+/// Handler for deleting a user
+///
+/// # API Example
+/// DELETE /api/users/123e4567-e89b-12d3-a456-426614174000
+/// Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+///
+/// # Response
+/// 204 No Content
 #[delete("/{id}")]
 pub async fn delete_user(pool: web::Data<PgPool>, id: web::Path<Uuid>, _: BearerAuth) -> impl Responder {
     let result = sqlx::query!("DELETE FROM users WHERE id = $1", id.into_inner())
@@ -273,6 +381,7 @@ pub async fn delete_user(pool: web::Data<PgPool>, id: web::Path<Uuid>, _: Bearer
     }
 }
 
+/// Generate a random verification token
 fn generate_verification_token() -> String {
     use rand::Rng;
     let mut rng = rand::thread_rng();

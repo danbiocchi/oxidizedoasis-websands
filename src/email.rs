@@ -3,6 +3,7 @@ use lettre::{Message, SmtpTransport, Transport};
 use lettre::message::header::ContentType;
 use log::error;
 
+/// Struct to handle email-related operations
 pub struct EmailService {
     smtp_username: String,
     smtp_password: String,
@@ -11,6 +12,7 @@ pub struct EmailService {
 }
 
 impl EmailService {
+    /// Create a new EmailService instance
     pub fn new() -> Self {
         EmailService {
             smtp_username: std::env::var("SMTP_USERNAME").expect("SMTP_USERNAME must be set"),
@@ -20,6 +22,14 @@ impl EmailService {
         }
     }
 
+    /// Send a verification email to the user
+    ///
+    /// # Arguments
+    /// * `to_email` - The recipient's email address
+    /// * `verification_token` - The verification token to be included in the email
+    ///
+    /// # Returns
+    /// * `Result<(), Box<dyn std::error::Error>>` - Ok if email sent successfully, Err otherwise
     pub fn send_verification_email(&self, to_email: &str, verification_token: &str) -> Result<(), Box<dyn std::error::Error>> {
         let email_body = format!(
             r#"

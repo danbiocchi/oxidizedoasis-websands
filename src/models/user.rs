@@ -3,6 +3,7 @@ use sqlx::FromRow;
 use uuid::Uuid;
 use chrono::{DateTime, Utc};
 
+/// Represents a user in the database
 #[derive(Debug, Serialize, Deserialize, FromRow)]
 pub struct User {
     pub id: Uuid,
@@ -16,6 +17,7 @@ pub struct User {
     pub updated_at: Option<DateTime<Utc>>,
 }
 
+/// Represents the data required to create a new user
 #[derive(Deserialize, Debug)]
 pub struct CreateUser {
     pub username: String,
@@ -23,18 +25,21 @@ pub struct CreateUser {
     pub password: String,
 }
 
+/// Represents the data required for user login
 #[derive(Deserialize)]
 pub struct LoginUser {
     pub username: String,
     pub password: String,
 }
 
+/// Represents the data that can be updated for a user
 #[derive(Deserialize)]
 pub struct UpdateUser {
     pub username: Option<String>,
     pub password: Option<String>,
 }
 
+/// Represents the user data that is safe to send in API responses
 #[derive(Serialize)]
 pub struct UserResponse {
     pub id: Uuid,
