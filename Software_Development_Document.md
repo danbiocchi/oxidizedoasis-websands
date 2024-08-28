@@ -1874,9 +1874,10 @@ This section provides supplementary information and references to support the ma
 
 ### 12.3 Change Log
 
-| Version | Date       | Description of Changes | Author |
-|---------|------------|------------------------|--------|
-| 1.0 | 2024-08-26 | Initial release of the Software Development Document | Daniel |
+| Version | Date       | Description of Changes                               | Author |
+|---------|------------|------------------------------------------------------|--------|
+| 1.0     | 2024-08-26 | Initial release of the Software Development Document | Daniel |
+| 1.1     | 2024-08-28 | Added implementation for email verification          | Daniel |
 
 ### 12.4 Document Approval
 
