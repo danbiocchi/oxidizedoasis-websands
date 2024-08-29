@@ -7,12 +7,14 @@ use actix_cors::Cors;
 use actix_web_httpauth::middleware::HttpAuthentication;
 use env_logger::Env;
 use serde_json;
+use actix_governor::{Governor, GovernorConfigBuilder};
 
 mod handlers;
 mod models;
 mod auth;
 mod email;
 mod middleware;
+mod validation;
 
 /// Main function to start the OxidizedOasis-WebSands application
 #[actix_web::main]
@@ -42,6 +44,13 @@ async fn main() -> std::io::Result<()> {
 
     debug!("Server will be listening on: {}", server_addr);
 
+    // Configure rate limiting
+    let governor_conf = GovernorConfigBuilder::default()
+        .per_second(2) // Allow 2 requests per second
+        .burst_size(5) // Allow a burst of 5 requests
+        .finish()
+        .unwrap();
+
     // Start HTTP server
     HttpServer::new(move || {
         debug!("Configuring HTTP server");
@@ -59,6 +68,7 @@ async fn main() -> std::io::Result<()> {
             .wrap(actix_web::middleware::Logger::default())
             .service(
                 web::scope("/users")
+                    .wrap(Governor::new(&governor_conf))
                     .route("/register", web::post().to(handlers::user::create_user))
                     .route("/login", web::post().to(handlers::user::login_user))
                     .route("/verify", web::get().to(handlers::user::verify_email))
@@ -70,6 +80,7 @@ async fn main() -> std::io::Result<()> {
                     .service(handlers::user::update_user)
                     .service(handlers::user::delete_user)
             )
+            .service(fs::Files::new("/css", "./static/css").show_files_listing())
             .service(fs::Files::new("/", "./static").index_file("index.html"))
             .default_service(web::route().to(|req: actix_web::HttpRequest| async move {
                 error!("Unhandled request: {:?}", req);
@@ -79,7 +90,7 @@ async fn main() -> std::io::Result<()> {
                 }))
             }))
     })
-        .bind(server_addr)?
-        .run()
-        .await
+    .bind(server_addr)?
+    .run()
+    .await
 }

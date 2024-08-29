@@ -1,6 +1,6 @@
 use actix_web::{web, HttpResponse, Responder, get, put, delete};
 use sqlx::PgPool;
-use crate::models::user::{User, UserResponse, CreateUser, LoginUser, UpdateUser};
+use crate::models::user::{User, UserResponse};
 use crate::email::EmailService;
 use bcrypt::{hash, verify, DEFAULT_COST};
 use uuid::Uuid;
@@ -10,6 +10,7 @@ use crate::auth;
 use actix_web_httpauth::extractors::bearer::BearerAuth;
 use serde::Deserialize;
 use std::convert::TryFrom;
+use crate::validation::{UserInput, LoginInput, validate_and_sanitize_user_input, validate_and_sanitize_login_input, sanitize_input};
 
 /// Struct to represent the token query parameter
 #[derive(Deserialize)]
@@ -58,62 +59,78 @@ impl TryFrom<web::Query<TokenQuery>> for TokenQuery {
 ///     "is_email_verified": false,
 ///     "created_at": "2023-04-20T12:00:00Z"
 /// }
-pub async fn create_user(pool: web::Data<PgPool>, user: web::Json<CreateUser>) -> impl Responder {
-    debug!("Received create_user request at /users/register");
-    info!("Attempting to create user: {:?}", user);
+pub async fn create_user(pool: web::Data<PgPool>, user: web::Json<UserInput>) -> impl Responder {
+    match validate_and_sanitize_user_input(user.into_inner()) {
+        Ok(validated_user) => {
+            debug!("Received create_user request at /users/register");
+            info!("Attempting to create user: {:?}", validated_user);
 
-    // Log the raw request
-    debug!("Raw request: {:?}", &user);
+            // Hash the password
+            let password_hash = match validated_user.password {
+                Some(password) => match hash(&password, DEFAULT_COST) {
+                    Ok(hash) => hash,
+                    Err(e) => {
+                        error!("Failed to hash password: {:?}", e);
+                        return HttpResponse::InternalServerError().json("Failed to create user");
+                    }
+                },
+                None => return HttpResponse::BadRequest().json("Password is required for user creation"),
+            };
 
-    // Hash the password
-    let password_hash = match hash(user.password.as_bytes(), DEFAULT_COST) {
-        Ok(hash) => hash,
-        Err(e) => {
-            error!("Failed to hash password: {:?}", e);
-            return HttpResponse::InternalServerError().json("Failed to create user");
-        }
-    };
+            // Generate verification token and expiration
+            let verification_token = generate_verification_token();
+            let verification_token_expires_at = Utc::now() + Duration::hours(24);
 
-    // Generate verification token and expiration
-    let verification_token = generate_verification_token();
-    let verification_token_expires_at = Utc::now() + Duration::hours(24);
+            // Get current timestamp for created_at and updated_at
+            let now = Utc::now();
 
-    // Insert new user into the database
-    let result = sqlx::query_as!(
-        User,
-        r#"INSERT INTO users (id, username, email, password_hash, is_email_verified, verification_token, verification_token_expires_at)
-        VALUES ($1, $2, $3, $4, $5, $6, $7)
-        RETURNING *"#,
-        Uuid::new_v4(),
-        user.username,
-        user.email,
-        password_hash,
-        false,
-        verification_token,
-        verification_token_expires_at
-    )
-        .fetch_one(pool.get_ref())
-        .await;
+            // Insert new user into the database
+            let result = sqlx::query_as!(
+                User,
+                r#"INSERT INTO users (id, username, email, password_hash, is_email_verified, verification_token, verification_token_expires_at, created_at, updated_at)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+                RETURNING *"#,
+                Uuid::new_v4(),
+                validated_user.username,
+                validated_user.email,
+                password_hash,
+                false,
+                verification_token,
+                verification_token_expires_at,
+                now,
+                now
+            )
+            .fetch_one(pool.get_ref())
+            .await;
 
-    match result {
-        Ok(user) => {
-            // Send verification email
-            let email_service = EmailService::new();
-            match email_service.send_verification_email(user.email.as_deref().unwrap_or_default(), &verification_token) {
-                Ok(_) => {
-                    info!("Verification email sent to: {}", user.email.as_deref().unwrap_or_default());
-                    let user_response: UserResponse = user.into();
-                    HttpResponse::Created().json(user_response)
+            match result {
+                Ok(user) => {
+                    // Send verification email
+                    let email_service = EmailService::new();
+                    match email_service.send_verification_email(user.email.as_deref().unwrap_or_default(), &verification_token) {
+                        Ok(_) => {
+                            info!("Verification email sent to: {}", user.email.as_deref().unwrap_or_default());
+                            let user_response: UserResponse = user.into();
+                            HttpResponse::Created().json(serde_json::json!({
+                                "message": "User created successfully",
+                                "email": user_response.email,
+                                "user": user_response
+                            }))
+                        },
+                        Err(e) => {
+                            error!("Failed to send verification email: {:?}", e);
+                            HttpResponse::InternalServerError().json("User created but failed to send verification email")
+                        }
+                    }
                 },
                 Err(e) => {
-                    error!("Failed to send verification email: {:?}", e);
-                    HttpResponse::InternalServerError().json("User created but failed to send verification email")
+                    error!("Failed to create user: {:?}", e);
+                    HttpResponse::InternalServerError().json(format!("Failed to create user: {:?}", e))
                 }
             }
         },
-        Err(e) => {
-            error!("Failed to create user: {:?}", e);
-            HttpResponse::InternalServerError().json(format!("Failed to create user: {:?}", e))
+        Err(errors) => {
+            HttpResponse::BadRequest().json(errors.into_iter().map(|e| e.to_string()).collect::<Vec<String>>())
         }
     }
 }
@@ -142,12 +159,17 @@ pub async fn create_user(pool: web::Data<PgPool>, user: web::Json<CreateUser>) -
 ///         "created_at": "2023-04-19T10:30:00Z"
 ///     }
 /// }
-pub async fn login_user(pool: web::Data<PgPool>, user: web::Json<LoginUser>) -> impl Responder {
+pub async fn login_user(pool: web::Data<PgPool>, user: web::Json<LoginInput>) -> impl Responder {
+    let validated_user = match validate_and_sanitize_login_input(user.into_inner()) {
+        Ok(user) => user,
+        Err(errors) => return HttpResponse::BadRequest().json(errors.into_iter().map(|e| e.to_string()).collect::<Vec<String>>()),
+    };
+
     // Fetch user from database
     let user_result = sqlx::query_as!(
         User,
         "SELECT * FROM users WHERE username = $1",
-        user.username
+        validated_user.username
     )
         .fetch_optional(pool.get_ref())
         .await;
@@ -156,11 +178,14 @@ pub async fn login_user(pool: web::Data<PgPool>, user: web::Json<LoginUser>) -> 
         Ok(Some(db_user)) => {
             // Check if email is verified
             if !db_user.is_email_verified {
-                return HttpResponse::Unauthorized().json("Email not verified");
+                return HttpResponse::Unauthorized().json(serde_json::json!({
+                    "message": "Email has not been verified yet. Please check your email for the verification link.",
+                    "error_type": "email_not_verified"
+                }));
             }
 
             // Verify password
-            match verify(&user.password, &db_user.password_hash) {
+            match verify(&validated_user.password, &db_user.password_hash) {
                 Ok(true) => {
                     // Generate JWT token
                     let jwt_secret = std::env::var("JWT_SECRET").expect("JWT_SECRET must be set");
@@ -207,8 +232,9 @@ pub async fn verify_email(
     token_query: web::Query<TokenQuery>,
 ) -> Result<impl Responder, actix_web::Error> {
     let token = TokenQuery::try_from(token_query)?;
+    let sanitized_token = sanitize_input(token.token());
 
-    debug!("Received email verification request with token: {}", token.token());
+    debug!("Received email verification request with token: {}", sanitized_token);
 
     // Update user's email verification status
     let result = sqlx::query!(
@@ -218,7 +244,7 @@ pub async fn verify_email(
         WHERE verification_token = $1 AND verification_token_expires_at > CURRENT_TIMESTAMP
         RETURNING id
         "#,
-        token.token()
+        sanitized_token
     )
         .fetch_optional(pool.get_ref())
         .await;
@@ -317,35 +343,40 @@ pub async fn get_user(pool: web::Data<PgPool>, id: web::Path<Uuid>, _: BearerAut
 ///     "is_email_verified": true,
 ///     "created_at": "2023-04-19T10:30:00Z"
 /// }
-#[put("/{id}")]
+#[put("/users/{id}")]
 pub async fn update_user(
     pool: web::Data<PgPool>,
     id: web::Path<Uuid>,
-    user: web::Json<UpdateUser>,
+    user: web::Json<UserInput>,
     _: BearerAuth
 ) -> impl Responder {
+    let validated_user = match validate_and_sanitize_user_input(user.into_inner()) {
+        Ok(user) => user,
+        Err(errors) => return HttpResponse::BadRequest().json(errors.into_iter().map(|e| e.to_string()).collect::<Vec<String>>()),
+    };
+
     let current_user = sqlx::query_as!(User, "SELECT * FROM users WHERE id = $1", id.into_inner())
         .fetch_optional(pool.get_ref())
         .await;
 
     match current_user {
         Ok(Some(current_user)) => {
-            let new_username = user.username.as_ref().unwrap_or(&current_user.username);
-            let new_password_hash = match &user.password {
-                Some(new_password) => hash(new_password.as_bytes(), DEFAULT_COST).unwrap(),
-                None => current_user.password_hash,
+            let new_username = validated_user.username;
+            let new_password_hash = match validated_user.password {
+                Some(password) => hash(&password, DEFAULT_COST).unwrap(),
+                None => current_user.password_hash,  // Keep the existing password if not provided
             };
-
             let result = sqlx::query_as!(
                 User,
                 r#"
                 UPDATE users
-                SET username = $1, password_hash = $2
-                WHERE id = $3
+                SET username = $1, password_hash = $2, email = $3
+                WHERE id = $4
                 RETURNING *
                 "#,
                 new_username,
                 new_password_hash,
+                validated_user.email,
                 current_user.id
             )
                 .fetch_one(pool.get_ref())
@@ -378,7 +409,7 @@ pub async fn update_user(
 ///
 /// # Response
 /// 204 No Content
-#[delete("/{id}")]
+#[delete("/users/{id}")]
 pub async fn delete_user(pool: web::Data<PgPool>, id: web::Path<Uuid>, _: BearerAuth) -> impl Responder {
     let result = sqlx::query!("DELETE FROM users WHERE id = $1", id.into_inner())
         .execute(pool.get_ref())

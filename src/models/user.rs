@@ -13,30 +13,8 @@ pub struct User {
     pub is_email_verified: bool,
     pub verification_token: Option<String>,
     pub verification_token_expires_at: Option<DateTime<Utc>>,
-    pub created_at: Option<DateTime<Utc>>,
-    pub updated_at: Option<DateTime<Utc>>,
-}
-
-/// Represents the data required to create a new user
-#[derive(Deserialize, Debug)]
-pub struct CreateUser {
-    pub username: String,
-    pub email: String,
-    pub password: String,
-}
-
-/// Represents the data required for user login
-#[derive(Deserialize)]
-pub struct LoginUser {
-    pub username: String,
-    pub password: String,
-}
-
-/// Represents the data that can be updated for a user
-#[derive(Deserialize)]
-pub struct UpdateUser {
-    pub username: Option<String>,
-    pub password: Option<String>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
 }
 
 /// Represents the user data that is safe to send in API responses
@@ -46,7 +24,7 @@ pub struct UserResponse {
     pub username: String,
     pub email: Option<String>,
     pub is_email_verified: bool,
-    pub created_at: Option<DateTime<Utc>>,
+    pub created_at: DateTime<Utc>,
 }
 
 impl From<User> for UserResponse {

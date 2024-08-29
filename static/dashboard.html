@@ -5,239 +5,153 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dashboard - OxidizedOasis-WebSands</title>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap" rel="stylesheet">
-    <style>
-        :root {
-            --primary-color: #3498db;
-            --secondary-color: #2ecc71;
-            --background-color: #f0f3f5;
-            --text-color: #34495e;
-        }
-
-        body {
-            font-family: 'Poppins', sans-serif;
-            background-color: var(--background-color);
-            color: var(--text-color);
-            margin: 0;
-            padding: 0;
-        }
-
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 2rem;
-        }
-
-        .header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 2rem;
-            background-color: white;
-            padding: 1rem 2rem;
-            border-radius: 10px;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-        }
-
-        h1, h2 {
-            color: var(--primary-color);
-        }
-
-        .grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 1rem;
-            margin-bottom: 2rem; /* Add space below the grid */
-        }
-
-        .card {
-            background-color: white;
-            padding: 1.5rem;
-            border-radius: 10px;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-            transition: all 0.3s ease;
-        }
-
-        .card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 6px 8px rgba(0, 0, 0, 0.15);
-        }
-
-        .session-timer {
-            margin-top: 2rem; /* Add space above the session timer */
-        }
-
-        button {
-            padding: 0.5rem 1rem;
-            background-color: var(--primary-color);
-            color: white;
-            border: none;
-            cursor: pointer;
-            border-radius: 5px;
-            transition: background-color 0.3s ease;
-        }
-
-        button:hover {
-            background-color: var(--secondary-color);
-        }
-
-        textarea {
-            width: 100%;
-            padding: 0.5rem;
-            border: 1px solid #ddd;
-            border-radius: 5px;
-            resize: vertical;
-        }
-
-        .error-message {
-            background-color: #f8d7da;
-            color: #721c24;
-            padding: 10px;
-            margin-bottom: 15px;
-            border: 1px solid #f5c6cb;
-            border-radius: 4px;
-        }
-    </style>
+    <link rel="stylesheet" href="/css/styles.css">
+    <link rel="stylesheet" href="/css/dashboard.css">
 </head>
-<body>
-<div class="container">
-    <div class="header">
-        <h1>Welcome to Your Dashboard</h1>
-        <button id="logout">Logout</button>
+<body class="dashboard-body">
+    <div class="dashboard-container">
+        <header class="dashboard-header">
+            <h1>Welcome to Your Dashboard 👋</h1>
+            <button id="logout" class="logout-button">Logout</button>
+        </header>
+        <main class="dashboard-main">
+            <section class="card user-info">
+                <h2>User Information 📋</h2>
+                <div class="info-grid">
+                    <div class="info-item">
+                        <span class="info-label">Username:</span>
+                        <span id="username" class="info-value"></span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">User ID:</span>
+                        <span id="userId" class="info-value"></span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">Email:</span>
+                        <span id="userEmail" class="info-value"></span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">Email Verified:</span>
+                        <span id="emailVerified" class="info-value"></span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">Account Created:</span>
+                        <span id="accountCreated" class="info-value"></span>
+                    </div>
+                </div>
+                <button id="refreshUserInfo" class="refresh-button">Refresh User Info</button>
+            </section>
+            <section class="card notepad">
+                <h2>Quick Notepad 📝</h2>
+                <textarea id="notepad" rows="5" placeholder="Write your notes here..."></textarea>
+                <button id="saveNotes" class="save-button">Save Notes 💾</button>
+            </section>
+        </main>
+        <footer class="dashboard-footer">
+            <div class="card session-timer">
+                <h2>Session Timer ⏱️</h2>
+                <p>Time elapsed: <span id="timer">00:00:00</span></p>
+            </div>
+        </footer>
     </div>
-    <div class="grid">
-        <div class="card user-info">
-            <h2>User Information</h2>
-            <p><strong>Username:</strong> <span id="username"></span></p>
-            <p><strong>User ID:</strong> <span id="userId"></span></p>
-            <p><strong>Email:</strong> <span id="userEmail"></span></p>
-            <p><strong>Email Verified:</strong> <span id="emailVerified"></span></p>
-            <p><strong>Account Created:</strong> <span id="accountCreated"></span></p>
-            <button id="refreshUserInfo">Refresh User Info</button>
-        </div>
-        <div class="card">
-            <h2>Quick Notepad</h2>
-            <textarea id="notepad" rows="5"></textarea>
-            <br>
-            <button id="saveNotes">Save Notes</button>
-        </div>
-    </div>
-    <div class="card session-timer">
-        <h2>Session Timer</h2>
-        <p>Time elapsed: <span id="timer">00:00:00</span></p>
-    </div>
-</div>
-
-<script>
-    function fetchWithAuth(url, options = {}) {
-        const token = localStorage.getItem('token');
-        console.log('Token being sent:', token);
-        return fetch(url, {
-            ...options,
-            headers: {
-                ...options.headers,
-                'Authorization': `Bearer ${token}`,
-            },
-        });
-    }
-
-    // Check if user is authenticated
-    const token = localStorage.getItem('token');
-    const userId = localStorage.getItem('userId');
-    const username = localStorage.getItem('username');
     
-    console.log('Stored user data:', { token, userId, username });
-
-    if (!token || !userId) {
-        console.log('No token or userId found, redirecting to login');
-        window.location.href = '/index.html';
-    } else {
-        console.log('Token and userId found');
-    }
-
-    // Populate user information
-    document.getElementById('username').textContent = username || 'Unknown';
-    document.getElementById('userId').textContent = userId || 'Unknown';
-
-    // Logout functionality
-    document.getElementById('logout').addEventListener('click', () => {
-        localStorage.removeItem('token');
-        localStorage.removeItem('userId');
-        localStorage.removeItem('username');
-        window.location.href = '/index.html';
-    });
-
-    // Timer functionality
-    let seconds = 0;
-    setInterval(() => {
-        seconds++;
-        const hours = Math.floor(seconds / 3600);
-        const minutes = Math.floor((seconds % 3600) / 60);
-        const secs = seconds % 60;
-        document.getElementById('timer').textContent =
-            `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-    }, 1000);
-
-    // Notepad functionality
-    const notepad = document.getElementById('notepad');
-    const savedNotes = localStorage.getItem('notes');
-    if (savedNotes) {
-        notepad.value = savedNotes;
-    }
-
-    document.getElementById('saveNotes').addEventListener('click', () => {
-        localStorage.setItem('notes', notepad.value);
-        alert('Notes saved successfully!');
-    });
-
-    // Function to show error message
-    function showError(message) {
-        const errorDiv = document.createElement('div');
-        errorDiv.className = 'error-message';
-        errorDiv.textContent = message;
-        document.querySelector('.container').prepend(errorDiv);
-        setTimeout(() => errorDiv.remove(), 5000);  // Remove after 5 seconds
-    }
-
-    // Function to test the API and update user information
-    function testAPI() {
-        console.log('Testing API...');
-        if (!userId) {
-            console.error('User ID not found in localStorage');
-            return;
-        }
-        console.log('Fetching user data for ID:', userId);
-        fetchWithAuth(`http://localhost:8080/api/users/${userId}`)
-            .then(response => {
-                console.log('Response status:', response.status);
-                console.log('Response headers:', Object.fromEntries(response.headers));
-                return response.json();
-            })
-            .then(data => {
-                console.log('Parsed response data:', data);
-                // Update user information on the page
-                document.getElementById('username').textContent = data.username;
-                document.getElementById('userId').textContent = data.id;
-                document.getElementById('userEmail').textContent = data.email;
-                document.getElementById('emailVerified').textContent = data.is_email_verified ? 'Yes' : 'No';
-                document.getElementById('accountCreated').textContent = new Date(data.created_at).toLocaleString();
-            })
-            .catch(error => {
-                console.error('Fetch error:', error);
-                showError('Failed to fetch user data. Please try again later.');
-                if (error.message.includes('401')) {
-                    localStorage.removeItem('token');
-                    localStorage.removeItem('userId');
-                    localStorage.removeItem('username');
-                    window.location.href = '/index.html';
-                }
+    <script>
+        function fetchWithAuth(url, options = {}) {
+            const token = localStorage.getItem('token');
+            return fetch(url, {
+                ...options,
+                headers: {
+                    ...options.headers,
+                    'Authorization': `Bearer ${token}`,
+                },
             });
-    }
-
-    // Call the testAPI function when the page loads
-    window.addEventListener('load', testAPI);
-
-    // Add event listener for refresh button
-    document.getElementById('refreshUserInfo').addEventListener('click', testAPI);
-</script>
+        }
+    
+        function showError(message) {
+            const errorDiv = document.createElement('div');
+            errorDiv.className = 'error-message';
+            errorDiv.textContent = message;
+            document.querySelector('.container').prepend(errorDiv);
+            setTimeout(() => errorDiv.remove(), 5000);
+        }
+    
+        function logout() {
+            localStorage.removeItem('token');
+            localStorage.removeItem('userId');
+            localStorage.removeItem('username');
+            window.location.href = '/index.html';
+        }
+    
+        function updateUserInfo(data) {
+            document.getElementById('username').textContent = data.username;
+            document.getElementById('userId').textContent = data.id;
+            document.getElementById('userEmail').textContent = data.email || 'Not provided';
+            document.getElementById('emailVerified').textContent = data.is_email_verified ? 'Yes' : 'No';
+            document.getElementById('accountCreated').textContent = data.created_at ? new Date(data.created_at).toLocaleString() : 'Unknown';
+        }
+    
+        function fetchUserData() {
+            const userId = localStorage.getItem('userId');
+            if (!userId) {
+                showError('User ID not found. Please log in again.');
+                logout();
+                return;
+            }
+    
+            fetchWithAuth(`/api/users/${userId}`)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    updateUserInfo(data);
+                })
+                .catch(error => {
+                    console.error('Fetch error:', error);
+                    showError('Failed to fetch user data. Please try again later.');
+                    if (error.message.includes('401')) {
+                        logout();
+                    }
+                });
+        }
+    
+        // Check authentication
+        const token = localStorage.getItem('token');
+        const userId = localStorage.getItem('userId');
+        if (!token || !userId) {
+            logout();
+        } else {
+            fetchUserData();
+        }
+    
+        // Event listeners
+        document.getElementById('logout').addEventListener('click', logout);
+        document.getElementById('refreshUserInfo').addEventListener('click', fetchUserData);
+    
+        document.getElementById('saveNotes').addEventListener('click', () => {
+            const notes = document.getElementById('notepad').value;
+            localStorage.setItem('notes', notes);
+            alert('Notes saved successfully!');
+        });
+    
+        // Load saved notes
+        const savedNotes = localStorage.getItem('notes');
+        if (savedNotes) {
+            document.getElementById('notepad').value = savedNotes;
+        }
+    
+        // Session timer
+        let seconds = 0;
+        setInterval(() => {
+            seconds++;
+            const hours = Math.floor(seconds / 3600);
+            const minutes = Math.floor((seconds % 3600) / 60);
+            const secs = seconds % 60;
+            document.getElementById('timer').textContent =
+                `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+        }, 1000);
+    </script>
 </body>
 </html>
