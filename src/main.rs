@@ -8,6 +8,8 @@ use actix_web_httpauth::middleware::HttpAuthentication;
 use env_logger::Env;
 use serde_json;
 use actix_governor::{Governor, GovernorConfigBuilder};
+use crate::middleware::validator;
+use crate::handlers::admin::admin_validator;
 
 mod handlers;
 mod models;
@@ -53,8 +55,8 @@ async fn main() -> std::io::Result<()> {
 
     // Start HTTP server
     HttpServer::new(move || {
-        debug!("Configuring HTTP server");
-        let auth = HttpAuthentication::bearer(crate::middleware::validator);
+        let auth = HttpAuthentication::bearer(validator);
+        let admin_auth = HttpAuthentication::bearer(admin_validator);
 
         App::new()
             .app_data(web::Data::new(pool.clone()))
@@ -79,6 +81,11 @@ async fn main() -> std::io::Result<()> {
                     .service(handlers::user::get_user)
                     .service(handlers::user::update_user)
                     .service(handlers::user::delete_user)
+            )
+            .service(
+                web::scope("/admin")
+                    .wrap(admin_auth)
+                    .route("/dashboard", web::get().to(handlers::admin::admin_dashboard))
             )
             .service(fs::Files::new("/css", "./static/css").show_files_listing())
             .service(fs::Files::new("/", "./static").index_file("index.html"))

@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard - OxidizedOasis</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/css/styles.css">
+    <link rel="stylesheet" href="/css/dashboard.css">
+</head>
+<body class="dashboard-body">
+    <div class="dashboard-container">
+        <header class="dashboard-header">
+            <h1>Admin Dashboard</h1>
+            <button id="logout" class="logout-button">Logout</button>
+        </header>
+        <main class="dashboard-main">
+            <section class="card user-list">
+                <h2>User List</h2>
+                <div id="userList"></div>
+            </section>
+        </main>
+    </div>
+    
+    <script>
+        function fetchWithAuth(url, options = {}) {
+            const token = localStorage.getItem('token');
+            return fetch(url, {
+                ...options,
+                headers: {
+                    ...options.headers,
+                    'Authorization': `Bearer ${token}`,
+                },
+            });
+        }
+
+        function logout() {
+            localStorage.removeItem('token');
+            localStorage.removeItem('userId');
+            localStorage.removeItem('username');
+            window.location.href = '/index.html';
+        }
+
+        function fetchUsers() {
+            fetchWithAuth('/admin/dashboard')
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Failed to fetch users');
+                    }
+                    return response.json();
+                })
+                .then(users => {
+                    const userList = document.getElementById('userList');
+                    userList.innerHTML = users.map(user => `
+                        <div class="user-item">
+                            <h3>${user.username}</h3>
+                            <p>Email: ${user.email || 'N/A'}</p>
+                            <p>Role: ${user.role}</p>
+                            <p>Verified: ${user.is_email_verified ? 'Yes' : 'No'}</p>
+                        </div>
+                    `).join('');
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('Failed to fetch users. Please check your admin privileges.');
+                });
+        }
+
+        document.getElementById('logout').addEventListener('click', logout);
+        fetchUsers();
+    </script>
+</body>
+</html>

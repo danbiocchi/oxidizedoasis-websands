@@ -3,7 +3,6 @@ use sqlx::FromRow;
 use uuid::Uuid;
 use chrono::{DateTime, Utc};
 
-/// Represents a user in the database
 #[derive(Debug, Serialize, Deserialize, FromRow)]
 pub struct User {
     pub id: Uuid,
@@ -15,9 +14,9 @@ pub struct User {
     pub verification_token_expires_at: Option<DateTime<Utc>>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
+    pub role: String,  // New field
 }
 
-/// Represents the user data that is safe to send in API responses
 #[derive(Serialize)]
 pub struct UserResponse {
     pub id: Uuid,
@@ -25,6 +24,7 @@ pub struct UserResponse {
     pub email: Option<String>,
     pub is_email_verified: bool,
     pub created_at: DateTime<Utc>,
+    pub role: String,  // Include role in the response
 }
 
 impl From<User> for UserResponse {
@@ -35,6 +35,7 @@ impl From<User> for UserResponse {
             email: user.email,
             is_email_verified: user.is_email_verified,
             created_at: user.created_at,
+            role: user.role,  // Include role in the conversion
         }
     }
 }

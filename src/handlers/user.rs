@@ -87,8 +87,8 @@ pub async fn create_user(pool: web::Data<PgPool>, user: web::Json<UserInput>) ->
             // Insert new user into the database
             let result = sqlx::query_as!(
                 User,
-                r#"INSERT INTO users (id, username, email, password_hash, is_email_verified, verification_token, verification_token_expires_at, created_at, updated_at)
-                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+                r#"INSERT INTO users (id, username, email, password_hash, is_email_verified, verification_token, verification_token_expires_at, created_at, updated_at, role)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
                 RETURNING *"#,
                 Uuid::new_v4(),
                 validated_user.username,
@@ -98,7 +98,8 @@ pub async fn create_user(pool: web::Data<PgPool>, user: web::Json<UserInput>) ->
                 verification_token,
                 verification_token_expires_at,
                 now,
-                now
+                now,
+                "user" // Set default role to "user"
             )
             .fetch_one(pool.get_ref())
             .await;
@@ -287,38 +288,50 @@ pub async fn verify_email(
 ///     "created_at": "2023-04-19T10:30:00Z"
 /// }
 #[get("/users/{id}")]
-pub async fn get_user(pool: web::Data<PgPool>, id: web::Path<Uuid>, _: BearerAuth) -> impl Responder {
+pub async fn get_user(
+    pool: web::Data<PgPool>,
+    id: web::Path<Uuid>,
+    auth: BearerAuth,
+) -> impl Responder {
     let user_id = id.into_inner();
-    info!("Attempting to fetch user with ID: {}", user_id);
+    let jwt_secret = std::env::var("JWT_SECRET").expect("JWT_SECRET must be set");
     
-    let result = sqlx::query_as!(
-        User,
-        "SELECT * FROM users WHERE id = $1",
-        user_id
-    )
-    .fetch_optional(pool.get_ref())
-    .await;
+    // Validate JWT and check user authorization
+    match auth::validate_jwt(auth.token(), &jwt_secret) {
+        Ok(claims) if claims.sub == user_id => {
+            // Proceed with fetching user info
+            let result = sqlx::query_as!(
+                User,
+                "SELECT * FROM users WHERE id = $1",
+                user_id
+            )
+            .fetch_optional(pool.get_ref())
+            .await;
 
-    match result {
-        Ok(Some(user)) => {
-            info!("User found: {:?}", user);
-            let user_response: UserResponse = user.into();
-            HttpResponse::Ok().json(user_response)
+            match result {
+                Ok(Some(user)) => {
+                    info!("User found: {:?}", user);
+                    let user_response: UserResponse = user.into();
+                    HttpResponse::Ok().json(user_response)
+                },
+                Ok(None) => {
+                    warn!("User not found for ID: {}", user_id);
+                    HttpResponse::NotFound().json(serde_json::json!({
+                        "error": "Not Found",
+                        "message": "User not found"
+                    }))
+                },
+                Err(e) => {
+                    error!("Failed to get user: {:?}", e);
+                    HttpResponse::InternalServerError().json(serde_json::json!({
+                        "error": "Internal Server Error",
+                        "message": "Failed to get user"
+                    }))
+                }
+            }
         },
-        Ok(None) => {
-            warn!("User not found for ID: {}", user_id);
-            HttpResponse::NotFound().json(serde_json::json!({
-                "error": "Not Found",
-                "message": "User not found"
-            }))
-        },
-        Err(e) => {
-            error!("Failed to get user: {:?}", e);
-            HttpResponse::InternalServerError().json(serde_json::json!({
-                "error": "Internal Server Error",
-                "message": "Failed to get user"
-            }))
-        }
+        Ok(_) => HttpResponse::Forbidden().json("Access denied: You can only view your own information"),
+        Err(_) => HttpResponse::Unauthorized().json("Invalid token"),
     }
 }
 
@@ -347,57 +360,67 @@ pub async fn get_user(pool: web::Data<PgPool>, id: web::Path<Uuid>, _: BearerAut
 pub async fn update_user(
     pool: web::Data<PgPool>,
     id: web::Path<Uuid>,
-    user: web::Json<UserInput>,
-    _: BearerAuth
+    user_input: web::Json<UserInput>,
+    auth: BearerAuth,
 ) -> impl Responder {
-    let validated_user = match validate_and_sanitize_user_input(user.into_inner()) {
-        Ok(user) => user,
-        Err(errors) => return HttpResponse::BadRequest().json(errors.into_iter().map(|e| e.to_string()).collect::<Vec<String>>()),
-    };
-
-    let current_user = sqlx::query_as!(User, "SELECT * FROM users WHERE id = $1", id.into_inner())
-        .fetch_optional(pool.get_ref())
-        .await;
-
-    match current_user {
-        Ok(Some(current_user)) => {
-            let new_username = validated_user.username;
-            let new_password_hash = match validated_user.password {
-                Some(password) => hash(&password, DEFAULT_COST).unwrap(),
-                None => current_user.password_hash,  // Keep the existing password if not provided
+    let user_id = id.into_inner();
+    let jwt_secret = std::env::var("JWT_SECRET").expect("JWT_SECRET must be set");
+    
+    // Validate JWT and check user authorization
+    match auth::validate_jwt(auth.token(), &jwt_secret) {
+        Ok(claims) if claims.sub == user_id => {
+            let validated_user = match validate_and_sanitize_user_input(user_input.into_inner()) {
+                Ok(user) => user,
+                Err(errors) => return HttpResponse::BadRequest().json(errors.into_iter().map(|e| e.to_string()).collect::<Vec<String>>()),
             };
-            let result = sqlx::query_as!(
-                User,
-                r#"
-                UPDATE users
-                SET username = $1, password_hash = $2, email = $3
-                WHERE id = $4
-                RETURNING *
-                "#,
-                new_username,
-                new_password_hash,
-                validated_user.email,
-                current_user.id
-            )
-                .fetch_one(pool.get_ref())
+
+            let current_user = sqlx::query_as!(User, "SELECT * FROM users WHERE id = $1", user_id)
+                .fetch_optional(pool.get_ref())
                 .await;
 
-            match result {
-                Ok(updated_user) => {
-                    let user_response: UserResponse = updated_user.into();
-                    HttpResponse::Ok().json(user_response)
+            match current_user {
+                Ok(Some(current_user)) => {
+                    let new_username = validated_user.username;
+                    let new_password_hash = match validated_user.password {
+                        Some(password) => hash(&password, DEFAULT_COST).unwrap(),
+                        None => current_user.password_hash,  // Keep the existing password if not provided
+                    };
+                    let result = sqlx::query_as!(
+                        User,
+                        r#"
+                        UPDATE users
+                        SET username = $1, password_hash = $2, email = $3
+                        WHERE id = $4
+                        RETURNING *
+                        "#,
+                        new_username,
+                        new_password_hash,
+                        validated_user.email,
+                        current_user.id
+                    )
+                        .fetch_one(pool.get_ref())
+                        .await;
+
+                    match result {
+                        Ok(updated_user) => {
+                            let user_response: UserResponse = updated_user.into();
+                            HttpResponse::Ok().json(user_response)
+                        },
+                        Err(e) => {
+                            error!("Failed to update user: {:?}", e);
+                            HttpResponse::InternalServerError().json("Failed to update user")
+                        }
+                    }
                 },
+                Ok(None) => HttpResponse::NotFound().json("User not found"),
                 Err(e) => {
-                    error!("Failed to update user: {:?}", e);
+                    error!("Failed to get user for update: {:?}", e);
                     HttpResponse::InternalServerError().json("Failed to update user")
                 }
             }
         },
-        Ok(None) => HttpResponse::NotFound().json("User not found"),
-        Err(e) => {
-            error!("Failed to get user for update: {:?}", e);
-            HttpResponse::InternalServerError().json("Failed to update user")
-        }
+        Ok(_) => HttpResponse::Forbidden().json("Access denied: You can only update your own information"),
+        Err(_) => HttpResponse::Unauthorized().json("Invalid token"),
     }
 }
 
@@ -410,18 +433,33 @@ pub async fn update_user(
 /// # Response
 /// 204 No Content
 #[delete("/users/{id}")]
-pub async fn delete_user(pool: web::Data<PgPool>, id: web::Path<Uuid>, _: BearerAuth) -> impl Responder {
-    let result = sqlx::query!("DELETE FROM users WHERE id = $1", id.into_inner())
-        .execute(pool.get_ref())
-        .await;
+pub async fn delete_user(
+    pool: web::Data<PgPool>,
+    id: web::Path<Uuid>,
+    auth: BearerAuth,
+) -> impl Responder {
+    let user_id = id.into_inner();
+    let jwt_secret = std::env::var("JWT_SECRET").expect("JWT_SECRET must be set");
+    
+    // Validate JWT and check user authorization
+    match auth::validate_jwt(auth.token(), &jwt_secret) {
+        Ok(claims) if claims.sub == user_id => {
+            // Proceed with deleting user
+            let result = sqlx::query!("DELETE FROM users WHERE id = $1", user_id)
+                .execute(pool.get_ref())
+                .await;
 
-    match result {
-        Ok(ref deleted) if deleted.rows_affected() > 0 => HttpResponse::NoContent().finish(),
-        Ok(_) => HttpResponse::NotFound().json("User not found"),
-        Err(e) => {
-            error!("Failed to delete user: {:?}", e);
-            HttpResponse::InternalServerError().json("Failed to delete user")
-        }
+            match result {
+                Ok(ref deleted) if deleted.rows_affected() > 0 => HttpResponse::NoContent().finish(),
+                Ok(_) => HttpResponse::NotFound().json("User not found"),
+                Err(e) => {
+                    error!("Failed to delete user: {:?}", e);
+                    HttpResponse::InternalServerError().json("Failed to delete user")
+                }
+            }
+        },
+        Ok(_) => HttpResponse::Forbidden().json("Access denied: You can only delete your own account"),
+        Err(_) => HttpResponse::Unauthorized().json("Invalid token"),
     }
 }
 
