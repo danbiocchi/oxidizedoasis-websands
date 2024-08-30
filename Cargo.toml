@@ -25,5 +25,5 @@ chrono = { version = "0.4", features = ["serde"] }
 validator = { version = "0.16", features = ["derive"] }
 regex = "1.5"
 lazy_static = "1.4"
-ammonia = "3.1"
+ammonia = "4.0.0"
 actix-governor = "0.5"
