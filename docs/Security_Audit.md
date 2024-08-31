@@ -536,17 +536,17 @@ gantt
     title Security Improvement Timeline
     dateFormat  YYYY-MM-DD
     section Immediate Actions
-    Implement HTTPS           :a1, 2024-03-01, 7d
-    Server Hardening          :a2, 2024-03-08, 14d
-    Dependency Audit          :a3, 2024-03-22, 7d
+    Implement HTTPS           :a1, 2024-08-30, 7d
+    Server Hardening          :a2, 2024-09-06, 14d
+    Dependency Audit          :a3, 2024-09-20, 7d
     section Short-term Goals
-    Access Control System     :b1, 2024-04-01, 30d
-    Enhanced Logging          :b2, 2024-05-01, 21d
-    Token Refresh Mechanism   :b3, 2024-05-22, 14d
+    Access Control System     :b1, 2024-09-27, 30d
+    Enhanced Logging          :b2, 2024-10-27, 21d
+    Token Refresh Mechanism   :b3, 2024-11-17, 14d
     section Long-term Goals
-    Continuous Security Integration :c1, 2024-06-01, 30d
-    Security Training Program :c2, 2024-07-01, 60d
-    First Penetration Test    :milestone, m1, 2024-09-01, 0d
+    Continuous Security Integration :c1, 2024-12-01, 30d
+    Security Training Program :c2, 2024-12-31, 60d
+    First Penetration Test    :milestone, m1, 2025-02-28, 0d
 ```
 
 This Gantt chart provides a visual timeline for our security improvement efforts over the next 6 months.
