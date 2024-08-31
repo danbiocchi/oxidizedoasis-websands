@@ -10,6 +10,16 @@ OxidizedOasis-WebSands is a robust, high-performance web application built with 
 
 OxidizedOasis-WebSands is designed to provide a solid foundation for building scalable web applications with strong security features. Our goal is to showcase the capabilities of Rust in creating high-performance, secure web services while maintaining excellent developer ergonomics.
 
+## 📚 Documentation
+
+Comprehensive documentation for OxidizedOasis-WebSands is available to help developers, administrators, and users understand and work with the system effectively:
+
+- [Software Development Document](docs/Software_Development_Document.md): Detailed technical specifications, architecture overview, and development guidelines.
+- [Security Audit Report](docs/Security_Audit.md): In-depth analysis of the project's security measures and recommendations for improvement.
+- [Security Backlog](docs/Security_Backlog.md): Ongoing security tasks and improvements planned for the project.
+
+These documents provide valuable insights into the project's structure, security considerations, and future development plans. We encourage all contributors and users to review these resources for a deeper understanding of OxidizedOasis-WebSands.
+
 ## ✨ Key Features
 
 - 🔒 Robust user authentication system with JWT (JSON Web Tokens)
@@ -236,3 +246,4 @@ Project Link: [https://github.com/yourusername/oxidizedoasis-websands](https://g
 <p align="center">
   Made with ❤️ by the OxidizedOasis-WebSands Team
 </p>
+
