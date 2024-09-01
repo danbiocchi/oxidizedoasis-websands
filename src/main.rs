@@ -12,6 +12,7 @@ use actix_governor::{Governor, GovernorConfigBuilder};
 use std::env;
 use crate::middleware::validator;
 use crate::handlers::admin::admin_validator;
+use crate::middleware::cors_logger::CorsLogger;
 
 mod handlers;
 mod models;
@@ -45,7 +46,7 @@ async fn setup_database(database_url: &str, run_migrations: bool) -> Result<sqlx
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
     dotenv().ok();
-    env_logger::Builder::from_env(Env::default().default_filter_or("debug")).init();
+    env_logger::Builder::from_env(Env::default().default_filter_or("info")).init();
 
     info!("Starting OxidizedOasis-WebSands application");
 
@@ -95,6 +96,7 @@ async fn main() -> std::io::Result<()> {
 
         App::new()
             .app_data(web::Data::new(pool.clone()))
+            .wrap(CorsLogger)  // Add this line
             .wrap(cors)
             .wrap(actix_web::middleware::Logger::default())
             .service(
