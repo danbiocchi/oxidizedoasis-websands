@@ -31,6 +31,18 @@ impl EmailService {
     /// # Returns
     /// * `Result<(), Box<dyn std::error::Error>>` - Ok if email sent successfully, Err otherwise
     pub fn send_verification_email(&self, to_email: &str, verification_token: &str) -> Result<(), Box<dyn std::error::Error>> {
+        let base_url = std::env::var("ENVIRONMENT")
+            .map(|env| {
+                if env == "production" {
+                    std::env::var("PRODUCTION_URL").expect("PRODUCTION_URL must be set")
+                } else {
+                    std::env::var("DEVELOPMENT_URL").expect("DEVELOPMENT_URL must be set")
+                }
+            })
+            .expect("ENVIRONMENT must be set");
+
+        let verification_url = format!("{}/users/verify?token={}", base_url, verification_token);
+
         let email_body = format!(
             r#"
             <html>
@@ -39,17 +51,17 @@ impl EmailService {
                     <h1 style="color: #3498db;">Verify Your Email</h1>
                     <p>Thank you for signing up with OxidizedOasis! Please click the button below to verify your email address:</p>
                     <p style="text-align: center;">
-                        <a href="http://localhost:8080/users/verify?token={}" style="display: inline-block; padding: 10px 20px; background-color: #3498db; color: #ffffff; text-decoration: none; border-radius: 5px;">Verify Email</a>
+                        <a href="{0}" style="display: inline-block; padding: 10px 20px; background-color: #3498db; color: #ffffff; text-decoration: none; border-radius: 5px;">Verify Email</a>
                     </p>
                     <p>If the button doesn't work, you can copy and paste the following link into your browser:</p>
-                    <p><a href="http://localhost:8080/users/verify?token={}">http://localhost:8080/users/verify?token={}</a></p>
+                    <p><a href="{0}">{0}</a></p>
                     <p>This link will expire in 24 hours.</p>
                     <p>If you didn't sign up for an account, you can safely ignore this email.</p>
                 </div>
             </body>
             </html>
             "#,
-            verification_token, verification_token, verification_token
+            verification_url
         );
 
         let email = Message::builder()
