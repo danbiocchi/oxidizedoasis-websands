@@ -60,6 +60,7 @@ impl TryFrom<web::Query<TokenQuery>> for TokenQuery {
 ///     "created_at": "2023-04-20T12:00:00Z"
 /// }
 pub async fn create_user(pool: web::Data<PgPool>, user: web::Json<UserInput>) -> impl Responder {
+
     match validate_and_sanitize_user_input(user.into_inner()) {
         Ok(validated_user) => {
             debug!("Received create_user request at /users/register");
@@ -101,8 +102,8 @@ pub async fn create_user(pool: web::Data<PgPool>, user: web::Json<UserInput>) ->
                 now,
                 "user" // Set default role to "user"
             )
-            .fetch_one(pool.get_ref())
-            .await;
+                .fetch_one(pool.get_ref())
+                .await;
 
             match result {
                 Ok(user) => {
@@ -295,7 +296,7 @@ pub async fn get_user(
 ) -> impl Responder {
     let user_id = id.into_inner();
     let jwt_secret = std::env::var("JWT_SECRET").expect("JWT_SECRET must be set");
-    
+
     // Validate JWT and check user authorization
     match auth::validate_jwt(auth.token(), &jwt_secret) {
         Ok(claims) if claims.sub == user_id => {
@@ -305,8 +306,8 @@ pub async fn get_user(
                 "SELECT * FROM users WHERE id = $1",
                 user_id
             )
-            .fetch_optional(pool.get_ref())
-            .await;
+                .fetch_optional(pool.get_ref())
+                .await;
 
             match result {
                 Ok(Some(user)) => {
@@ -365,7 +366,7 @@ pub async fn update_user(
 ) -> impl Responder {
     let user_id = id.into_inner();
     let jwt_secret = std::env::var("JWT_SECRET").expect("JWT_SECRET must be set");
-    
+
     // Validate JWT and check user authorization
     match auth::validate_jwt(auth.token(), &jwt_secret) {
         Ok(claims) if claims.sub == user_id => {
@@ -440,7 +441,7 @@ pub async fn delete_user(
 ) -> impl Responder {
     let user_id = id.into_inner();
     let jwt_secret = std::env::var("JWT_SECRET").expect("JWT_SECRET must be set");
-    
+
     // Validate JWT and check user authorization
     match auth::validate_jwt(auth.token(), &jwt_secret) {
         Ok(claims) if claims.sub == user_id => {
