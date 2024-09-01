@@ -1,6 +1,7 @@
 use actix_web::{web, App, HttpServer, HttpResponse, http};
-use sqlx::postgres::PgPoolOptions;
-use log::{info, debug, error};
+use sqlx::postgres::{PgPoolOptions, Postgres};
+use sqlx::migrate::MigrateDatabase;
+use log::{info, debug, error, warn};
 use dotenv::dotenv;
 use actix_files as fs;
 use actix_cors::Cors;
@@ -8,6 +9,7 @@ use actix_web_httpauth::middleware::HttpAuthentication;
 use env_logger::Env;
 use serde_json;
 use actix_governor::{Governor, GovernorConfigBuilder};
+use std::env;
 use crate::middleware::validator;
 use crate::handlers::admin::admin_validator;
 
@@ -18,42 +20,62 @@ mod email;
 mod middleware;
 mod validation;
 
-/// Main function to start the OxidizedOasis-WebSands application
+async fn setup_database(database_url: &str, run_migrations: bool) -> Result<sqlx::Pool<Postgres>, sqlx::Error> {
+    if !Postgres::database_exists(database_url).await? {
+        info!("Creating database");
+        Postgres::create_database(database_url).await?;
+    }
+
+    let pool = PgPoolOptions::new()
+        .max_connections(5)
+        .connect(database_url)
+        .await?;
+
+    if run_migrations {
+        info!("Running database migrations");
+        sqlx::migrate!("./migrations").run(&pool).await?;
+        info!("Migrations completed successfully");
+    } else {
+        warn!("Skipping database migrations. Make sure your database schema is up to date.");
+    }
+
+    Ok(pool)
+}
+
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
-    // Load environment variables from .env file
     dotenv().ok();
-    // Initialize logger
     env_logger::Builder::from_env(Env::default().default_filter_or("debug")).init();
 
     info!("Starting OxidizedOasis-WebSands application");
 
-    // Get database URL from environment variables
-    let database_url = std::env::var("DATABASE_URL")
+    let database_url = env::var("DATABASE_URL")
         .expect("DATABASE_URL must be set in environment variables");
 
-    // Create database connection pool
-    let pool = PgPoolOptions::new()
-        .max_connections(5)
-        .connect(&database_url)
-        .await
-        .expect("Failed to create database connection pool");
+    let run_migrations = env::var("RUN_MIGRATIONS")
+        .map(|v| v.to_lowercase() == "true")
+        .unwrap_or(true);
 
-    // Get server host and port from environment variables or use defaults
-    let host = std::env::var("SERVER_HOST").unwrap_or_else(|_| "127.0.0.1".to_string());
-    let port = std::env::var("SERVER_PORT").unwrap_or_else(|_| "8080".to_string());
+    let pool = match setup_database(&database_url, run_migrations).await {
+        Ok(pool) => pool,
+        Err(e) => {
+            error!("Failed to set up database: {:?}", e);
+            return Err(std::io::Error::new(std::io::ErrorKind::Other, e.to_string()));
+        }
+    };
+
+    let host = env::var("SERVER_HOST").unwrap_or_else(|_| "127.0.0.1".to_string());
+    let port = env::var("SERVER_PORT").unwrap_or_else(|_| "8080".to_string());
     let server_addr = format!("{}:{}", host, port);
 
     debug!("Server will be listening on: {}", server_addr);
 
-    // Configure rate limiting
     let governor_conf = GovernorConfigBuilder::default()
-        .per_second(2) // Allow 2 requests per second
-        .burst_size(5) // Allow a burst of 5 requests
+        .per_second(2)
+        .burst_size(5)
         .finish()
         .unwrap();
 
-    // Start HTTP server
     HttpServer::new(move || {
         let auth = HttpAuthentication::bearer(validator);
         let admin_auth = HttpAuthentication::bearer(admin_validator);
@@ -97,7 +119,7 @@ async fn main() -> std::io::Result<()> {
                 }))
             }))
     })
-    .bind(server_addr)?
-    .run()
-    .await
+        .bind(server_addr)?
+        .run()
+        .await
 }
