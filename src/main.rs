@@ -76,19 +76,26 @@ async fn main() -> std::io::Result<()> {
         .finish()
         .unwrap();
 
+    let environment = env::var("ENVIRONMENT").unwrap_or_else(|_| "development".to_string());
+    let allowed_origin = match environment.as_str() {
+        "production" => env::var("PRODUCTION_URL").expect("PRODUCTION_URL must be set in production"),
+        "development" => env::var("DEVELOPMENT_URL").expect("DEVELOPMENT_URL must be set for development"),
+        _ => panic!("ENVIRONMENT must be set to either 'production' or 'development'"),
+    };
+
     HttpServer::new(move || {
+        let cors = Cors::default()
+            .allowed_origin(&allowed_origin)
+            .allowed_methods(vec!["GET", "POST", "PUT", "DELETE"])
+            .allowed_headers(vec![http::header::AUTHORIZATION, http::header::ACCEPT, http::header::CONTENT_TYPE])
+            .max_age(3600);
+
         let auth = HttpAuthentication::bearer(validator);
         let admin_auth = HttpAuthentication::bearer(admin_validator);
 
         App::new()
             .app_data(web::Data::new(pool.clone()))
-            .wrap(
-                Cors::default()
-                    .allowed_origin("http://127.0.0.1:8080")
-                    .allowed_methods(vec!["GET", "POST", "PUT", "DELETE"])
-                    .allowed_headers(vec![http::header::AUTHORIZATION, http::header::ACCEPT, http::header::CONTENT_TYPE])
-                    .max_age(3600)
-            )
+            .wrap(cors)
             .wrap(actix_web::middleware::Logger::default())
             .service(
                 web::scope("/users")
