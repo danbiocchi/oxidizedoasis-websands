@@ -17,8 +17,7 @@ Comprehensive documentation for OxidizedOasis-WebSands is available to help deve
 - [Software Development Document](docs/Software_Development_Document.md): Detailed technical specifications, architecture overview, and development guidelines.
 - [Security Audit Report](docs/Security_Audit.md): In-depth analysis of the project's security measures and recommendations for improvement.
 - [Security Backlog](docs/Security_Backlog.md): Ongoing security tasks and improvements planned for the project.
-
-These documents provide valuable insights into the project's structure, security considerations, and future development plans. We encourage all contributors and users to review these resources for a deeper understanding of OxidizedOasis-WebSands.
+- [User Guide](docs/User_Guide.md): Guide for end-users on how to use the application.
 
 ## ✨ Key Features
 
@@ -33,6 +32,7 @@ These documents provide valuable insights into the project's structure, security
 - 🎨 Modern, responsive frontend with smooth animations
 - 📱 Mobile-friendly design for seamless user experience across devices
 - 🔧 Easily extensible architecture for adding new features
+- 🔄 Database migrations for easy schema management and updates
 
 ## 🛠️ Technology Stack
 
@@ -71,12 +71,7 @@ Before you begin, ensure you have the following installed:
    cd oxidizedoasis-websands
    ```
 
-2. Set up the database:
-   ```sh
-   psql -c "CREATE DATABASE oxidizedoasis"
-   ```
-
-3. Set up environment variables:
+2. Set up the environment variables:
    Create a `.env` file in the project root with the following content:
    ```
    DATABASE_URL=postgres://username:password@localhost/oxidizedoasis
@@ -86,21 +81,18 @@ Before you begin, ensure you have the following installed:
    SMTP_SERVER=your_smtp_server
    FROM_EMAIL=noreply@yourdomain.com
    RUST_LOG=debug
+   RUN_MIGRATIONS=true
    ```
    Replace the placeholders with your actual database and SMTP credentials.
 
-4. Run database migrations:
-   ```sh
-   cargo install sqlx-cli
-   sqlx migrate run
-   ```
-
-5. Build and run the project:
+3. Build and run the project:
    ```sh
    cargo run
    ```
 
-6. Visit `http://localhost:8080` in your browser to access the application.
+4. The application will automatically create the database if it doesn't exist and run all necessary migrations.
+
+5. Visit `http://localhost:8080` in your browser to access the application.
 
 ## 🔧 Configuration
 
@@ -113,95 +105,23 @@ Before you begin, ensure you have the following installed:
 - `SMTP_SERVER`: SMTP server address
 - `FROM_EMAIL`: Email address used as the sender for verification emails
 - `RUST_LOG`: Logging level (e.g., debug, info, warn, error)
-
-### CORS Configuration
-
-CORS is configured in `src/main.rs`. Modify the CORS settings to match your deployment environment:
-
-```rust
-let cors = Cors::default()
-    .allowed_origin("http://localhost:8080")
-    .allowed_methods(vec!["GET", "POST", "PUT", "DELETE"])
-    .allowed_headers(vec![header::AUTHORIZATION, header::ACCEPT, header::CONTENT_TYPE])
-    .max_age(3600);
-```
+- `RUN_MIGRATIONS`: Whether to run database migrations on startup (true/false)
 
 ## 📚 Usage
 
-### User Registration
-
-To register a new user, send a POST request to `/users/register` with the following JSON payload:
-
-```json
-{
-  "username": "newuser",
-  "email": "user@example.com",
-  "password": "SecurePassword123!"
-}
-```
-
-### User Login
-
-To log in, send a POST request to `/users/login` with the following JSON payload:
-
-```json
-{
-  "username": "newuser",
-  "password": "SecurePassword123!"
-}
-```
-
-A successful login will return a JWT token, which should be included in the `Authorization` header for subsequent requests.
-
-### Protected Routes
-
-To access protected routes, include the JWT token in the `Authorization` header:
-
-```
-Authorization: Bearer <your_jwt_token>
-```
+Refer to the [User Guide](docs/User_Guide.md) for detailed information on how to use the application.
 
 ## 🧪 Testing
 
-OxidizedOasis-WebSands uses a comprehensive test suite to ensure reliability and correctness. To run the tests:
+To run the tests:
 
 ```sh
 cargo test
 ```
 
-For more verbose output:
-
-```sh
-cargo test -- --nocapture
-```
-
 ## 🚢 Deployment
 
-### Docker Deployment
-
-1. Build the Docker image:
-   ```sh
-   docker build -t oxidizedoasis-websands .
-   ```
-
-2. Run the container:
-   ```sh
-   docker run -p 8080:8080 --env-file .env oxidizedoasis-websands
-   ```
-
-### Manual Deployment
-
-1. Build the release version:
-   ```sh
-   cargo build --release
-   ```
-
-2. Run the binary:
-   ```sh
-   ./target/release/oxidizedoasis-websands
-   ```
-
-Remember to set up your environment variables and database before deploying.
+Refer to the [Software Development Document](docs/Software_Development_Document.md) for detailed deployment instructions.
 
 ## 🤝 Contributing
 
@@ -221,8 +141,7 @@ Distributed under the MIT License. See `LICENSE` file for more information.
 
 ## 📬 Contact
 
-Daniel Biocchi - daniel@biocchi.ca
-Fabio Campioni
+Daniel Biocchi 
 
 Project Link: [https://github.com/yourusername/oxidizedoasis-websands](https://github.com/yourusername/oxidizedoasis-websands)
 
@@ -234,16 +153,9 @@ Project Link: [https://github.com/yourusername/oxidizedoasis-websands](https://g
 - [PostgreSQL](https://www.postgresql.org/)
 - [JSON Web Tokens](https://jwt.io/)
 - [bcrypt](https://en.wikipedia.org/wiki/Bcrypt)
-
-## 📊 Project Status
-
-![Build Status](https://img.shields.io/github/workflow/status/yourusername/oxidizedoasis-websands/Rust)
-![License](https://img.shields.io/badge/License-MIT-blue.svg)
-![Rust Version](https://img.shields.io/badge/Rust-1.68%2B-orange.svg)
-
+- Diablo 2
 ---
 
 <p align="center">
   Made with ❤️ by the OxidizedOasis-WebSands Team
 </p>
-
