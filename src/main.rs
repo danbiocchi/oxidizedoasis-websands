@@ -120,6 +120,9 @@ async fn main() -> std::io::Result<()> {
             )
             .service(fs::Files::new("/css", "./static/css").show_files_listing())
             .service(fs::Files::new("/", "./static").index_file("index.html"))
+            .service(web::resource("/token_failure.html").to(|| async {
+                HttpResponse::Ok().content_type("text/html").body(include_str!("../static/token_failure.html"))
+            }))
             .default_service(web::route().to(|req: actix_web::HttpRequest| async move {
                 error!("Unhandled request: {:?}", req);
                 HttpResponse::NotFound().json(serde_json::json!({

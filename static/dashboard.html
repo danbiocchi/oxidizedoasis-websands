@@ -64,6 +64,12 @@
                     ...options.headers,
                     'Authorization': `Bearer ${token}`,
                 },
+            }).then(response => {
+                if (response.status === 401) {
+                    window.location.href = '/token_failure.html';
+                    throw new Error('Unauthorized');
+                }
+                return response;
             });
         }
     
