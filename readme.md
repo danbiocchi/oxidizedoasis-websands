@@ -143,7 +143,7 @@ Distributed under the MIT License. See `LICENSE` file for more information.
 
 Daniel Biocchi 
 
-Project Link: [https://github.com/yourusername/oxidizedoasis-websands](https://github.com/yourusername/oxidizedoasis-websands)
+Project Link: [https://github.com/danbiocchi/oxidizedoasis-websands](https://github.com/yourusername/oxidizedoasis-websands)
 
 ## 🙏 Acknowledgements
 
