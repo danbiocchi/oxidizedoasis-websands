@@ -245,63 +245,6 @@ sequenceDiagram
     LB-->>C: Deliver
 ```
 
-```mermaid
-graph TD
-    %% Styles
-    classDef source fill:#e6f3ff,stroke:#4a86e8,stroke-width:2px;
-    classDef process fill:#fff2cc,stroke:#f1c232,stroke-width:2px;
-    classDef storage fill:#e6ffe6,stroke:#6aa84f,stroke-width:2px;
-    classDef analysis fill:#f4cccc,stroke:#cc0000,stroke-width:2px;
-
-    %% Log Sources
-    A[Web Server Logs] -->|Raw logs| C
-    B[Application Logs] -->|Raw logs| C
-    C{Log Aggregator}
-    class A,B source
-
-    %% Processing
-    C -->|Structured logs| D[Log Parser]
-    D -->|Parsed logs| E[Log Enricher]
-    E -->|Enriched logs| F[Log Filter]
-    class C,D,E,F process
-
-    %% Storage
-    F -->|Filtered logs| G[(Short-term Storage)]
-    F -->|Filtered logs| H[(Long-term Archive)]
-    class G,H storage
-
-    %% Analysis and Monitoring
-    G -->|Recent logs| I[Real-time Analyzer]
-    G -->|Performance metrics| J[Monitoring Dashboard]
-    H -->|Historical data| K[Batch Analyzer]
-    class I,J,K analysis
-
-    %% Annotations
-    A:::source
-    B:::source
-    C:::process
-    D:::process
-    E:::process
-    F:::process
-    G:::storage
-    H:::storage
-    I:::analysis
-    J:::analysis
-    K:::analysis
-
-    %% Labels and descriptions
-    A[Web Server Logs<br/>HTTP request details]
-    B[Application Logs<br/>Business logic events]
-    C{Log Aggregator<br/>Collects all log streams}
-    D[Log Parser<br/>Extracts structured data]
-    E[Log Enricher<br/>Adds context and metadata]
-    F[Log Filter<br/>Removes sensitive info]
-    G[(Short-term Storage<br/>Recent logs for quick access)]
-    H[(Long-term Archive<br/>Historical data for compliance)]
-    I[Real-time Analyzer<br/>Detects anomalies and alerts]
-    J[Monitoring Dashboard<br/>Visualizes system health]
-    K[Batch Analyzer<br/>Generates insights and reports]
-```
 # Engineering Approach to Logging System Performance and Scalability Monitoring in OxidizedOasis-WebSands
 
 ## 1. Key Performance Indicators (KPIs)
