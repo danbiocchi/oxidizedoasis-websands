@@ -214,67 +214,8 @@ erDiagram
     SECURITY_LOGS ||--|| SECURITY_LOGS_INDEXES : "has indexes"
 ```
 
-```mermaid
-graph TB
-    %% Define styles
-    classDef appLayer fill:#e6f3ff,stroke:#4a86e8,stroke-width:2px;
-    classDef dataStore fill:#e6ffe6,stroke:#6aa84f,stroke-width:2px;
-    classDef monitoring fill:#fff2cc,stroke:#f1c232,stroke-width:2px;
-    classDef performance fill:#f4cccc,stroke:#cc0000,stroke-width:2px;
+# Logging Sequence Diagram
 
-    %% Application Layer
-    subgraph APP["Application Layer"]
-        A[Web Server]
-        B[Application Logic]
-        C[Logging Middleware]
-    end
-    class A,B,C appLayer;
-
-    %% Data Storage
-    subgraph DATA["Data Storage"]
-        D[(PostgreSQL DB)]
-        E[(Log Archive)]
-    end
-    class D,E dataStore;
-
-    %% Monitoring & Analysis
-    subgraph MON["Monitoring & Analysis"]
-        F[Prometheus]
-        G[Grafana]
-        H[Log Analysis Tool]
-    end
-    class F,G,H monitoring;
-
-    %% Performance & Scaling
-    subgraph PERF["Performance & Scaling"]
-        I[Load Balancer]
-        J[Caching Layer]
-    end
-    class I,J performance;
-
-    %% Connections
-    A --> B
-    B --> C
-    C --> D
-    D --> E
-    F --> D
-    F --> G
-    H --> D
-    I --> A
-    J --> B
-
-    %% Labels
-    A["Web Server<br/>(HTTP requests)"]
-    B["App Logic<br/>(Core business)"]
-    C["Logging Middleware<br/>(Data capture)"]
-    D["PostgreSQL DB<br/>(Current logs)"]
-    E["Log Archive<br/>(Long-term storage)"]
-    F["Prometheus<br/>(Metrics collection)"]
-    G["Grafana<br/>(Visualization)"]
-    H["Log Analysis<br/>(Processing)"]
-    I["Load Balancer<br/>(Traffic distribution)"]
-    J["Caching Layer<br/>(Performance boost)"]
-```
 
 ```mermaid
 sequenceDiagram
@@ -415,5 +356,69 @@ Quarterly sprints dedicated to monitoring and optimization:
 3. In-depth query and index optimization
 4. Review and updating of scaling strategies
 5. Stakeholder feedback integration
+
+
+```mermaid
+graph TB
+    %% Define styles
+    classDef appLayer fill:#e6f3ff,stroke:#4a86e8,stroke-width:2px;
+    classDef dataStore fill:#e6ffe6,stroke:#6aa84f,stroke-width:2px;
+    classDef monitoring fill:#fff2cc,stroke:#f1c232,stroke-width:2px;
+    classDef performance fill:#f4cccc,stroke:#cc0000,stroke-width:2px;
+
+    %% Application Layer
+    subgraph APP["Application Layer"]
+        A[Web Server]
+        B[Application Logic]
+        C[Logging Middleware]
+    end
+    class A,B,C appLayer;
+
+    %% Data Storage
+    subgraph DATA["Data Storage"]
+        D[(PostgreSQL DB)]
+        E[(Log Archive)]
+    end
+    class D,E dataStore;
+
+    %% Monitoring & Analysis
+    subgraph MON["Monitoring & Analysis"]
+        F[Prometheus]
+        G[Grafana]
+        H[Log Analysis Tool]
+    end
+    class F,G,H monitoring;
+
+    %% Performance & Scaling
+    subgraph PERF["Performance & Scaling"]
+        I[Load Balancer]
+        J[Caching Layer]
+    end
+    class I,J performance;
+
+    %% Connections
+    A --> B
+    B --> C
+    C --> D
+    D --> E
+    F --> D
+    F --> G
+    H --> D
+    I --> A
+    J --> B
+
+    %% Labels
+    A["Web Server<br/>(HTTP requests)"]
+    B["App Logic<br/>(Core business)"]
+    C["Logging Middleware<br/>(Data capture)"]
+    D["PostgreSQL DB<br/>(Current logs)"]
+    E["Log Archive<br/>(Long-term storage)"]
+    F["Prometheus<br/>(Metrics collection)"]
+    G["Grafana<br/>(Visualization)"]
+    H["Log Analysis<br/>(Processing)"]
+    I["Load Balancer<br/>(Traffic distribution)"]
+    J["Caching Layer<br/>(Performance boost)"]
+```
+
 
 This engineering approach ensures proactive management of the logging system's performance and scalability. The methodologies outlined are designed to adapt to changing requirements and preemptively address potential issues as the OxidizedOasis-WebSands project scales.
