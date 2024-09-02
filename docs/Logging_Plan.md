@@ -214,6 +214,96 @@ erDiagram
     SECURITY_LOGS ||--|| SECURITY_LOGS_INDEXES : "has indexes"
 ```
 
+```mermaid
+graph TB
+    %% Define styles
+    classDef appLayer fill:#e6f3ff,stroke:#4a86e8,stroke-width:2px;
+    classDef dataStore fill:#e6ffe6,stroke:#6aa84f,stroke-width:2px;
+    classDef monitoring fill:#fff2cc,stroke:#f1c232,stroke-width:2px;
+    classDef performance fill:#f4cccc,stroke:#cc0000,stroke-width:2px;
+
+    %% Application Layer
+    subgraph APP["Application Layer"]
+        A[Web Server]
+        B[Application Logic]
+        C[Logging Middleware]
+    end
+    class A,B,C appLayer;
+
+    %% Data Storage
+    subgraph DATA["Data Storage"]
+        D[(PostgreSQL DB)]
+        E[(Log Archive)]
+    end
+    class D,E dataStore;
+
+    %% Monitoring & Analysis
+    subgraph MON["Monitoring & Analysis"]
+        F[Prometheus]
+        G[Grafana]
+        H[Log Analysis Tool]
+    end
+    class F,G,H monitoring;
+
+    %% Performance & Scaling
+    subgraph PERF["Performance & Scaling"]
+        I[Load Balancer]
+        J[Caching Layer]
+    end
+    class I,J performance;
+
+    %% Connections
+    A --> B
+    B --> C
+    C --> D
+    D --> E
+    F --> D
+    F --> G
+    H --> D
+    I --> A
+    J --> B
+
+    %% Labels
+    A["Web Server<br/>(HTTP requests)"]
+    B["App Logic<br/>(Core business)"]
+    C["Logging Middleware<br/>(Data capture)"]
+    D["PostgreSQL DB<br/>(Current logs)"]
+    E["Log Archive<br/>(Long-term storage)"]
+    F["Prometheus<br/>(Metrics collection)"]
+    G["Grafana<br/>(Visualization)"]
+    H["Log Analysis<br/>(Processing)"]
+    I["Load Balancer<br/>(Traffic distribution)"]
+    J["Caching Layer<br/>(Performance boost)"]
+```
+
+```mermaid
+sequenceDiagram
+    participant C as Client
+    participant LB as LoadBalancer
+    participant WS as WebServer
+    participant LM as LogMiddleware
+    participant AL as AppLogic
+    participant DB as Database
+
+    C->>LB: Request
+    Note over LB: Log: Incoming
+    LB->>WS: Forward
+    Note over WS: Log: Received
+    WS->>LM: Process
+    Note over LM: Log: Details
+    LM->>AL: Handle
+    Note over AL: Log: Logic
+    AL->>DB: Query
+    Note over DB: Log: DB Op
+    DB-->>AL: Result
+    AL-->>LM: Response
+    Note over LM: Log: Response
+    LM-->>WS: Forward
+    WS-->>LB: Send
+    Note over LB: Log: Outgoing
+    LB-->>C: Deliver
+```
+
 # Engineering Approach to Logging System Performance and Scalability Monitoring in OxidizedOasis-WebSands
 
 ## 1. Key Performance Indicators (KPIs)
