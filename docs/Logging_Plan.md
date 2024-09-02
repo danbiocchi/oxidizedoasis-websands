@@ -162,52 +162,54 @@ CREATE INDEX idx_security_logs_severity ON security_logs (severity);
 This logging database plan provides a comprehensive approach to implementing robust, scalable, and secure logging for the OxidizedOasis-WebSands project. By following this plan, we can ensure that our logging system will effectively capture all necessary information while maintaining high performance and adhering to best practices in database management and security.
 
 
+# Logging Database Schema 
+
+```mermaid
 erDiagram
-SITE_TRAFFIC_LOGS {
-BIGSERIAL id PK
-TIMESTAMP timestamp
-UUID user_id FK
-UUID session_id
-INET ip_address
-VARCHAR(10) request_method
-TEXT request_path
-JSONB query_params
-JSONB request_body
-INTEGER response_status
-FLOAT response_time
-TEXT user_agent
-TEXT referer
-JSONB additional_data
-}
+    SITE_TRAFFIC_LOGS {
+        bigserial id PK
+        timestamp timestamp
+        uuid user_id FK
+        uuid session_id
+        inet ip_address
+        varchar request_method
+        text request_path
+        jsonb query_params
+        jsonb request_body
+        integer response_status
+        float response_time
+        text user_agent
+        text referer
+        jsonb additional_data
+    }
 
     SECURITY_LOGS {
-        BIGSERIAL id PK
-        TIMESTAMP timestamp
-        VARCHAR(50) event_type
-        UUID user_id FK
-        INET ip_address
-        JSONB details
-        VARCHAR(20) severity
+        bigserial id PK
+        timestamp timestamp
+        varchar event_type
+        uuid user_id FK
+        inet ip_address
+        jsonb details
+        varchar severity
     }
 
     SITE_TRAFFIC_LOGS ||--o{ SECURITY_LOGS : "related to"
 
-    %% Indexes for SITE_TRAFFIC_LOGS
     SITE_TRAFFIC_LOGS_INDEXES {
-        TIMESTAMP idx_site_traffic_logs_timestamp
-        UUID idx_site_traffic_logs_user_id
-        INET idx_site_traffic_logs_ip_address
-        TEXT idx_site_traffic_logs_request_path
+        timestamp idx_site_traffic_logs_timestamp
+        uuid idx_site_traffic_logs_user_id
+        inet idx_site_traffic_logs_ip_address
+        text idx_site_traffic_logs_request_path
     }
 
-    %% Indexes for SECURITY_LOGS
     SECURITY_LOGS_INDEXES {
-        TIMESTAMP idx_security_logs_timestamp
-        VARCHAR(50) idx_security_logs_event_type
-        UUID idx_security_logs_user_id
-        INET idx_security_logs_ip_address
-        VARCHAR(20) idx_security_logs_severity
+        timestamp idx_security_logs_timestamp
+        varchar idx_security_logs_event_type
+        uuid idx_security_logs_user_id
+        inet idx_security_logs_ip_address
+        varchar idx_security_logs_severity
     }
 
     SITE_TRAFFIC_LOGS ||--|| SITE_TRAFFIC_LOGS_INDEXES : "has indexes"
     SECURITY_LOGS ||--|| SECURITY_LOGS_INDEXES : "has indexes"
+```
