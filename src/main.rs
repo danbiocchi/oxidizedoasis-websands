@@ -103,7 +103,7 @@ async fn setup_database(run_migrations: bool) -> Result<sqlx::Pool<Postgres>, Bo
     drop(su_conn);
     info!("Closed super user connection");
 
-    // Set up connection pool with application user
+    // Set up connection pool with application usr
     info!("Setting up connection pool for application user");
     let pool = match PgPoolOptions::new()
         .max_connections(5)

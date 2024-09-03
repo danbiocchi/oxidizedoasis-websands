@@ -67,7 +67,7 @@ Before you begin, ensure you have the following installed:
 
 1. Clone the repository:
    ```sh
-   git clone https://github.com/yourusername/oxidizedoasis-websands.git
+   git clone https://github.com/danbiocchi/oxidizedoasis-websands.git
    cd oxidizedoasis-websands
    ```
 
@@ -82,15 +82,20 @@ Before you begin, ensure you have the following installed:
    FROM_EMAIL=noreply@yourdomain.com
    RUST_LOG=debug
    RUN_MIGRATIONS=true
+   SU_DATABASE_URL=postgres://superuser:password@localhost/postgres
+   SERVER_HOST=127.0.0.1
+   SERVER_PORT=8080
+   ENVIRONMENT=development
+   DEVELOPMENT_URL=http://localhost:8080
    ```
-   Replace the placeholders with your actual database and SMTP credentials.
+   Replace the placeholders with your actual database, SMTP, and other credentials.
 
 3. Build and run the project:
    ```sh
    cargo run
    ```
 
-4. The application will automatically create the database if it doesn't exist and run all necessary migrations.
+4. The application will automatically create the database if it doesn't exist, run all necessary migrations, and start the server.
 
 5. Visit `http://localhost:8080` in your browser to access the application.
 
@@ -106,6 +111,11 @@ Before you begin, ensure you have the following installed:
 - `FROM_EMAIL`: Email address used as the sender for verification emails
 - `RUST_LOG`: Logging level (e.g., debug, info, warn, error)
 - `RUN_MIGRATIONS`: Whether to run database migrations on startup (true/false)
+- `SU_DATABASE_URL`: Superuser database connection string for initial setup
+- `SERVER_HOST`: Host address for the server
+- `SERVER_PORT`: Port number for the server
+- `ENVIRONMENT`: Current environment (development or production)
+- `DEVELOPMENT_URL`: URL for the development environment
 
 ## 📚 Usage
 
