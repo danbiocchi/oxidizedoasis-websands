@@ -14,7 +14,9 @@ use std::time::Duration;
 use sqlx::migrate::MigrateDatabase;
 use crate::middleware::validator;
 use crate::handlers::admin::admin_validator;
-use crate::middleware::cors_logger::CorsLogger;
+use crate::middleware::cors_logger;
+mod config;
+use config::Config;
 
 mod handlers;
 mod models;
@@ -159,6 +161,8 @@ async fn main() -> std::io::Result<()> {
         }
     };
 
+    let config = Config::new();
+
     let host = env::var("SERVER_HOST").unwrap_or_else(|_| "127.0.0.1".to_string());
     let port = env::var("SERVER_PORT").unwrap_or_else(|_| "8080".to_string());
     let server_addr = format!("{}:{}", host, port);
@@ -185,13 +189,10 @@ async fn main() -> std::io::Result<()> {
             .allowed_headers(vec![http::header::AUTHORIZATION, http::header::ACCEPT, http::header::CONTENT_TYPE])
             .max_age(3600);
 
-        let auth = HttpAuthentication::bearer(validator);
-        let admin_auth = HttpAuthentication::bearer(admin_validator);
-
         App::new()
+            .wrap(cors)  
             .app_data(web::Data::new(pool.clone()))
-            .wrap(CorsLogger)
-            .wrap(cors)
+            .wrap(cors_logger::CorsLogger::new(config.clone()))
             .wrap(actix_web::middleware::Logger::default())
             .wrap(
                 actix_web::middleware::DefaultHeaders::new()
@@ -209,14 +210,14 @@ async fn main() -> std::io::Result<()> {
             )
             .service(
                 web::scope("/api")
-                    .wrap(auth)
+                    .wrap(HttpAuthentication::bearer(validator))
                     .service(handlers::user::get_user)
                     .service(handlers::user::update_user)
                     .service(handlers::user::delete_user)
             )
             .service(
                 web::scope("/admin")
-                    .wrap(admin_auth)
+                    .wrap(HttpAuthentication::bearer(admin_validator))
                     .route("/dashboard", web::get().to(handlers::admin::admin_dashboard))
             )
             .service(fs::Files::new("/css", "./static/css").show_files_listing())
