@@ -25,7 +25,21 @@ mod email;
 mod middleware;
 mod validation;
 
-
+/// Sets up the database connection pool and runs migrations if specified.
+///
+/// This function performs the following steps:
+/// 1. Retrieves database configuration from environment variables.
+/// 2. Validates the database URL format.
+/// 3. Creates the database if it doesn't exist.
+/// 4. Grants necessary privileges to the application user.
+/// 5. Sets up a connection pool for the application.
+/// 6. Runs database migrations if specified.
+///
+/// # Arguments
+/// * `run_migrations` - A boolean indicating whether to run migrations.
+///
+/// # Returns
+/// * `Result<sqlx::Pool<Postgres>, Box<dyn std::error::Error>>` - A database connection pool on success, or an error.
 async fn setup_database(run_migrations: bool) -> Result<sqlx::Pool<Postgres>, Box<dyn std::error::Error>> {
     // Fetch environment variables
     let su_database_url = env::var("SU_DATABASE_URL")
@@ -139,20 +153,26 @@ async fn setup_database(run_migrations: bool) -> Result<sqlx::Pool<Postgres>, Bo
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
+    // Load environment variables from .env file
     dotenv().ok();
+
+    // Initialize the logger with the default filter level set to "debug"
     env_logger::Builder::from_env(Env::default().default_filter_or("debug")).init();
 
     info!("Starting OxidizedOasis-WebSands application");
 
+    // Ensure critical environment variables are set
     let _su_database_url = env::var("SU_DATABASE_URL")
         .expect("SU_DATABASE_URL must be set in environment variables");
     let _app_database_url = env::var("DATABASE_URL")
         .expect("DATABASE_URL must be set in environment variables");
 
+    // Determine whether to run database migrations
     let run_migrations = env::var("RUN_MIGRATIONS")
         .map(|v| v.to_lowercase() == "true")
         .unwrap_or(true);
 
+    // Set up the database connection pool
     let pool = match setup_database(run_migrations).await {
         Ok(pool) => pool,
         Err(e) => {
@@ -161,20 +181,24 @@ async fn main() -> std::io::Result<()> {
         }
     };
 
+    // Initialize application configuration
     let config = Config::new();
 
+    // Determine the server host and port from environment variables or use defaults
     let host = env::var("SERVER_HOST").unwrap_or_else(|_| "127.0.0.1".to_string());
     let port = env::var("SERVER_PORT").unwrap_or_else(|_| "8080".to_string());
     let server_addr = format!("{}:{}", host, port);
 
     debug!("Server will be listening on: {}", server_addr);
 
+    // Configure rate limiting
     let governor_conf = GovernorConfigBuilder::default()
         .per_second(2)
         .burst_size(5)
         .finish()
         .unwrap();
 
+    // Determine the allowed origin for CORS based on the environment
     let environment = env::var("ENVIRONMENT").unwrap_or_else(|_| "development".to_string());
     let allowed_origin = match environment.as_str() {
         "production" => env::var("PRODUCTION_URL").expect("PRODUCTION_URL must be set in production"),
@@ -182,25 +206,29 @@ async fn main() -> std::io::Result<()> {
         _ => panic!("ENVIRONMENT must be set to either 'production' or 'development'"),
     };
 
+    // Configure and start the HTTP server
     HttpServer::new(move || {
+        // Configure CORS
         let cors = Cors::default()
             .allowed_origin(&allowed_origin)
             .allowed_methods(vec!["GET", "POST", "PUT", "DELETE"])
             .allowed_headers(vec![http::header::AUTHORIZATION, http::header::ACCEPT, http::header::CONTENT_TYPE])
             .max_age(3600);
 
+        // Build the application with all middleware and service configurations
         App::new()
-            .wrap(cors)  
-            .app_data(web::Data::new(pool.clone()))
-            .wrap(cors_logger::CorsLogger::new(config.clone()))
-            .wrap(actix_web::middleware::Logger::default())
-            .wrap(
+            .wrap(cors)  // Apply CORS middleware
+            .app_data(web::Data::new(pool.clone()))  // Share database pool across handlers
+            .wrap(cors_logger::CorsLogger::new(config.clone()))  // Custom CORS logging
+            .wrap(actix_web::middleware::Logger::default())  // Standard request logging
+            .wrap(  // Apply security headers
                 actix_web::middleware::DefaultHeaders::new()
                     .add(("X-XSS-Protection", "1; mode=block"))
                     .add(("X-Frame-Options", "DENY"))
                     .add(("X-Content-Type-Options", "nosniff"))
                     .add(("Referrer-Policy", "strict-origin-when-cross-origin"))
             )
+            // Public routes with rate limiting
             .service(
                 web::scope("/users")
                     .wrap(Governor::new(&governor_conf))
@@ -208,6 +236,7 @@ async fn main() -> std::io::Result<()> {
                     .route("/login", web::post().to(handlers::user::login_user))
                     .route("/verify", web::get().to(handlers::user::verify_email))
             )
+            // Protected API routes
             .service(
                 web::scope("/api")
                     .wrap(HttpAuthentication::bearer(validator))
@@ -215,16 +244,20 @@ async fn main() -> std::io::Result<()> {
                     .service(handlers::user::update_user)
                     .service(handlers::user::delete_user)
             )
+            // Admin routes with separate authentication
             .service(
                 web::scope("/admin")
                     .wrap(HttpAuthentication::bearer(admin_validator))
                     .route("/dashboard", web::get().to(handlers::admin::admin_dashboard))
             )
+            // Serve static files
             .service(fs::Files::new("/css", "./static/css").show_files_listing())
             .service(fs::Files::new("/", "./static").index_file("index.html"))
+            // Custom route for token failure
             .service(web::resource("/token_failure.html").to(|| async {
                 HttpResponse::Ok().content_type("text/html").body(include_str!("../static/token_failure.html"))
             }))
+            // Default service for unhandled routes
             .default_service(web::route().to(|req: actix_web::HttpRequest| async move {
                 error!("Unhandled request: {:?}", req);
                 HttpResponse::NotFound().json(serde_json::json!({
@@ -233,7 +266,7 @@ async fn main() -> std::io::Result<()> {
                 }))
             }))
     })
-        .bind(server_addr)?
-        .run()
-        .await
+    .bind(server_addr)?  // Bind the server to the specified address
+    .run()  // Run the server
+    .await  // Wait for the server to complete
 }
