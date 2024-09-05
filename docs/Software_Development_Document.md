@@ -8,7 +8,6 @@
    1.3 [Definitions, Acronyms, and Abbreviations](#13-definitions-acronyms-and-abbreviations)
    1.4 [References](#14-references)
    1.5 [Overview](#15-overview)
-
 2. [System Overview](#2-system-overview)
    2.1 [System Description](#21-system-description)
    2.2 [System Architecture](#22-system-architecture)
@@ -16,63 +15,52 @@
    2.4 [Operating Environment](#24-operating-environment)
    2.5 [Design and Implementation Constraints](#25-design-and-implementation-constraints)
    2.6 [Assumptions and Dependencies](#26-assumptions-and-dependencies)
-
 3. [System Features](#3-system-features)
    3.1 [User Management](#31-user-management)
    3.2 [Authentication and Authorization](#32-authentication-and-authorization)
    3.3 [Security Features](#33-security-features)
    3.4 [API Endpoints](#34-api-endpoints)
    3.5 [Frontend Interface](#35-frontend-interface)
-
 4. [Data Model](#4-data-model)
    4.1 [Database Schema](#41-database-schema)
    4.2 [Entity Relationships](#42-entity-relationships)
    4.3 [Data Access Layer](#43-data-access-layer)
-
 5. [External Interfaces](#5-external-interfaces)
    5.1 [User Interfaces](#51-user-interfaces)
    5.2 [Software Interfaces](#52-software-interfaces)
    5.3 [Communication Interfaces](#53-communication-interfaces)
-
 6. [Non-functional Requirements](#6-non-functional-requirements)
    6.1 [Performance Requirements](#61-performance-requirements)
    6.2 [Security Requirements](#62-security-requirements)
    6.3 [Reliability and Availability](#63-reliability-and-availability)
    6.4 [Scalability](#64-scalability)
-
 7. [Implementation Details](#7-implementation-details)
    7.1 [Programming Languages and Frameworks](#71-programming-languages-and-frameworks)
    7.2 [Development Tools and Environment](#72-development-tools-and-environment)
    7.3 [Coding Standards and Best Practices](#73-coding-standards-and-best-practices)
    7.4 [Error Handling and Logging](#74-error-handling-and-logging)
-
 8. [Testing](#8-testing)
    8.1 [Test Approach](#81-test-approach)
    8.2 [Test Categories](#82-test-categories)
    8.3 [Test Environment](#83-test-environment)
    8.4 [Security Testing](#84-security-testing)
-
 9. [Deployment](#9-deployment)
    9.1 [Deployment Architecture](#91-deployment-architecture)
    9.2 [Deployment Process](#92-deployment-process)
    9.3 [System Dependencies](#93-system-dependencies)
    9.4 [Configuration Management](#94-configuration-management)
-
 10. [Maintenance and Support](#10-maintenance-and-support)
     10.1 [Maintenance Tasks](#101-maintenance-tasks)
     10.2 [Support Procedures](#102-support-procedures)
     10.3 [Monitoring and Logging](#103-monitoring-and-logging)
-
 11. [Future Enhancements](#11-future-enhancements)
     11.1 [Advanced User Profile Features](#111-advanced-user-profile-features)
     11.2 [Analytics and Reporting](#112-analytics-and-reporting)
     11.3 [Integration with External Services](#113-integration-with-external-services)
-
 12. [Appendices](#12-appendices)
     12.1 [Glossary](#121-glossary)
     12.2 [Reference Documents](#122-reference-documents)
     12.3 [API Documentation](#123-api-documentation)
-
 # OxidizedOasis-WebSands Software Development Document
 
 ## 1. Introduction
