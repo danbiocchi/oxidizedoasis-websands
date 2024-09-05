@@ -73,7 +73,6 @@
     12.2 [Reference Documents](#122-reference-documents)
     12.3 [API Documentation](#123-api-documentation)
 
-
 # OxidizedOasis-WebSands Software Development Document
 
 ## 1. Introduction
