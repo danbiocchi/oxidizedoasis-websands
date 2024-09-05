@@ -8,168 +8,249 @@
 
 ## 1. User Management
 
-### 1.1 User Registration
-🔷 Test valid user registration
-🔷 Test duplicate username registration
-🔷 Test duplicate email registration
-🔷 Test invalid username format
-🔷 Test invalid email format
-🔷 Test weak password
-🔷 Test password hashing
-🔷 Test verification email sent
+<details>
+<summary>1.1 User Registration</summary>
 
-### 1.2 User Login
-🔷 Test valid user login
-🔷 Test login with non-existent user
-🔷 Test login with incorrect password
-🔷 Test login with unverified email
-✅ Test JWT token generation
+- 🔷 Test valid user registration
+- 🔷 Test duplicate username registration
+- 🔷 Test duplicate email registration
+- 🔷 Test invalid username format
+- 🔷 Test invalid email format
+- 🔷 Test weak password
+- 🔷 Test password hashing
+- 🔷 Test verification email sent
+</details>
 
-### 1.3 Password Management
-🚧 Password reset functionality not fully implemented
-🔷 Test password reset request
-💡 Test password reset with valid token
-💡 Test password reset with invalid token
-💡 Test password change for authenticated user
+<details>
+<summary>1.2 User Login</summary>
 
-### 1.4 Email Verification
-🔷 Test email verification with valid token
-🔷 Test email verification with invalid token
-🔷 Test email verification with expired token
+- 🔷 Test valid user login
+- 🔷 Test login with non-existent user
+- 🔷 Test login with incorrect password
+- 🔷 Test login with unverified email
+- ✅ Test JWT token generation
+</details>
 
-### 1.5 User Profile Management
-🔷 Test retrieving user profile
-🔷 Test updating user profile
-🔷 Test deleting user account
+<details>
+<summary>1.3 Password Management</summary>
+
+- 🚧 Password reset functionality not fully implemented
+- 🔷 Test password reset request
+- 💡 Test password reset with valid token
+- 💡 Test password reset with invalid token
+- 💡 Test password change for authenticated user
+</details>
+
+<details>
+<summary>1.4 Email Verification</summary>
+
+- 🔷 Test email verification with valid token
+- 🔷 Test email verification with invalid token
+- 🔷 Test email verification with expired token
+</details>
+
+<details>
+<summary>1.5 User Profile Management</summary>
+
+- 🔷 Test retrieving user profile
+- 🔷 Test updating user profile
+- 🔷 Test deleting user account
+</details>
 
 ## 2. Authentication and Authorization
 
-### 2.1 JWT Token Handling
-✅ Test JWT token generation
-✅ Test JWT token validation
-✅ Test JWT token expiration (partial)
-✅ Test JWT creation with empty secret
-✅ Test JWT validation with invalid secret
-✅ Test JWT validation with invalid token
-✅ Test JWT claims content
-🔷 Test handling of malformed JWTs
-💡 Test JWT token revocation
-💡 Test JWT refresh token mechanism
-💡 Test JWT with different algorithms (e.g., RS256)
-💡 Test JWT with custom claims
-🔷 Test JWT token generation with different expiration times
-💡 Test JWT validation with clock skew
+<details>
+<summary>2.1 JWT Token Handling</summary>
 
-### 2.2 Role-Based Access Control
-🔷 Test access to user-only resources
-🔷 Test access to admin-only resources
-🔷 Test role assignment and modification
-🔷 Test access denied for insufficient permissions
-💡 Test JWT with role claims
+- ✅ Test JWT token generation
+- ✅ Test JWT token validation
+- ✅ Test JWT token expiration (partial)
+- ✅ Test JWT creation with empty secret
+- ✅ Test JWT validation with invalid secret
+- ✅ Test JWT validation with invalid token
+- ✅ Test JWT claims content
+- 🔷 Test handling of malformed JWTs
+- 💡 Test JWT token revocation
+- 💡 Test JWT refresh token mechanism
+- 💡 Test JWT with different algorithms (e.g., RS256)
+- 💡 Test JWT with custom claims
+- 🔷 Test JWT token generation with different expiration times
+- 💡 Test JWT validation with clock skew
+</details>
+
+<details>
+<summary>2.2 Role-Based Access Control</summary>
+
+- 🔷 Test access to user-only resources
+- 🔷 Test access to admin-only resources
+- 🔷 Test role assignment and modification
+- 🔷 Test access denied for insufficient permissions
+- 💡 Test JWT with role claims
+</details>
 
 ## 3. Database Operations
 
-### 3.1 User Data CRUD
-🔷 Test creating user data
-🔷 Test reading user data
-🔷 Test updating user data
-🔷 Test deleting user data
+<details>
+<summary>3.1 User Data CRUD</summary>
 
-### 3.2 Database Connection
-🔷 Test database connection establishment
-🔷 Test connection pool management
+- 🔷 Test creating user data
+- 🔷 Test reading user data
+- 🔷 Test updating user data
+- 🔷 Test deleting user data
+</details>
 
-### 3.3 Query Execution
-🔷 Test simple query execution
-🔷 Test complex query execution
-💡 Test transaction management
+<details>
+<summary>3.2 Database Connection</summary>
+
+- 🔷 Test database connection establishment
+- 🔷 Test connection pool management
+</details>
+
+<details>
+<summary>3.3 Query Execution</summary>
+
+- 🔷 Test simple query execution
+- 🔷 Test complex query execution
+- 💡 Test transaction management
+</details>
 
 ## 4. API Endpoints
 
-### 4.1 User Management Endpoints
-🔷 Test user registration endpoint
-🔷 Test user login endpoint
-🔷 Test user profile endpoint
-🚧 Password reset endpoints not fully implemented
-🔷 Test password reset request endpoint
-💡 Test password reset confirmation endpoint
+<details>
+<summary>4.1 User Management Endpoints</summary>
 
-### 4.2 Admin Endpoints
-🔷 Test user listing endpoint
-🔷 Test user management endpoints
+- 🔷 Test user registration endpoint
+- 🔷 Test user login endpoint
+- 🔷 Test user profile endpoint
+- 🚧 Password reset endpoints not fully implemented
+- 🔷 Test password reset request endpoint
+- 💡 Test password reset confirmation endpoint
+</details>
 
-### 4.3 Error Handling
-🔷 Test invalid input handling
-🔷 Test internal server error handling
-🔷 Test not found error handling
+<details>
+<summary>4.2 Admin Endpoints</summary>
+
+- 🔷 Test user listing endpoint
+- 🔷 Test user management endpoints
+</details>
+
+<details>
+<summary>4.3 Error Handling</summary>
+
+- 🔷 Test invalid input handling
+- 🔷 Test internal server error handling
+- 🔷 Test not found error handling
+</details>
 
 ## 5. Email Service
 
-### 5.1 Email Sending
-🔷 Test sending verification email
-🚧 Test sending password reset email
-🔷 Test handling email sending failures
+<details>
+<summary>5.1 Email Sending</summary>
 
-### 5.2 Email Templates
-🔷 Test verification email template rendering
-🚧 Test password reset email template rendering
+- 🔷 Test sending verification email
+- 🚧 Test sending password reset email
+- 🔷 Test handling email sending failures
+</details>
+
+<details>
+<summary>5.2 Email Templates</summary>
+
+- 🔷 Test verification email template rendering
+- 🚧 Test password reset email template rendering
+</details>
 
 ## 6. Middleware
 
-### 6.1 Authentication Middleware
-🔷 Test JWT authentication middleware
-🔷 Test handling requests with invalid tokens
-🔷 Test handling requests with expired tokens
+<details>
+<summary>6.1 Authentication Middleware</summary>
 
-### 6.2 Logging Middleware
-🔷 Test request logging
-🔷 Test error logging
+- 🔷 Test JWT authentication middleware
+- 🔷 Test handling requests with invalid tokens
+- 🔷 Test handling requests with expired tokens
+</details>
 
-### 6.3 CORS Middleware
-🔷 Test CORS headers for allowed origins
-🔷 Test CORS preflight requests
+<details>
+<summary>6.2 Logging Middleware</summary>
+
+- 🔷 Test request logging
+- 🔷 Test error logging
+</details>
+
+<details>
+<summary>6.3 CORS Middleware</summary>
+
+- 🔷 Test CORS headers for allowed origins
+- 🔷 Test CORS preflight requests
+</details>
 
 ## 7. Config Management
 
-### 7.1 Environment Variables
-🔷 Test loading valid environment variables
-🔷 Test handling missing environment variables
-🔷 Test handling invalid environment variable values
+<details>
+<summary>7.1 Environment Variables</summary>
+
+- 🔷 Test loading valid environment variables
+- 🔷 Test handling missing environment variables
+- 🔷 Test handling invalid environment variable values
+</details>
 
 ## 8. Utility Functions
 
-### 8.1 Input Validation
-🔷 Test username validation
-🔷 Test email validation
-🔷 Test password strength validation
+<details>
+<summary>8.1 Input Validation</summary>
 
-### 8.2 Data Sanitization
-🔷 Test input sanitization for user data
-🔷 Test output sanitization for user data
+- 🔷 Test username validation
+- 🔷 Test email validation
+- 🔷 Test password strength validation
+</details>
+
+<details>
+<summary>8.2 Data Sanitization</summary>
+
+- 🔷 Test input sanitization for user data
+- 🔷 Test output sanitization for user data
+</details>
 
 ## 9. Integration Tests
 
-### 9.1 User Registration Flow
-🔷 Test complete user registration flow including email verification
+<details>
+<summary>9.1 User Registration Flow</summary>
 
-### 9.2 User Authentication Flow
-🔷 Test user login, token generation, and authenticated requests
+- 🔷 Test complete user registration flow including email verification
+</details>
 
-### 9.3 Password Reset Flow
-🚧 Password reset flow not fully implemented
-🔷 Test password reset request
-💡 Test complete password reset flow
+<details>
+<summary>9.2 User Authentication Flow</summary>
+
+- 🔷 Test user login, token generation, and authenticated requests
+</details>
+
+<details>
+<summary>9.3 Password Reset Flow</summary>
+
+- 🚧 Password reset flow not fully implemented
+- 🔷 Test password reset request
+- 💡 Test complete password reset flow
+</details>
 
 ## 10. Security Features
 
-### 10.1 Rate Limiting
-🔷 Test rate limiting for registration attempts
-🔷 Test rate limiting for login attempts
-🚧 Test rate limiting for password reset attempts
+<details>
+<summary>10.1 Rate Limiting</summary>
 
-### 10.2 Input Sanitization
-🔷 Test prevention of XSS attacks
-🔷 Test prevention of SQL injection attacks
+- ✅ Test rate limiting for registration attempts
+- ✅ Test rate limiting for login attempts
+- 🚧 Test rate limiting for password reset attempts
+</details>
 
-### 10.3 CORS Configuration
-🔷 Test CORS policy enforcement
+<details>
+<summary>10.2 Input Sanitization</summary>
+
+- 🔷 Test prevention of XSS attacks
+- 🔷 Test prevention of SQL injection attacks
+</details>
+
+<details>
+<summary>10.3 CORS Configuration</summary>
+
+- 🔷 Test CORS policy enforcement
+</details>
