@@ -1,7 +1,7 @@
 # OxidizedOasis-WebSands Project Structure
 
 ```mermaid
-graph TD
+graph LR
     A[oxidizedoasis-websands] --> B[docs]
     A --> C[migrations]
     A --> D[src]
