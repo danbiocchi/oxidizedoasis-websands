@@ -472,3 +472,5 @@ fn generate_verification_token() -> String {
         .map(|_| rng.sample(rand::distributions::Alphanumeric) as char)
         .collect()
 }
+
+

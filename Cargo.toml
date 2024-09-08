@@ -29,3 +29,6 @@ ammonia = "4.0.0"
 actix-governor = "0.5"
 actix-rt = "2.2"
 url = "2.5.2"
+
+[dev-dependencies]
+actix-rt = "2.2"
