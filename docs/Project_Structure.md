@@ -43,30 +43,35 @@ graph TD
 
     E --> E1[css]
     E --> E2[images]
-    E --> E3[admin_dashboard.html]
-    E --> E4[dashboard.html]
-    E --> E5[email_verified.html]
-    E --> E6[index.html]
-    E --> E7[token_failure.html]
+    E --> E3[HTML files]
 
     E1 --> E1a[dashboard.css]
     E1 --> E1b[styles.css]
 
     E2 --> E2a[signup-page-screenshot.png]
 
-    G --> G1[.env]
-    G --> G2[.env.test]
-    G --> G3[.gitignore]
-    G --> G4[Cargo.lock]
-    G --> G5[Cargo.toml]
-    G --> G6[readme.md]
+    E3 --> E3a[admin_dashboard.html]
+    E3 --> E3b[dashboard.html]
+    E3 --> E3c[email_verified.html]
+    E3 --> E3d[index.html]
+    E3 --> E3e[token_failure.html]
 
-    classDef default fill:#f9f,stroke:#333,stroke-width:2px;
-    classDef directory fill:#bbf,stroke:#333,stroke-width:2px;
-    classDef file fill:#ffd,stroke:#333,stroke-width:1px;
+    G --> G1[.env files]
+    G --> G2[.gitignore]
+    G --> G3[Cargo.lock]
+    G --> G4[Cargo.toml]
+    G --> G5[readme.md]
+
+    classDef default fill:#f9f9f9,stroke:#333,stroke-width:1px;
+    classDef rootDir fill:#e1f5fe,stroke:#01579b,stroke-width:2px;
+    classDef mainDir fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px;
+    classDef subDir fill:#fff3e0,stroke:#ef6c00,stroke-width:1px;
+    classDef file fill:#ffffff,stroke:#616161,stroke-width:1px;
     
-    class A,B,C,D,E,F,G directory;
-    class B1,B2,B3,B4,B5,C1,D1a,D1b,D2a,D2b,D2c,D3a,D3b,D3c,D4a,D4b,D4c,D5,D6,D7,D8,E1a,E1b,E2a,E3,E4,E5,E6,E7,G1,G2,G3,G4,G5,G6 file;
+    class A rootDir;
+    class B,C,D,E,F,G mainDir;
+    class D1,D2,D3,D4,E1,E2,E3 subDir;
+    class B1,B2,B3,B4,B5,C1,D1a,D1b,D2a,D2b,D2c,D3a,D3b,D3c,D4a,D4b,D4c,D5,D6,D7,D8,E1a,E1b,E2a,E3a,E3b,E3c,E3d,E3e,G1,G2,G3,G4,G5 file;
 ```
 
 ## Directory and File Descriptions
