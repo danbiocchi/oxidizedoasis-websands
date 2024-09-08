@@ -111,9 +111,6 @@ Directory for integration tests.
 - `Cargo.toml`: Cargo manifest file specifying project dependencies and metadata.
 - `readme.md`: Provides an overview and instructions for the project.
 
-This Mermaid chart provides a visual representation of the OxidizedOasis-WebSands project structure, making it easy to understand the project's organization at a glance.
-
-
 
 # OxidizedOasis-WebSands Plain-Text Project Structure
 ```
