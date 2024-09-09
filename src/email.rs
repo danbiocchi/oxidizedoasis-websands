@@ -2,35 +2,34 @@ use lettre::transport::smtp::authentication::Credentials;
 use lettre::{Message, SmtpTransport, Transport};
 use lettre::message::header::ContentType;
 use log::error;
+use std::error::Error;
+#[allow(dead_code)]
+pub trait EmailServiceTrait: Send + Sync {
+    fn send_verification_email(&self, to_email: &str, verification_token: &str) -> Result<(), Box<dyn Error>>;
+    fn clone_box(&self) -> Box<dyn EmailServiceTrait>;
+}
 
-/// Struct to handle email-related operations
-pub struct EmailService {
+#[derive(Clone)]
+pub struct RealEmailService {
     smtp_username: String,
     smtp_password: String,
     smtp_server: String,
     from_email: String,
 }
 
-impl EmailService {
-    /// Create a new EmailService instance
+impl RealEmailService {
     pub fn new() -> Self {
-        EmailService {
+        RealEmailService {
             smtp_username: std::env::var("SMTP_USERNAME").expect("SMTP_USERNAME must be set"),
             smtp_password: std::env::var("SMTP_PASSWORD").expect("SMTP_PASSWORD must be set"),
             smtp_server: std::env::var("SMTP_SERVER").expect("SMTP_SERVER must be set"),
             from_email: std::env::var("FROM_EMAIL").expect("FROM_EMAIL must be set"),
         }
     }
+}
 
-    /// Send a verification email to the user
-    ///
-    /// # Arguments
-    /// * `to_email` - The recipient's email address
-    /// * `verification_token` - The verification token to be included in the email
-    ///
-    /// # Returns
-    /// * `Result<(), Box<dyn std::error::Error>>` - Ok if email sent successfully, Err otherwise
-    pub fn send_verification_email(&self, to_email: &str, verification_token: &str) -> Result<(), Box<dyn std::error::Error>> {
+impl EmailServiceTrait for RealEmailService {
+    fn send_verification_email(&self, to_email: &str, verification_token: &str) -> Result<(), Box<dyn Error>> {
         let base_url = std::env::var("ENVIRONMENT")
             .map(|env| {
                 if env == "production" {
@@ -83,6 +82,47 @@ impl EmailService {
                 error!("Could not send email: {:?}", e);
                 Err(Box::new(e))
             }
+        }
+    }
+
+    fn clone_box(&self) -> Box<dyn EmailServiceTrait> {
+        Box::new(self.clone())
+    }
+}
+
+#[cfg(test)]
+pub mod mock {
+    use super::*;
+    use std::sync::Mutex;
+
+    pub struct MockEmailService {
+        pub sent_emails: Mutex<Vec<(String, String)>>,
+    }
+    #[allow(dead_code)]
+    impl MockEmailService {
+        pub fn new() -> Self {
+            MockEmailService {
+                sent_emails: Mutex::new(Vec::new()),
+            }
+        }
+    }
+
+    impl Clone for MockEmailService {
+        fn clone(&self) -> Self {
+            MockEmailService {
+                sent_emails: Mutex::new(self.sent_emails.lock().unwrap().clone()),
+            }
+        }
+    }
+    #[allow(dead_code)]
+    impl EmailServiceTrait for MockEmailService {
+        fn send_verification_email(&self, to_email: &str, verification_token: &str) -> Result<(), Box<dyn Error>> {
+            self.sent_emails.lock().unwrap().push((to_email.to_string(), verification_token.to_string()));
+            Ok(())
+        }
+        #[allow(dead_code)]
+        fn clone_box(&self) -> Box<dyn EmailServiceTrait> {
+            Box::new(self.clone())
         }
     }
 }

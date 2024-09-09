@@ -1,7 +1,7 @@
 use actix_web::{web, HttpResponse, Responder, get, put, delete};
 use sqlx::PgPool;
 use crate::models::user::{User, UserResponse};
-use crate::email::EmailService;
+use crate::email::{EmailServiceTrait};
 use bcrypt::{hash, verify, DEFAULT_COST};
 use uuid::Uuid;
 use log::{debug, error, info, warn};
@@ -39,28 +39,11 @@ impl TryFrom<web::Query<TokenQuery>> for TokenQuery {
 }
 
 /// Handler for user registration
-///
-/// # API Example
-/// POST /users/register
-/// Content-Type: application/json
-///
-/// {
-///     "username": "newuser",
-///     "email": "newuser@example.com",
-///     "password": "securepassword123"
-/// }
-///
-/// # Response
-/// 201 Created
-/// {
-///     "id": "123e4567-e89b-12d3-a456-426614174000",
-///     "username": "newuser",
-///     "email": "newuser@example.com",
-///     "is_email_verified": false,
-///     "created_at": "2023-04-20T12:00:00Z"
-/// }
-pub async fn create_user(pool: web::Data<PgPool>, user: web::Json<UserInput>) -> impl Responder {
-
+pub async fn create_user(
+    pool: web::Data<PgPool>,
+    user: web::Json<UserInput>,
+    email_service: web::Data<Box<dyn EmailServiceTrait>>,
+) -> impl Responder {
     match validate_and_sanitize_user_input(user.into_inner()) {
         Ok(validated_user) => {
             debug!("Received create_user request at /users/register");
@@ -108,7 +91,7 @@ pub async fn create_user(pool: web::Data<PgPool>, user: web::Json<UserInput>) ->
             match result {
                 Ok(user) => {
                     // Send verification email
-                    let email_service = EmailService::new();
+                    let email_service = email_service.get_ref();
                     match email_service.send_verification_email(user.email.as_deref().unwrap_or_default(), &verification_token) {
                         Ok(_) => {
                             info!("Verification email sent to: {}", user.email.as_deref().unwrap_or_default());
@@ -138,29 +121,6 @@ pub async fn create_user(pool: web::Data<PgPool>, user: web::Json<UserInput>) ->
 }
 
 /// Handler for user login
-///
-/// # API Example
-/// POST /users/login
-/// Content-Type: application/json
-///
-/// {
-///     "username": "existinguser",
-///     "password": "correctpassword123"
-/// }
-///
-/// # Response
-/// 200 OK
-/// {
-///     "message": "Login successful",
-///     "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-///     "user": {
-///         "id": "123e4567-e89b-12d3-a456-426614174000",
-///         "username": "existinguser",
-///         "email": "existinguser@example.com",
-///         "is_email_verified": true,
-///         "created_at": "2023-04-19T10:30:00Z"
-///     }
-/// }
 pub async fn login_user(pool: web::Data<PgPool>, user: web::Json<LoginInput>) -> impl Responder {
     let validated_user = match validate_and_sanitize_login_input(user.into_inner()) {
         Ok(user) => user,
@@ -222,13 +182,6 @@ pub async fn login_user(pool: web::Data<PgPool>, user: web::Json<LoginInput>) ->
 }
 
 /// Handler for email verification
-///
-/// # API Example
-/// GET /users/verify?token=abcdef1234567890abcdef1234567890
-///
-/// # Response
-/// 302 Found
-/// Location: /email_verified.html
 pub async fn verify_email(
     pool: web::Data<PgPool>,
     token_query: web::Query<TokenQuery>,
@@ -274,20 +227,6 @@ pub async fn verify_email(
 }
 
 /// Handler for getting user information
-///
-/// # API Example
-/// GET /api/users/123e4567-e89b-12d3-a456-426614174000
-/// Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
-///
-/// # Response
-/// 200 OK
-/// {
-///     "id": "123e4567-e89b-12d3-a456-426614174000",
-///     "username": "existinguser",
-///     "email": "existinguser@example.com",
-///     "is_email_verified": true,
-///     "created_at": "2023-04-19T10:30:00Z"
-/// }
 #[get("/users/{id}")]
 pub async fn get_user(
     pool: web::Data<PgPool>,
@@ -337,26 +276,6 @@ pub async fn get_user(
 }
 
 /// Handler for updating user information
-///
-/// # API Example
-/// PUT /api/users/123e4567-e89b-12d3-a456-426614174000
-/// Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
-/// Content-Type: application/json
-///
-/// {
-///     "username": "updatedusername",
-///     "password": "newpassword123"
-/// }
-///
-/// # Response
-/// 200 OK
-/// {
-///     "id": "123e4567-e89b-12d3-a456-426614174000",
-///     "username": "updatedusername",
-///     "email": "existinguser@example.com",
-///     "is_email_verified": true,
-///     "created_at": "2023-04-19T10:30:00Z"
-/// }
 #[put("/users/{id}")]
 pub async fn update_user(
     pool: web::Data<PgPool>,
@@ -426,13 +345,6 @@ pub async fn update_user(
 }
 
 /// Handler for deleting a user
-///
-/// # API Example
-/// DELETE /api/users/123e4567-e89b-12d3-a456-426614174000
-/// Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
-///
-/// # Response
-/// 204 No Content
 #[delete("/users/{id}")]
 pub async fn delete_user(
     pool: web::Data<PgPool>,

@@ -1,5 +1,14 @@
 # OxidizedOasis-WebSands Test-Driven Development Plan
+# OxidizedOasis-WebSands Test-Driven Development Plan
 
+```mermaid
+pie title Implementation Status
+    "Implemented" : 39
+    "Can be implemented now" : 24
+    "Not fully implemented" : 5
+    "Future implementation" : 13
+```
+    
 ## Legend
 ✅ Implemented and tested  
 🔷 Can be implemented now  
@@ -10,21 +19,21 @@
 
 ### 1.1 User Registration
 
-🔷 Test valid user registration  
-🔷 Test duplicate username registration  
-🔷 Test duplicate email registration  
-🔷 Test invalid username format  
-🔷 Test invalid email format  
-🔷 Test weak password  
-🔷 Test password hashing  
+✅ Test valid user registration  
+✅ Test duplicate username registration  
+✅ Test duplicate email registration  
+✅ Test invalid username format  
+✅ Test invalid email format  
+✅ Test weak password  
+✅ Test password hashing  
 🔷 Test verification email sent
 
 ### 1.2 User Login
 
-🔷 Test valid user login  
-🔷 Test login with non-existent user  
-🔷 Test login with incorrect password  
-🔷 Test login with unverified email  
+✅ Test valid user login  
+✅ Test login with non-existent user  
+✅ Test login with incorrect password  
+✅ Test login with unverified email  
 ✅ Test JWT token generation
 
 ### 1.3 Password Management
@@ -53,17 +62,17 @@
 
 ✅ Test JWT token generation  
 ✅ Test JWT token validation  
-✅ Test JWT token expiration (partial)  
+✅ Test JWT token expiration  
 ✅ Test JWT creation with empty secret  
 ✅ Test JWT validation with invalid secret  
 ✅ Test JWT validation with invalid token  
 ✅ Test JWT claims content  
-🔷 Test handling of malformed JWTs  
+✅ Test handling of malformed JWTs  
 💡 Test JWT token revocation  
 💡 Test JWT refresh token mechanism  
 💡 Test JWT with different algorithms (e.g., RS256)  
 💡 Test JWT with custom claims  
-🔷 Test JWT token generation with different expiration times  
+✅ Test JWT token generation with different expiration times  
 💡 Test JWT validation with clock skew
 
 ### 2.2 Role-Based Access Control
@@ -85,8 +94,8 @@
 
 ### 3.2 Database Connection
 
-🔷 Test database connection establishment  
-🔷 Test connection pool management
+✅ Test database connection establishment  
+✅ Test connection pool management
 
 ### 3.3 Query Execution
 
@@ -98,9 +107,9 @@
 
 ### 4.1 User Management Endpoints
 
-🔷 Test user registration endpoint  
-🔷 Test user login endpoint  
-🔷 Test user profile endpoint  
+✅ Test user registration endpoint  
+✅ Test user login endpoint  
+✅ Test user profile endpoint  
 🚧 Password reset endpoints not fully implemented  
 🔷 Test password reset request endpoint  
 💡 Test password reset confirmation endpoint
@@ -112,9 +121,9 @@
 
 ### 4.3 Error Handling
 
-🔷 Test invalid input handling  
+✅ Test invalid input handling  
 🔷 Test internal server error handling  
-🔷 Test not found error handling
+✅ Test not found error handling
 
 ## 5. Email Service
 
@@ -133,9 +142,9 @@
 
 ### 6.1 Authentication Middleware
 
-🔷 Test JWT authentication middleware  
-🔷 Test handling requests with invalid tokens  
-🔷 Test handling requests with expired tokens
+✅ Test JWT authentication middleware  
+✅ Test handling requests with invalid tokens  
+✅ Test handling requests with expired tokens
 
 ### 6.2 Logging Middleware
 
@@ -172,11 +181,11 @@
 
 ### 9.1 User Registration Flow
 
-🔷 Test complete user registration flow including email verification
+✅ Test complete user registration flow including email verification
 
 ### 9.2 User Authentication Flow
 
-🔷 Test user login, token generation, and authenticated requests
+✅ Test user login, token generation, and authenticated requests
 
 ### 9.3 Password Reset Flow
 

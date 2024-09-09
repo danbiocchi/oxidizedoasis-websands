@@ -15,8 +15,10 @@ use sqlx::migrate::MigrateDatabase;
 use crate::middleware::validator;
 use crate::handlers::admin::admin_validator;
 use crate::middleware::cors_logger;
+use crate::email::{EmailServiceTrait, RealEmailService};
 mod config;
 use config::Config;
+use std::sync::Arc;
 
 mod handlers;
 mod models;
@@ -150,7 +152,6 @@ async fn setup_database(run_migrations: bool) -> Result<sqlx::Pool<Postgres>, Bo
     Ok(pool)
 }
 
-
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
     // Load environment variables from .env file
@@ -206,6 +207,9 @@ async fn main() -> std::io::Result<()> {
         _ => panic!("ENVIRONMENT must be set to either 'production' or 'development'"),
     };
 
+    // Initialize the email service
+    let email_service: Arc<dyn EmailServiceTrait> = Arc::new(RealEmailService::new());
+
     // Configure and start the HTTP server
     HttpServer::new(move || {
         // Configure CORS
@@ -219,14 +223,15 @@ async fn main() -> std::io::Result<()> {
         App::new()
             .wrap(cors)  // Apply CORS middleware
             .app_data(web::Data::new(pool.clone()))  // Share database pool across handlers
+            .app_data(web::Data::new(email_service.clone()))  // Share email service across handlers
             .wrap(cors_logger::CorsLogger::new(config.clone()))  // Custom CORS logging
             .wrap(actix_web::middleware::Logger::default())  // Standard request logging
             .wrap(  // Apply security headers
-                actix_web::middleware::DefaultHeaders::new()
-                    .add(("X-XSS-Protection", "1; mode=block"))
-                    .add(("X-Frame-Options", "DENY"))
-                    .add(("X-Content-Type-Options", "nosniff"))
-                    .add(("Referrer-Policy", "strict-origin-when-cross-origin"))
+                    actix_web::middleware::DefaultHeaders::new()
+                        .add(("X-XSS-Protection", "1; mode=block"))
+                        .add(("X-Frame-Options", "DENY"))
+                        .add(("X-Content-Type-Options", "nosniff"))
+                        .add(("Referrer-Policy", "strict-origin-when-cross-origin"))
             )
             // Public routes with rate limiting
             .service(
@@ -266,7 +271,7 @@ async fn main() -> std::io::Result<()> {
                 }))
             }))
     })
-    .bind(server_addr)?  // Bind the server to the specified address
-    .run()  // Run the server
-    .await  // Wait for the server to complete
+        .bind(server_addr)?  // Bind the server to the specified address
+        .run()  // Run the server
+        .await  // Wait for the server to complete
 }
