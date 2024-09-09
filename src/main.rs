@@ -223,7 +223,7 @@ async fn main() -> std::io::Result<()> {
         App::new()
             .wrap(cors)  // Apply CORS middleware
             .app_data(web::Data::new(pool.clone()))  // Share database pool across handlers
-            .app_data(web::Data::new(email_service.clone()))  // Share email service across handlers
+            .app_data(web::Data::new(email_service.clone()))  // Use Arc<dyn EmailServiceTrait>
             .wrap(cors_logger::CorsLogger::new(config.clone()))  // Custom CORS logging
             .wrap(actix_web::middleware::Logger::default())  // Standard request logging
             .wrap(  // Apply security headers

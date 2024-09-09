@@ -1,11 +1,13 @@
 use actix_web::error::ErrorUnauthorized;
-use actix_web::{dev::ServiceRequest, Error, web, HttpResponse};
+use actix_web::{dev::ServiceRequest, Error, web, HttpResponse, Responder};
 use actix_web_httpauth::extractors::bearer::BearerAuth;
 use sqlx::PgPool;
 use crate::auth;
 use log::{error, info};
 use chrono; // Import chrono for DateTime
 use uuid::Uuid; // Import Uuid for User struct
+use std::sync::Arc;
+use crate::email::EmailServiceTrait;
 
 #[derive(serde::Serialize)]
 struct User {
@@ -58,4 +60,13 @@ pub async fn admin_dashboard(pool: web::Data<PgPool>) -> HttpResponse {
         Ok(users) => HttpResponse::Ok().json(users),
         Err(_) => HttpResponse::InternalServerError().finish(),
     }
+}
+
+#[allow(dead_code)]
+pub async fn admin_function(
+    // ... other parameters
+    _email_service: web::Data<Arc<dyn EmailServiceTrait>>,
+) -> impl Responder {
+    // Function implementation
+    HttpResponse::Ok().finish()
 }

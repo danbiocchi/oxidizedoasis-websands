@@ -1,7 +1,7 @@
 use actix_web::{web, HttpResponse, Responder, get, put, delete};
 use sqlx::PgPool;
 use crate::models::user::{User, UserResponse};
-use crate::email::{EmailServiceTrait};
+use crate::email::EmailServiceTrait;
 use bcrypt::{hash, verify, DEFAULT_COST};
 use uuid::Uuid;
 use log::{debug, error, info, warn};
@@ -11,6 +11,7 @@ use actix_web_httpauth::extractors::bearer::BearerAuth;
 use serde::Deserialize;
 use std::convert::TryFrom;
 use crate::validation::{UserInput, LoginInput, validate_and_sanitize_user_input, validate_and_sanitize_login_input, sanitize_input};
+use std::sync::Arc;
 
 /// Struct to represent the token query parameter
 #[derive(Deserialize)]
@@ -42,7 +43,7 @@ impl TryFrom<web::Query<TokenQuery>> for TokenQuery {
 pub async fn create_user(
     pool: web::Data<PgPool>,
     user: web::Json<UserInput>,
-    email_service: web::Data<Box<dyn EmailServiceTrait>>,
+    email_service: web::Data<Arc<dyn EmailServiceTrait>>,
 ) -> impl Responder {
     match validate_and_sanitize_user_input(user.into_inner()) {
         Ok(validated_user) => {

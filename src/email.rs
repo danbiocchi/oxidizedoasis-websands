@@ -3,10 +3,11 @@ use lettre::{Message, SmtpTransport, Transport};
 use lettre::message::header::ContentType;
 use log::error;
 use std::error::Error;
+use std::sync::Arc;
 #[allow(dead_code)]
 pub trait EmailServiceTrait: Send + Sync {
     fn send_verification_email(&self, to_email: &str, verification_token: &str) -> Result<(), Box<dyn Error>>;
-    fn clone_box(&self) -> Box<dyn EmailServiceTrait>;
+    fn clone_box(&self) -> Arc<dyn EmailServiceTrait>;
 }
 
 #[derive(Clone)]
@@ -85,8 +86,8 @@ impl EmailServiceTrait for RealEmailService {
         }
     }
 
-    fn clone_box(&self) -> Box<dyn EmailServiceTrait> {
-        Box::new(self.clone())
+    fn clone_box(&self) -> Arc<dyn EmailServiceTrait> {
+        Arc::new(self.clone())
     }
 }
 
@@ -121,8 +122,8 @@ pub mod mock {
             Ok(())
         }
         #[allow(dead_code)]
-        fn clone_box(&self) -> Box<dyn EmailServiceTrait> {
-            Box::new(self.clone())
+        fn clone_box(&self) -> Arc<dyn EmailServiceTrait> {
+            Arc::new(self.clone())
         }
     }
 }
