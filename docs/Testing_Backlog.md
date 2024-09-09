@@ -1,5 +1,4 @@
 # OxidizedOasis-WebSands Test-Driven Development Plan
-# OxidizedOasis-WebSands Test-Driven Development Plan
 
 ```mermaid
 pie title Implementation Status
