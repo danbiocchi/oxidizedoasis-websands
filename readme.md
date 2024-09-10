@@ -85,6 +85,10 @@ Before you begin, ensure you have the following installed:
    SERVER_HOST=127.0.0.1
    SERVER_PORT=8080
    
+   DB_SUPERUSER=oxidizedcreator
+   DB_SUPERUSER_PASSWORD=password
+   DB_NAME=oxidizedoasis
+   DB_USER=oxidizedoasis
    DATABASE_URL=postgres://${DB_USER}:${DB_PASSWORD}@${DB_HOST}/${DB_NAME}
    SU_DATABASE_URL=postgres://${SU_DB_USER}:${SU_DB_PASSWORD}@${DB_HOST}/${DB_NAME}
    RUN_MIGRATIONS=true
@@ -95,7 +99,7 @@ Before you begin, ensure you have the following installed:
    SMTP_PASSWORD=your_smtp_password
    SMTP_SERVER=your_smtp_server
    FROM_EMAIL=noreply@yourdomain.com
-   
+
    RUST_LOG=debug
    ```
 
@@ -103,13 +107,16 @@ Before you begin, ensure you have the following installed:
    ```
    ENVIRONMENT=development
    DEVELOPMENT_URL=http://localhost:8080
-   RUN_MIGRATIONS=true
    TEST_SERVER_HOST=127.0.0.1
    TEST_SERVER_PORT=8080
    
-   
+   TEST_DB_SUPERUSER=oxidizedcreator
+   TEST_DB_SUPERUSER_PASSWORD=password
+   TEST_DB_NAME=test_oxidizedoasis
+   TEST_DB_USER=testuser
    TEST_DATABASE_URL=postgres://${TEST_DB_USER}:${TEST_DB_PASSWORD}@${TEST_DB_HOST}/${TEST_DB_NAME}
    TEST_SU_DATABASE_URL=postgres://${TEST_DB_SUPERUSER}:${TEST_DB_SUPERUSER_PASSWORD}@${TEST_DB_HOST}/${TEST_DB_NAME}
+   RUN_MIGRATIONS=true
    
    TEST_JWT_SECRET=your_test_jwt_secret_key
    
@@ -118,9 +125,6 @@ Before you begin, ensure you have the following installed:
    TEST_SMTP_SERVER=your_test_smtp_server
    TEST_FROM_EMAIL=test_noreply@yourdomain.com
 
-   TEST_DB_NAME=test_oxidizedoasis
-   TEST_DB_USER=testuser
-   
    RUST_LOG=debug
    ```
 
