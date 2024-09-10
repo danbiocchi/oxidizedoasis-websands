@@ -80,32 +80,50 @@ Before you begin, ensure you have the following installed:
 
    `.env` file content:
    ```
-   DATABASE_URL=postgres://username:password@localhost/oxidizedoasis
+   ENVIRONMENT=development
+   DEVELOPMENT_URL=http://localhost:8080
+   SERVER_HOST=127.0.0.1
+   SERVER_PORT=8080
+   
+   DATABASE_URL=postgres://${DB_USER}:${DB_PASSWORD}@${DB_HOST}/${DB_NAME}
+   SU_DATABASE_URL=postgres://${SU_DB_USER}:${SU_DB_PASSWORD}@${DB_HOST}/${DB_NAME}
+   RUN_MIGRATIONS=true
+   
    JWT_SECRET=your_jwt_secret_key
+   
    SMTP_USERNAME=your_smtp_username
    SMTP_PASSWORD=your_smtp_password
    SMTP_SERVER=your_smtp_server
    FROM_EMAIL=noreply@yourdomain.com
+   
    RUST_LOG=debug
-   RUN_MIGRATIONS=true
-   SU_DATABASE_URL=postgres://superuser:password@localhost/postgres
-   SERVER_HOST=127.0.0.1
-   SERVER_PORT=8080
-   ENVIRONMENT=development
-   DEVELOPMENT_URL=http://localhost:8080
    ```
 
    `.env.test` file content:
    ```
-   TEST_DATABASE_URL=postgres://testuser:testpass@localhost/test_oxidizedoasis
+   ENVIRONMENT=development
+   DEVELOPMENT_URL=http://localhost:8080
+   RUN_MIGRATIONS=true
+   TEST_SERVER_HOST=127.0.0.1
+   TEST_SERVER_PORT=8080
+   
+   
+   TEST_DATABASE_URL=postgres://${TEST_DB_USER}:${TEST_DB_PASSWORD}@${TEST_DB_HOST}/${TEST_DB_NAME}
+   TEST_SU_DATABASE_URL=postgres://${TEST_DB_SUPERUSER}:${TEST_DB_SUPERUSER_PASSWORD}@${TEST_DB_HOST}/${TEST_DB_NAME}
+   
    TEST_JWT_SECRET=your_test_jwt_secret_key
+   
    TEST_SMTP_USERNAME=your_test_smtp_username
    TEST_SMTP_PASSWORD=your_test_smtp_password
    TEST_SMTP_SERVER=your_test_smtp_server
    TEST_FROM_EMAIL=test_noreply@yourdomain.com
-   TEST_SU_DATABASE_URL=postgres://superuser:password@localhost/postgres
+
    TEST_DB_NAME=test_oxidizedoasis
    TEST_DB_USER=testuser
+   
+   TEST_JWT_SECRET=8Zz5tw0Ionm3XZPZfN0NOml3z9FMfmgpXwovR9fp6ryDIoGRM8EPHAB6iHsc0fb
+   
+   RUST_LOG=debug
    ```
 
    Replace the placeholders with your actual database, SMTP, and other credentials.
