@@ -92,7 +92,7 @@ Before you begin, ensure you have the following installed:
    DATABASE_URL=postgres://${DB_USER}:${DB_PASSWORD}@${DB_HOST}/${DB_NAME}
    SU_DATABASE_URL=postgres://${SU_DB_USER}:${SU_DB_PASSWORD}@${DB_HOST}/${DB_NAME}
    RUN_MIGRATIONS=true
-   
+
    JWT_SECRET=your_jwt_secret_key
    
    SMTP_USERNAME=your_smtp_username
