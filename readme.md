@@ -121,8 +121,6 @@ Before you begin, ensure you have the following installed:
    TEST_DB_NAME=test_oxidizedoasis
    TEST_DB_USER=testuser
    
-   TEST_JWT_SECRET=8Zz5tw0Ionm3XZPZfN0NOml3z9FMfmgpXwovR9fp6ryDIoGRM8EPHAB6iHsc0fb
-   
    RUST_LOG=debug
    ```
 
