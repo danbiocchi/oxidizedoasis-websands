@@ -18,6 +18,9 @@ Comprehensive documentation for OxidizedOasis-WebSands is available to help deve
 - [Security Audit Report](docs/Security_Audit.md): In-depth analysis of the project's security measures and recommendations for improvement.
 - [Security Backlog](docs/Security_Backlog.md): Ongoing security tasks and improvements planned for the project.
 - [User Guide](docs/User_Guide.md): Guide for end-users on how to use the application.
+- [Project Structure](docs/Project_Structure.md): Overview of the project's directory structure and file organization.
+- [Logging Plan](docs/Logging_Plan.md): Detailed plan for implementing comprehensive logging in the project.
+- [Testing Backlog](docs/Testing_Backlog.md): List of tests to be implemented as part of the test-driven development approach.
 
 ## ✨ Key Features
 
@@ -33,6 +36,7 @@ Comprehensive documentation for OxidizedOasis-WebSands is available to help deve
 - 📱 Mobile-friendly design for seamless user experience across devices
 - 🔧 Easily extensible architecture for adding new features
 - 🔄 Database migrations for easy schema management and updates
+- 🧪 Test-driven development approach for improved code quality and reliability
 
 ## 🛠️ Technology Stack
 
@@ -72,7 +76,9 @@ Before you begin, ensure you have the following installed:
    ```
 
 2. Set up the environment variables:
-   Create a `.env` file in the project root with the following content:
+   Create two files in the project root: `.env` for development and `.env.test` for testing.
+
+   `.env` file content:
    ```
    DATABASE_URL=postgres://username:password@localhost/oxidizedoasis
    JWT_SECRET=your_jwt_secret_key
@@ -88,6 +94,20 @@ Before you begin, ensure you have the following installed:
    ENVIRONMENT=development
    DEVELOPMENT_URL=http://localhost:8080
    ```
+
+   `.env.test` file content:
+   ```
+   TEST_DATABASE_URL=postgres://testuser:testpass@localhost/test_oxidizedoasis
+   TEST_JWT_SECRET=your_test_jwt_secret_key
+   TEST_SMTP_USERNAME=your_test_smtp_username
+   TEST_SMTP_PASSWORD=your_test_smtp_password
+   TEST_SMTP_SERVER=your_test_smtp_server
+   TEST_FROM_EMAIL=test_noreply@yourdomain.com
+   TEST_SU_DATABASE_URL=postgres://superuser:password@localhost/postgres
+   TEST_DB_NAME=test_oxidizedoasis
+   TEST_DB_USER=testuser
+   ```
+
    Replace the placeholders with your actual database, SMTP, and other credentials.
 
 3. Build and run the project:
@@ -101,21 +121,7 @@ Before you begin, ensure you have the following installed:
 
 ## 🔧 Configuration
 
-### Environment Variables
-
-- `DATABASE_URL`: PostgreSQL database connection string
-- `JWT_SECRET`: Secret key for JWT token generation and validation
-- `SMTP_USERNAME`: Username for the SMTP server (for email verification)
-- `SMTP_PASSWORD`: Password for the SMTP server
-- `SMTP_SERVER`: SMTP server address
-- `FROM_EMAIL`: Email address used as the sender for verification emails
-- `RUST_LOG`: Logging level (e.g., debug, info, warn, error)
-- `RUN_MIGRATIONS`: Whether to run database migrations on startup (true/false)
-- `SU_DATABASE_URL`: Superuser database connection string for initial setup
-- `SERVER_HOST`: Host address for the server
-- `SERVER_PORT`: Port number for the server
-- `ENVIRONMENT`: Current environment (development or production)
-- `DEVELOPMENT_URL`: URL for the development environment
+Refer to the [Software Development Document](docs/Software_Development_Document.md) for detailed configuration instructions and environment variable descriptions.
 
 ## 📚 Usage
 
@@ -123,11 +129,13 @@ Refer to the [User Guide](docs/User_Guide.md) for detailed information on how to
 
 ## 🧪 Testing
 
-To run the tests:
+We follow a test-driven development (TDD) approach. To run the tests:
 
 ```sh
 cargo test
 ```
+
+For more information on our testing strategy and backlog, refer to the [Testing Backlog](docs/Testing_Backlog.md).
 
 ## 🚢 Deployment
 
@@ -145,15 +153,11 @@ Contributions are what make the open-source community such an amazing place to l
 
 Please make sure to update tests as appropriate and adhere to the [Rust Code of Conduct](https://www.rust-lang.org/policies/code-of-conduct).
 
-## 📜 License
-
-Distributed under the MIT License. See `LICENSE` file for more information.
-
 ## 📬 Contact
 
-Daniel Biocchi 
+Daniel Biocchi
 
-Project Link: [https://github.com/danbiocchi/oxidizedoasis-websands](https://github.com/yourusername/oxidizedoasis-websands)
+Project Link: [https://github.com/danbiocchi/oxidizedoasis-websands](https://github.com/danbiocchi/oxidizedoasis-websands)
 
 ## 🙏 Acknowledgements
 
@@ -164,6 +168,7 @@ Project Link: [https://github.com/danbiocchi/oxidizedoasis-websands](https://git
 - [JSON Web Tokens](https://jwt.io/)
 - [bcrypt](https://en.wikipedia.org/wiki/Bcrypt)
 - Diablo 2
+
 ---
 
 <p align="center">
