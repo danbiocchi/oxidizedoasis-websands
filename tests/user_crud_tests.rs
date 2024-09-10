@@ -1,12 +1,9 @@
 use oxidizedoasis_websands::User;
-use sqlx::{postgres::Postgres, Connection, PgConnection, PgPool, ConnectOptions};
+use sqlx::postgres::{PgPool, PgPoolOptions};
 use uuid::Uuid;
 use chrono::Utc;
 use std::env;
-use std::str::FromStr;
-use std::time::Duration;
-use log::{info, error, debug};
-use sqlx::migrate::MigrateDatabase;
+use log::{info, debug, warn};
 
 async fn setup_test_db() -> PgPool {
     dotenv::from_filename(".env.test").ok();
@@ -25,62 +22,78 @@ async fn setup_test_db() -> PgPool {
     debug!("Database name: {}", db_name);
     debug!("Database user: {}", db_user);
 
-    // Check if database exists, create if it doesn't
-    if !Postgres::database_exists(&su_database_url).await.unwrap_or(false) {
-        info!("Test database '{}' does not exist. Attempting to create...", db_name);
-        match Postgres::create_database(&su_database_url).await {
-            Ok(_) => info!("Test database '{}' created successfully", db_name),
-            Err(e) => {
-                error!("Failed to create test database '{}': {:?}", db_name, e);
-                panic!("Failed to create test database");
-            }
-        }
-    } else {
-        info!("Test database '{}' already exists", db_name);
-    }
-
-    // Connect as super user to grant privileges
-    info!("Connecting to database as super user");
-    let mut su_conn = PgConnection::connect(&su_database_url).await
-        .expect("Failed to connect as super user");
-
-    info!("Granting privileges to application user '{}'", db_user);
-
-    // Grant privileges to application user
-    let grant_query = format!("GRANT ALL PRIVILEGES ON DATABASE \"{}\" TO \"{}\"", db_name, db_user);
-    if let Err(e) = sqlx::query(&grant_query).execute(&mut su_conn).await {
-        error!("Failed to grant privileges to '{}': {:?}", db_user, e);
-        panic!("Failed to grant privileges");
-    }
-
-    // Close super user connection
-    drop(su_conn);
-    info!("Closed super user connection");
-
-    // Set up connection pool with application user
-    info!("Setting up connection pool for application user");
-    let pool = PgPool::connect_with(
-        sqlx::postgres::PgConnectOptions::from_str(&database_url)
-            .expect("Failed to parse database URL")
-            .application_name("oxidizedoasis_tests")
-            .log_statements(log::LevelFilter::Debug)
-            .log_slow_statements(log::LevelFilter::Warn, Duration::from_secs(1))
-    )
+    // Connect as superuser
+    let pool = PgPoolOptions::new()
+        .max_connections(5)
+        .connect(&su_database_url)
         .await
-        .expect("Failed to create connection pool");
+        .expect("Failed to connect to database as superuser");
+
+    // Check if database exists, create if it doesn't
+    let db_exists: bool = sqlx::query_scalar::<_, bool>("SELECT EXISTS(SELECT 1 FROM pg_database WHERE datname = $1)")
+        .bind(&db_name)
+        .fetch_one(&pool)
+        .await
+        .expect("Failed to check if database exists");
+
+    if !db_exists {
+        info!("Creating database '{}'", db_name);
+        sqlx::query(&format!("CREATE DATABASE \"{}\"", db_name))
+            .execute(&pool)
+            .await
+            .expect("Failed to create database");
+    }
+
+    // Connect to the specific database
+    let pool = PgPoolOptions::new()
+        .max_connections(5)
+        .connect(&database_url)
+        .await
+        .expect("Failed to connect to the specific database");
+
+    // Ensure the application user exists
+    let user_exists: bool = sqlx::query_scalar::<_, bool>("SELECT EXISTS(SELECT 1 FROM pg_roles WHERE rolname = $1)")
+        .bind(&db_user)
+        .fetch_one(&pool)
+        .await
+        .expect("Failed to check if user exists");
+
+    if !user_exists {
+        info!("Creating user '{}'", db_user);
+        sqlx::query(&format!("CREATE USER \"{}\" WITH PASSWORD '{}'", db_user, env::var("TEST_DB_PASSWORD").unwrap()))
+            .execute(&pool)
+            .await
+            .expect("Failed to create user");
+    }
+
+    // Grant privileges
+    info!("Granting privileges to user '{}'", db_user);
+    let grant_queries = vec![
+        format!("GRANT ALL PRIVILEGES ON DATABASE \"{}\" TO \"{}\"", db_name, db_user),
+        format!("GRANT ALL PRIVILEGES ON SCHEMA public TO \"{}\"", db_user),
+        format!("GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO \"{}\"", db_user),
+        format!("GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO \"{}\"", db_user),
+        format!("ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO \"{}\"", db_user),
+        format!("ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO \"{}\"", db_user),
+    ];
+
+    for query in grant_queries {
+        match sqlx::query(&query).execute(&pool).await {
+            Ok(_) => info!("Successfully executed: {}", query),
+            Err(e) => warn!("Failed to execute: {}. Error: {:?}", query, e),
+        }
+    }
 
     // Run migrations
-    info!("Running database migrations");
-    match sqlx::migrate!("./migrations").run(&pool).await {
-        Ok(_) => info!("Migrations completed successfully"),
-        Err(e) => {
-            error!("Migration failed: {:?}", e);
-            panic!("Failed to run migrations");
-        }
-    }
+    sqlx::migrate!("./migrations")
+        .run(&pool)
+        .await
+        .expect("Failed to run migrations");
 
     pool
 }
+
+
 async fn clean_test_db(pool: &PgPool) {
     sqlx::query!("DELETE FROM users")
         .execute(pool)
@@ -165,17 +178,17 @@ async fn test_read_user() {
     assert_eq!(user.username, "readuser");
     assert_eq!(user.email, Some("readuser@example.com".to_string()));
 }
-
 #[actix_rt::test]
 async fn test_update_user() {
     let pool = setup_test_db().await;
     clean_test_db(&pool).await;
 
     let user_id = Uuid::new_v4();
-    sqlx::query!(
+    let insert_result = sqlx::query!(
         r#"
         INSERT INTO users (id, username, email, password_hash, is_email_verified, role, created_at, updated_at)
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        RETURNING id
         "#,
         user_id,
         "updateuser",
@@ -186,9 +199,22 @@ async fn test_update_user() {
         Utc::now(),
         Utc::now()
     )
-        .execute(&pool)
-        .await
-        .expect("Failed to create test user");
+        .fetch_one(&pool)
+        .await;
+
+    assert!(insert_result.is_ok(), "Failed to insert user: {:?}", insert_result.err());
+
+    // Verify the user was inserted
+    let check_result = sqlx::query!(
+        r#"SELECT * FROM users WHERE id = $1"#,
+        user_id
+    )
+        .fetch_optional(&pool)
+        .await;
+
+    assert!(check_result.is_ok(), "Failed to check for inserted user: {:?}", check_result.err());
+    let checked_user = check_result.unwrap();
+    assert!(checked_user.is_some(), "User not found after insertion");
 
     let new_username = "updateduser";
     let result = sqlx::query!(
