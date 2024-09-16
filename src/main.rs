@@ -1,6 +1,6 @@
-use actix_web::{web, App, HttpServer, HttpResponse, http};
+use actix_web::{web, App, HttpServer, HttpResponse, http, HttpRequest};
 use sqlx::postgres::{PgPoolOptions, Postgres};
-use sqlx::{Connection, PgPool};
+use sqlx::{Connection};
 use log::{info, debug, error, warn};
 use dotenv::dotenv;
 use actix_files as fs;
@@ -12,6 +12,8 @@ use actix_governor::{Governor, GovernorConfigBuilder};
 use std::env;
 use std::time::Duration;
 use sqlx::migrate::MigrateDatabase;
+use tera::Tera;
+
 use crate::middleware::validator;
 use crate::handlers::admin::admin_validator;
 use crate::middleware::cors_logger;
@@ -174,13 +176,10 @@ async fn main() -> std::io::Result<()> {
         .unwrap_or(true);
 
     // Set up the database connection pool
-    let pool = match setup_database(run_migrations).await {
-        Ok(pool) => pool,
-        Err(e) => {
-            error!("Failed to set up database: {:?}", e);
-            return Err(std::io::Error::new(std::io::ErrorKind::Other, e.to_string()));
-        }
-    };
+    let pool = setup_database(run_migrations).await.map_err(|e| {
+        error!("Failed to set up database: {:?}", e);
+        std::io::Error::new(std::io::ErrorKind::Other, e.to_string())
+    })?;
 
     // Initialize application configuration
     let config = Config::new();
@@ -192,23 +191,15 @@ async fn main() -> std::io::Result<()> {
 
     debug!("Server will be listening on: {}", server_addr);
 
-    // Configure rate limiting
-    let governor_conf = GovernorConfigBuilder::default()
-        .per_second(2)
-        .burst_size(5)
-        .finish()
-        .unwrap();
 
     // Determine the allowed origin for CORS based on the environment
-    let environment = env::var("ENVIRONMENT").unwrap_or_else(|_| "development".to_string());
-    let allowed_origin = match environment.as_str() {
-        "production" => env::var("PRODUCTION_URL").expect("PRODUCTION_URL must be set in production"),
-        "development" => env::var("DEVELOPMENT_URL").expect("DEVELOPMENT_URL must be set for development"),
-        _ => panic!("ENVIRONMENT must be set to either 'production' or 'development'"),
-    };
+    let allowed_origin = get_allowed_origin();
 
     // Initialize the email service
     let email_service: Arc<dyn EmailServiceTrait> = Arc::new(RealEmailService::new());
+
+    // Initialize Tera template engine
+    let tera = Tera::new("templates/**/*").expect("Failed to initialize Tera");
 
     // Configure and start the HTTP server
     HttpServer::new(move || {
@@ -224,58 +215,69 @@ async fn main() -> std::io::Result<()> {
             .wrap(cors)  // Apply CORS middleware
             .app_data(web::Data::new(pool.clone()))  // Share database pool across handlers
             .app_data(web::Data::new(email_service.clone()))  // Use Arc<dyn EmailServiceTrait>
+            .app_data(web::Data::new(tera.clone()))  // Share Tera instance across handlers
             .wrap(cors_logger::CorsLogger::new(config.clone()))  // Custom CORS logging
             .wrap(actix_web::middleware::Logger::default())  // Standard request logging
-            .wrap(  // Apply security headers
-                    actix_web::middleware::DefaultHeaders::new()
-                        .add(("X-XSS-Protection", "1; mode=block"))
-                        .add(("X-Frame-Options", "DENY"))
-                        .add(("X-Content-Type-Options", "nosniff"))
-                        .add(("Referrer-Policy", "strict-origin-when-cross-origin"))
-            )
-            // Public routes with rate limiting
-            .service(
-                web::scope("/users")
-                    .wrap(Governor::new(&governor_conf))
-                    .route("/register", web::post().to(handlers::user::create_user))
-                    .route("/login", web::post().to(handlers::user::login_user))
-                    .route("/verify", web::get().to(|pool: web::Data<PgPool>,
-                                                     email_service: web::Data<Arc<dyn EmailServiceTrait>>,
-                                                     token_query: web::Query<handlers::user::TokenQuery>|
-                    handlers::user::verify_email(pool, email_service, token_query)))
-            )
-            // Protected API routes
-            .service(
-                web::scope("/api")
-                    .wrap(HttpAuthentication::bearer(validator))
-                    .service(handlers::user::get_user)
-                    .service(handlers::user::update_user)
-                    .service(handlers::user::delete_user)
-            )
-            // Admin routes with separate authentication
-            .service(
-                web::scope("/admin")
-                    .wrap(HttpAuthentication::bearer(admin_validator))
-                    .route("/dashboard", web::get().to(handlers::admin::admin_dashboard))
-            )
-            // Serve static files
-            .service(fs::Files::new("/static", "./static").show_files_listing())
-            .service(fs::Files::new("/css", "./static/css").show_files_listing())
-            .service(fs::Files::new("/", "./static").index_file("index.html"))
-            // Custom route for token failure
-            .service(web::resource("/token_failure.html").to(|| async {
-                HttpResponse::Ok().content_type("text/html").body(include_str!("../static/templates/token_failure.html"))
-            }))
-            // Default service for unhandled routes
-            .default_service(web::route().to(|req: actix_web::HttpRequest| async move {
-                error!("Unhandled request: {:?}", req);
-                HttpResponse::NotFound().json(serde_json::json!({
-                    "error": "Not Found",
-                    "message": "The requested resource could not be found."
-                }))
-            }))
+            .wrap(security_headers())  // Apply security headers
+            .configure(configure_services)  // Configure all services
+            .service(fs::Files::new("/static", "./static").prefer_utf8(true).use_last_modified(true))
+            .default_service(web::route().to(handle_not_found))
     })
-        .bind(server_addr)?  // Bind the server to the specified address
-        .run()  // Run the server
-        .await  // Wait for the server to complete
+        .bind(server_addr)?
+        .run()
+        .await
+}
+
+fn security_headers() -> actix_web::middleware::DefaultHeaders {
+    actix_web::middleware::DefaultHeaders::new()
+        .add(("X-XSS-Protection", "1; mode=block"))
+        .add(("X-Frame-Options", "DENY"))
+        .add(("X-Content-Type-Options", "nosniff"))
+        .add(("Referrer-Policy", "strict-origin-when-cross-origin"))
+        .add(("Content-Security-Policy", "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline';"))
+}
+
+fn configure_services(cfg: &mut web::ServiceConfig) {
+    let governor_conf = GovernorConfigBuilder::default()
+        .per_second(2)
+        .burst_size(5)
+        .finish()
+        .expect("Failed to create rate limiting configuration");
+
+    cfg.service(
+        web::scope("/users")
+            .wrap(Governor::new(&governor_conf))
+            .route("/register", web::post().to(handlers::user::create_user))
+            .route("/login", web::post().to(handlers::user::login_user))
+            .route("/verify", web::get().to(handlers::user::verify_email))
+    )
+        .service(
+            web::scope("/api")
+                .wrap(HttpAuthentication::bearer(validator))
+                .service(handlers::user::get_user)
+                .service(handlers::user::update_user)
+                .service(handlers::user::delete_user)
+        )
+        .service(
+            web::scope("/admin")
+                .wrap(HttpAuthentication::bearer(admin_validator))
+                .route("/dashboard", web::get().to(handlers::admin::admin_dashboard))
+        );
+}
+
+fn get_allowed_origin() -> String {
+    let environment = env::var("ENVIRONMENT").unwrap_or_else(|_| "development".to_string());
+    match environment.as_str() {
+        "production" => env::var("PRODUCTION_URL").expect("PRODUCTION_URL must be set in production"),
+        "development" => env::var("DEVELOPMENT_URL").expect("DEVELOPMENT_URL must be set for development"),
+        _ => panic!("ENVIRONMENT must be set to either 'production' or 'development'"),
+    }
+}
+
+async fn handle_not_found(req: HttpRequest) -> HttpResponse {
+    error!("Unhandled request: {:?}", req);
+    HttpResponse::NotFound().json(serde_json::json!({
+        "error": "Not Found",
+        "message": "The requested resource could not be found."
+    }))
 }
