@@ -80,52 +80,50 @@ Before you begin, ensure you have the following installed:
 
    `.env` file content:
    ```
-   ENVIRONMENT=development
-   DEVELOPMENT_URL=http://localhost:8080
-   SERVER_HOST=127.0.0.1
-   SERVER_PORT=8080
-   
-   DB_SUPERUSER=oxidizedcreator
-   DB_SUPERUSER_PASSWORD=password
-   DB_NAME=oxidizedoasis
-   DB_USER=oxidizedoasis
-   DATABASE_URL=postgres://${DB_USER}:${DB_PASSWORD}@${DB_HOST}/${DB_NAME}
-   SU_DATABASE_URL=postgres://${SU_DB_USER}:${SU_DB_PASSWORD}@${DB_HOST}/${DB_NAME}
-   RUN_MIGRATIONS=true
-
-   JWT_SECRET=your_jwt_secret_key
-   
-   SMTP_USERNAME=your_smtp_username
-   SMTP_PASSWORD=your_smtp_password
-   SMTP_SERVER=your_smtp_server
-   FROM_EMAIL=noreply@yourdomain.com
-
-   RUST_LOG=debug
-   ```
-
-   `.env.test` file content:
-   ```
-   ENVIRONMENT=development
-   DEVELOPMENT_URL=http://localhost:8080
-   TEST_SERVER_HOST=127.0.0.1
-   TEST_SERVER_PORT=8080
-   
-   TEST_DB_SUPERUSER=oxidizedcreator
-   TEST_DB_SUPERUSER_PASSWORD=password
-   TEST_DB_NAME=test_oxidizedoasis
-   TEST_DB_USER=testuser
-   TEST_DATABASE_URL=postgres://${TEST_DB_USER}:${TEST_DB_PASSWORD}@${TEST_DB_HOST}/${TEST_DB_NAME}
-   TEST_SU_DATABASE_URL=postgres://${TEST_DB_SUPERUSER}:${TEST_DB_SUPERUSER_PASSWORD}@${TEST_DB_HOST}/${TEST_DB_NAME}
-   RUN_MIGRATIONS=true
-   
-   TEST_JWT_SECRET=your_test_jwt_secret_key
-   
-   TEST_SMTP_USERNAME=your_test_smtp_username
-   TEST_SMTP_PASSWORD=your_test_smtp_password
-   TEST_SMTP_SERVER=your_test_smtp_server
-   TEST_FROM_EMAIL=test_noreply@yourdomain.com
-
-   RUST_LOG=debug
+   # Environment Configuration
+    ENVIRONMENT=development
+    PRODUCTION_URL=https://yourdomain.com
+    DEVELOPMENT_URL=http://localhost:8080
+    RUN_MIGRATIONS=true
+    
+    # Application Information
+    APP_NAME=OxidizedOasis
+    APP_VERSION=0.1.0
+    APP_DOMAIN=yourdomain.com
+    
+    # Server Configuration
+    SERVER_HOST=127.0.0.1
+    SERVER_PORT=8080
+    
+    # Database Configuration
+    DB_NAME=oxidizedoasis_db
+    DB_HOST=localhost
+    DB_USER=your_db_user
+    DB_PASSWORD=your_db_password
+    DATABASE_URL=postgres://${DB_USER}:${DB_PASSWORD}@${DB_HOST}/${DB_NAME}
+    
+    # Superuser Database Configuration
+    SU_DB_USER=your_su_db_user
+    SU_DB_PASSWORD=your_su_db_password
+    SU_DATABASE_URL=postgres://${SU_DB_USER}:${SU_DB_PASSWORD}@${DB_HOST}/${DB_NAME}
+    
+    # JWT Configuration
+    JWT_SECRET=your_jwt_secret_key
+    
+    # Email Configuration
+    SMTP_USERNAME=your_smtp_username
+    SMTP_PASSWORD=your_smtp_password
+    SMTP_SERVER=your_smtp_server
+    FROM_EMAIL=noreply@yourdomain.com
+    SUPPORT_EMAIL=support@yourdomain.com
+    EMAIL_FROM_NAME="${APP_NAME} Support"
+    EMAIL_VERIFICATION_SUBJECT="Verify Your ${APP_NAME} Account"
+    EMAIL_PASSWORD_RESET_SUBJECT="Reset Your ${APP_NAME} Password"
+    
+    # Logging Configuration
+    RUST_LOG=debug
+    
+    # Additional configurations...
    ```
 
    Replace the placeholders with your actual database, SMTP, and other credentials.
