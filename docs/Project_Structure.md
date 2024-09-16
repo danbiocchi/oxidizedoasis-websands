@@ -28,6 +28,7 @@ graph LR
     D --> D6[email.rs]
     D --> D7[main.rs]
     D --> D8[validation.rs]
+    D --> D9[lib.rs]
 
     D1 --> D1a[mod.rs]
     D1 --> D1b[config.rs]
@@ -46,34 +47,34 @@ graph LR
 
     E --> E1[css]
     E --> E2[images]
-    E --> E3[templates]
+    E --> E3[admin_dashboard.html]
+    E --> E4[dashboard.html]
+    E --> E5[index.html]
 
     E1 --> E1a[dashboard.css]
     E1 --> E1b[styles.css]
 
     E2 --> E2a[signup-page-screenshot.png]
 
-    E3 --> E3a[already_verified.html]
-    E3 --> E3b[email_verified.html]
-    E3 --> E3c[error.html]
-    E3 --> E3d[expired_token.html]
-    E3 --> E3e[invalid_token.html]
-    E3 --> E3f[token_failure.html]
-    E3 --> E3g[verification_resent.html]
-    
-    E --> E4[admin_dashboard.html]
-    E --> E5[dashboard.html]
-    E --> E6[index.html]
-
     F --> F1[e2e]
     F --> F2[user_crud_tests.rs]
     F --> F3[user_tests.rs]
 
-    G --> G1[.env files]
-    G --> G2[.gitignore]
-    G --> G3[Cargo.lock]
-    G --> G4[Cargo.toml]
-    G --> G5[readme.md]
+    G --> G1[.env]
+    G --> G2[.env.test]
+    G --> G3[.gitignore]
+    G --> G4[Cargo.lock]
+    G --> G5[Cargo.toml]
+    G --> G6[readme.md]
+
+    A --> H[templates]
+    H --> H1[already_verified.html]
+    H --> H2[email_verified.html]
+    H --> H3[error.html]
+    H --> H4[expired_token.html]
+    H --> H5[invalid_token.html]
+    H --> H6[token_failure.html]
+    H --> H7[verification_resent.html]
 
     classDef default fill:#f9f9f9,stroke:#333,stroke-width:1px;
     classDef rootDir fill:#e1f5fe,stroke:#01579b,stroke-width:2px;
@@ -82,9 +83,9 @@ graph LR
     classDef file fill:#ffffff,stroke:#616161,stroke-width:1px;
     
     class A rootDir;
-    class B,C,D,E,F,G mainDir;
-    class B1,D1,D2,D3,D4,E1,E2,E3,F1 subDir;
-    class B1a,B1b,B1c,B1d,B1e,B1f,B1g,C1,D1a,D1b,D2a,D2b,D2c,D3a,D3b,D3c,D4a,D4b,D4c,D5,D6,D7,D8,E1a,E1b,E2a,E3a,E3b,E3c,E3d,E3e,E3f,E3g,E4,E5,E6,F2,F3,G1,G2,G3,G4,G5 file;
+    class B,C,D,E,F,G,H mainDir;
+    class B1,D1,D2,D3,D4,E1,E2,F1 subDir;
+    class B1a,B1b,B1c,B1d,B1e,B1f,B1g,C1,D1a,D1b,D2a,D2b,D2c,D3a,D3b,D3c,D4a,D4b,D4c,D5,D6,D7,D8,D9,E1a,E1b,E2a,E3,E4,E5,F2,F3,G1,G2,G3,G4,G5,G6,H1,H2,H3,H4,H5,H6,H7 file;
 ```
 
 ## Directory and File Descriptions
@@ -106,13 +107,17 @@ The main source code directory for the application.
 - `email.rs`: Handles email-related functionality, such as sending verification emails.
 - `main.rs`: The entry point of the application, setting up the server and routes.
 - `validation.rs`: Implements input validation logic for user inputs and data.
+- `lib.rs`: Library file for shared functionality across the project.
 
 ### `/static`
 Contains static files served by the application.
 
 - `/css`: Stores CSS files for styling the frontend.
 - `/images`: Contains image assets used in the application.
-- HTML files: Templates for various pages (admin dashboard, user dashboard, etc.).
+- HTML files: Static HTML pages (admin dashboard, user dashboard, index).
+
+### `/templates`
+Contains HTML templates used by Tera for rendering dynamic content.
 
 ### `/tests`
 Directory for integration tests.
@@ -124,81 +129,73 @@ Directory for integration tests.
 - `Cargo.toml`: Cargo manifest file specifying project dependencies and metadata.
 - `readme.md`: Provides an overview and instructions for the project.
 
-
 # OxidizedOasis-WebSands Plain-Text Project Structure
 ```
-# OxidizedOasis-WebSands Plain-Text Project Structure
-
 oxidizedoasis-websands/
 │
-├── docs/                          # Project documentation
-│   ├── archive/                   # Archived documents
-│   │   ├── Logging_Plan.md        # Logging strategy and plan
-│   │   ├── Project_Structure.md   # Documentation for project structure
-│   │   ├── Security_Audit.md      # Security audit details
-│   │   ├── Security_Backlog.md    # Security-related backlogs
-│   │   ├── Software_Development_Document.md  # Development process documentation
-│   │   ├── Testing_Backlog.md     # Testing backlog documentation
-│   │   └── User_Guide.md          # User guide for the application
+├── docs/
+│   └── archive/
+│       ├── Logging_Plan.md
+│       ├── Project_Structure.md
+│       ├── Security_Audit.md
+│       ├── Security_Backlog.md
+│       ├── Software_Development_Document.md
+│       ├── Testing_Backlog.md
+│       └── User_Guide.md
 │
-├── migrations/                    # Database migration scripts
-│   └── 20240901010340_initial_schema.sql  # Initial database schema migration
+├── migrations/
+│   └── 20240901010340_initial_schema.sql
 │
-├── src/                           # Source code directory
-│   ├── config/                    # Configuration management
-│   │   ├── mod.rs                 # Module declaration file
-│   │   └── config.rs              # Application configuration handling
-│   │
-│   ├── handlers/                  # Request handlers
-│   │   ├── mod.rs                 # Module declaration file
-│   │   ├── admin.rs               # Admin-specific handlers
-│   │   └── user.rs                # User-related handlers
-│   │
-│   ├── middleware/                # Custom middleware
-│   │   ├── mod.rs                 # Module declaration file
-│   │   ├── cors_logger.rs         # CORS logging middleware
-│   │   └── middleware.rs          # General middleware implementations
-│   │
-│   ├── models/                    # Data models
-│   │   ├── mod.rs                 # Module declaration file
-│   │   ├── session.rs             # Session model
-│   │   └── user.rs                # User model
-│   │
-│   ├── auth.rs                    # Authentication logic
-│   ├── email.rs                   # Email service implementation
-│   ├── main.rs                    # Application entry point
-│   └── validation.rs              # Input validation logic
+├── src/
+│   ├── config/
+│   │   ├── mod.rs
+│   │   └── config.rs
+│   ├── handlers/
+│   │   ├── mod.rs
+│   │   ├── admin.rs
+│   │   └── user.rs
+│   ├── middleware/
+│   │   ├── mod.rs
+│   │   ├── cors_logger.rs
+│   │   └── middleware.rs
+│   ├── models/
+│   │   ├── mod.rs
+│   │   ├── session.rs
+│   │   └── user.rs
+│   ├── auth.rs
+│   ├── email.rs
+│   ├── main.rs
+│   ├── validation.rs
+│   └── lib.rs
 │
-├── static/                        # Static files
-│   ├── css/                       # CSS stylesheets
-│   │   ├── dashboard.css          # Dashboard-specific styles
-│   │   └── styles.css             # Global styles
-│   │
-│   ├── images/                    # Image assets
-│   │   └── signup-page-screenshot.png  # Signup page screenshot for documentation or UI reference
-│   │
-│   ├── templates/                 # HTML templates for various pages
-│   │   ├── already_verified.html  # Template for already verified users
-│   │   ├── email_verified.html    # Template for email verification success
-│   │   ├── error.html             # Error page template
-│   │   ├── expired_token.html     # Token expired template
-│   │   ├── invalid_token.html     # Invalid token template
-│   │   ├── token_failure.html     # Token failure template
-│   │   └── verification_resent.html  # Template for resent verification
-│   │
-│   ├── admin_dashboard.html       # Admin dashboard template
-│   ├── dashboard.html             # User dashboard template
-│   ├── index.html                 # Main landing page
+├── static/
+│   ├── css/
+│   │   ├── dashboard.css
+│   │   └── styles.css
+│   ├── images/
+│   │   └── signup-page-screenshot.png
+│   ├── admin_dashboard.html
+│   ├── dashboard.html
+│   └── index.html
 │
-├── tests/                         # Test directory (integration tests)
-│   ├── e2e/                       # End-to-end test scripts
-│   ├── user_crud_tests.rs         # CRUD operation tests for users
-│   └── user_tests.rs              # General user tests
+├── templates/
+│   ├── already_verified.html
+│   ├── email_verified.html
+│   ├── error.html
+│   ├── expired_token.html
+│   ├── invalid_token.html
+│   ├── token_failure.html
+│   └── verification_resent.html
 │
-├── .env                           # Environment variables for development
-├── .env.test                      # Environment variables for testing
-├── .gitignore                     # Git ignore file
-├── Cargo.lock                     # Cargo lock file (dependency versions)
-├── Cargo.toml                     # Cargo manifest file (project dependencies)
-└── readme.md                      # Project readme file
+├── tests/
+│   ├── e2e/
+│   ├── user_crud_tests.rs
+│   └── user_tests.rs
+│
+├── .env
+├── .env.test
+├── .gitignore
+├── Cargo.lock
+├── Cargo.toml
+└── readme.md
 ```
