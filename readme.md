@@ -126,7 +126,54 @@ Before you begin, ensure you have the following installed:
     # Additional configurations...
    ```
 
-   Replace the placeholders with your actual database, SMTP, and other credentials.
+   `.env.test` file content:
+   ```
+    # Test Environment Configuration
+    ENVIRONMENT=development
+    PRODUCTION_URL=https://yourdomain.com
+    DEVELOPMENT_URL=http://localhost:8080
+    RUN_MIGRATIONS=true
+    
+    # Test Application Information
+    TEST_APP_NAME=OxidizedOasis-Test
+    TEST_APP_VERSION=0.1.0
+    TEST_APP_DOMAIN=yourdomain.com
+    
+    # Test Server Configuration
+    TEST_SERVER_HOST=127.0.0.1
+    TEST_SERVER_PORT=8080
+    
+    # Test Database Configuration
+    TEST_DB_NAME=test_oxidizedoasis_db
+    TEST_DB_HOST=localhost
+    TEST_DB_USER=your_test_db_user
+    TEST_DB_PASSWORD=your_test_db_password
+    TEST_DATABASE_URL=postgres://${TEST_DB_USER}:${TEST_DB_PASSWORD}@${TEST_DB_HOST}/${TEST_DB_NAME}
+    
+    # Test Superuser Database Configuration
+    TEST_DB_SUPERUSER=your_test_su_db_user
+    TEST_DB_SUPERUSER_PASSWORD=your_test_su_db_password
+    TEST_SU_DATABASE_URL=postgres://${TEST_DB_SUPERUSER}:${TEST_DB_SUPERUSER_PASSWORD}@${TEST_DB_HOST}/${TEST_DB_NAME}
+    
+    # Test JWT Configuration
+    TEST_JWT_SECRET=your_test_jwt_secret_key
+    
+    # Test Email Configuration
+    TEST_SMTP_USERNAME=your_test_smtp_username
+    TEST_SMTP_PASSWORD=your_test_smtp_password
+    TEST_SMTP_SERVER=your_test_smtp_server
+    TEST_FROM_EMAIL=test_noreply@yourdomain.com
+    TEST_SUPPORT_EMAIL=test_support@yourdomain.com
+    TEST_EMAIL_FROM_NAME="${TEST_APP_NAME} Support"
+    TEST_EMAIL_VERIFICATION_SUBJECT="Verify Your ${TEST_APP_NAME} Account"
+    TEST_EMAIL_PASSWORD_RESET_SUBJECT="Reset Your ${TEST_APP_NAME} Password"
+    
+    # Logging Configuration
+    RUST_LOG=debug
+    
+    # Additional test configurations...
+   ```
+   Replace both files placeholders(.env and .env.test) with your actual database, SMTP, and other credentials.
 
 3. Build and run the project:
    ```sh
