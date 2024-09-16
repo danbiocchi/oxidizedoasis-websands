@@ -1,6 +1,6 @@
 use actix_web::{web, App, HttpServer, HttpResponse, http};
 use sqlx::postgres::{PgPoolOptions, Postgres};
-use sqlx::Connection;
+use sqlx::{Connection, PgPool};
 use log::{info, debug, error, warn};
 use dotenv::dotenv;
 use actix_files as fs;
@@ -239,7 +239,10 @@ async fn main() -> std::io::Result<()> {
                     .wrap(Governor::new(&governor_conf))
                     .route("/register", web::post().to(handlers::user::create_user))
                     .route("/login", web::post().to(handlers::user::login_user))
-                    .route("/verify", web::get().to(handlers::user::verify_email))
+                    .route("/verify", web::get().to(|pool: web::Data<PgPool>,
+                                                     email_service: web::Data<Arc<dyn EmailServiceTrait>>,
+                                                     token_query: web::Query<handlers::user::TokenQuery>|
+                    handlers::user::verify_email(pool, email_service, token_query)))
             )
             // Protected API routes
             .service(
@@ -256,11 +259,12 @@ async fn main() -> std::io::Result<()> {
                     .route("/dashboard", web::get().to(handlers::admin::admin_dashboard))
             )
             // Serve static files
+            .service(fs::Files::new("/static", "./static").show_files_listing())
             .service(fs::Files::new("/css", "./static/css").show_files_listing())
             .service(fs::Files::new("/", "./static").index_file("index.html"))
             // Custom route for token failure
             .service(web::resource("/token_failure.html").to(|| async {
-                HttpResponse::Ok().content_type("text/html").body(include_str!("../static/token_failure.html"))
+                HttpResponse::Ok().content_type("text/html").body(include_str!("../static/templates/token_failure.html"))
             }))
             // Default service for unhandled routes
             .default_service(web::route().to(|req: actix_web::HttpRequest| async move {

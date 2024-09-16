@@ -19,6 +19,7 @@ pub struct TokenQuery {
     token: String,
 }
 
+
 impl TokenQuery {
     /// Getter method for token
     pub fn token(&self) -> &str {
@@ -181,10 +182,10 @@ pub async fn login_user(pool: web::Data<PgPool>, user: web::Json<LoginInput>) ->
         }
     }
 }
-
 /// Handler for email verification
 pub async fn verify_email(
     pool: web::Data<PgPool>,
+    email_service: web::Data<Arc<dyn EmailServiceTrait>>,
     token_query: web::Query<TokenQuery>,
 ) -> Result<impl Responder, actix_web::Error> {
     let token = TokenQuery::try_from(token_query)?;
@@ -192,13 +193,12 @@ pub async fn verify_email(
 
     debug!("Received email verification request with token: {}", sanitized_token);
 
-    // Update user's email verification status
+    // Check user's email verification status
     let result = sqlx::query!(
         r#"
-        UPDATE users
-        SET is_email_verified = TRUE, verification_token = NULL, verification_token_expires_at = NULL
-        WHERE verification_token = $1 AND verification_token_expires_at > CURRENT_TIMESTAMP
-        RETURNING id
+        SELECT id, email, is_email_verified, verification_token_expires_at
+        FROM users
+        WHERE verification_token = $1
         "#,
         sanitized_token
     )
@@ -206,25 +206,104 @@ pub async fn verify_email(
         .await;
 
     match result {
-        Ok(Some(_)) => {
-            info!("Email verified successfully");
-            Ok(HttpResponse::Found()
-                .append_header((actix_web::http::header::LOCATION, "/email_verified.html"))
-                .finish())
+        Ok(Some(user)) => {
+            if user.is_email_verified {
+                info!("Email already verified for user: {}", user.id);
+                Ok(HttpResponse::Ok().content_type("text/html").body(
+                    include_str!("../../static/templates/already_verified.html")
+                ))
+            } else if user.verification_token_expires_at.map_or(true, |exp| exp < Utc::now()) {
+                warn!("Expired verification token for user: {}", user.id);
+                // Automatically resend verification email
+                match user.email {
+                    Some(ref email) => {
+                        match resend_verification_email_internal(&pool, &email_service, user.id, email).await {
+                            Ok(_) => Ok(HttpResponse::Ok().content_type("text/html").body(
+                                include_str!("../../static/templates/verification_resent.html")
+                            )),
+                            Err(_) => Ok(HttpResponse::InternalServerError().content_type("text/html").body(
+                                include_str!("../../static/templates/error.html")
+                            ))
+                        }
+                    },
+                    None => {
+                        error!("User {} has no email address", user.id);
+                        Ok(HttpResponse::InternalServerError().content_type("text/html").body(
+                            include_str!("../../static/templates/error.html")
+                        ))
+                    }
+                }
+            } else {
+                // Update user's email verification status
+                let update_result = sqlx::query!(
+                    r#"
+                    UPDATE users
+                    SET is_email_verified = TRUE, verification_token = NULL, verification_token_expires_at = NULL
+                    WHERE id = $1
+                    "#,
+                    user.id
+                )
+                    .execute(pool.get_ref())
+                    .await;
+
+                match update_result {
+                    Ok(_) => {
+                        info!("Email verified successfully for user: {}", user.id);
+                        Ok(HttpResponse::Found()
+                            .append_header((actix_web::http::header::LOCATION, "/static/templates/email_verified.html"))
+                            .finish())
+                    },
+                    Err(e) => {
+                        error!("Failed to update email verification status: {:?}", e);
+                        Ok(HttpResponse::InternalServerError().content_type("text/html").body(
+                            include_str!("../../static/templates/error.html")
+                        ))
+                    }
+                }
+            }
         },
         Ok(None) => {
-            warn!("Invalid or expired verification token");
+            warn!("Invalid verification token");
             Ok(HttpResponse::BadRequest().content_type("text/html").body(
-                "<html><body><h1>Invalid or Expired Verification Token</h1><p>Please request a new verification email.</p></body></html>"
+                include_str!("../../static/templates/invalid_token.html")
             ))
         },
         Err(e) => {
-            error!("Failed to verify email: {:?}", e);
+            error!("Database error during email verification: {:?}", e);
             Ok(HttpResponse::InternalServerError().content_type("text/html").body(
-                "<html><body><h1>Error</h1><p>An error occurred while verifying your email. Please try again later.</p></body></html>"
+                include_str!("../../static/templates/error.html")
             ))
         }
     }
+}
+
+async fn resend_verification_email_internal(
+    pool: &web::Data<PgPool>,
+    email_service: &web::Data<Arc<dyn EmailServiceTrait>>,
+    user_id: Uuid,
+    email: &str,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let new_token = generate_verification_token();
+    let expires_at = Utc::now() + Duration::hours(24);
+
+    // Update user with new token
+    sqlx::query!(
+        r#"
+        UPDATE users
+        SET verification_token = $1, verification_token_expires_at = $2
+        WHERE id = $3
+        "#,
+        new_token,
+        expires_at,
+        user_id
+    )
+        .execute(pool.get_ref())
+        .await?;
+
+    // Send new verification email
+    email_service.send_verification_email(email, &new_token)?;
+
+    Ok(())
 }
 
 /// Handler for getting user information
