@@ -12,16 +12,12 @@ use serde::Deserialize;
 use std::convert::TryFrom;
 use crate::validation::{UserInput, LoginInput, validate_and_sanitize_user_input, validate_and_sanitize_login_input, sanitize_input};
 use std::sync::Arc;
-use tera::Tera;
-
-
 
 /// Struct to represent the token query parameter
 #[derive(Deserialize)]
 pub struct TokenQuery {
     token: String,
 }
-
 
 impl TokenQuery {
     /// Getter method for token
@@ -42,136 +38,6 @@ impl TryFrom<web::Query<TokenQuery>> for TokenQuery {
         Ok(query.0)
     }
 }
-
-/// EMAIL
-///
-/// Handler for email verification
-pub async fn verify_email(
-    pool: web::Data<PgPool>,
-    email_service: web::Data<Arc<dyn EmailServiceTrait>>,
-    token_query: web::Query<TokenQuery>,
-    tmpl: web::Data<Tera>,
-) -> impl Responder {
-    let sanitized_token = sanitize_input(token_query.token());
-
-    debug!("Received email verification request with token: {}", sanitized_token);
-
-    let user_result = sqlx::query!(
-        r#"
-        SELECT id, email, is_email_verified, verification_token_expires_at
-        FROM users
-        WHERE verification_token = $1
-        "#,
-        sanitized_token
-    )
-        .fetch_optional(pool.get_ref())
-        .await;
-
-    match user_result {
-        Ok(Some(user)) => {
-            if user.is_email_verified {
-                info!("Email already verified for user: {}", user.id);
-                render_template(&tmpl, "already_verified.html")
-            } else if user.verification_token_expires_at.map_or(true, |exp| exp < Utc::now()) {
-                warn!("Expired verification token for user: {}", user.id);
-                match user.email {
-                    Some(ref email) => {
-                        match resend_verification_email(&pool, &email_service, user.id, email).await {
-                            Ok(_) => render_template(&tmpl, "verification_resent.html"),
-                            Err(e) => {
-                                error!("Failed to resend verification email: {:?}", e);
-                                render_error_template(&tmpl, "Failed to resend verification email")
-                            }
-                        }
-                    },
-                    None => {
-                        error!("User {} has no email address", user.id);
-                        render_error_template(&tmpl, "User has no email address")
-                    }
-                }
-            } else {
-                // Update user's email verification status
-                match sqlx::query!(
-                    r#"
-                    UPDATE users
-                    SET is_email_verified = TRUE, verification_token = NULL, verification_token_expires_at = NULL
-                    WHERE id = $1
-                    "#,
-                    user.id
-                )
-                    .execute(pool.get_ref())
-                    .await
-                {
-                    Ok(_) => {
-                        info!("Email verified successfully for user: {}", user.id);
-                        render_template(&tmpl, "email_verified.html")
-                    },
-                    Err(e) => {
-                        error!("Failed to update email verification status: {:?}", e);
-                        render_error_template(&tmpl, "Failed to verify email")
-                    }
-                }
-            }
-        },
-        Ok(None) => {
-            warn!("Invalid verification token");
-            render_template(&tmpl, "invalid_token.html")
-        },
-        Err(e) => {
-            error!("Database error during email verification: {:?}", e);
-            render_error_template(&tmpl, "An error occurred during verification")
-        }
-    }
-}
-
-fn render_template(tmpl: &Tera, template_name: &str) -> HttpResponse {
-    let mut context = tera::Context::new();
-    context.insert("app_name", "OxidizedOasis");
-    match tmpl.render(template_name, &context) {
-        Ok(rendered) => HttpResponse::Ok().content_type("text/html").body(rendered),
-        Err(e) => {
-            error!("Template rendering error: {}", e);
-            HttpResponse::InternalServerError().body("An error occurred while processing your request")
-        }
-    }
-}
-
-fn render_error_template(tmpl: &Tera, error_message: &str) -> HttpResponse {
-    let mut context = tera::Context::new();
-    context.insert("error_message", error_message);
-    render_template(tmpl, "error.html")
-}
-
-async fn resend_verification_email(
-    pool: &PgPool,
-    email_service: &Arc<dyn EmailServiceTrait>,
-    user_id: Uuid,
-    email: &str,
-) -> Result<(), Box<dyn std::error::Error>> {
-    let new_token = generate_verification_token();
-    let expires_at = Utc::now() + Duration::hours(24);
-
-    sqlx::query!(
-        r#"
-        UPDATE users
-        SET verification_token = $1, verification_token_expires_at = $2
-        WHERE id = $3
-        "#,
-        new_token,
-        expires_at,
-        user_id
-    )
-        .execute(pool)
-        .await?;
-
-    email_service.send_verification_email(email, &new_token)?;
-
-    Ok(())
-}
-
-
-
-
 
 /// Handler for user registration
 pub async fn create_user(
@@ -315,7 +181,52 @@ pub async fn login_user(pool: web::Data<PgPool>, user: web::Json<LoginInput>) ->
         }
     }
 }
+
 /// Handler for email verification
+pub async fn verify_email(
+    pool: web::Data<PgPool>,
+    token_query: web::Query<TokenQuery>,
+) -> Result<impl Responder, actix_web::Error> {
+    let token = TokenQuery::try_from(token_query)?;
+    let sanitized_token = sanitize_input(token.token());
+
+    debug!("Received email verification request with token: {}", sanitized_token);
+
+    // Update user's email verification status
+    let result = sqlx::query!(
+        r#"
+        UPDATE users
+        SET is_email_verified = TRUE, verification_token = NULL, verification_token_expires_at = NULL
+        WHERE verification_token = $1 AND verification_token_expires_at > CURRENT_TIMESTAMP
+        RETURNING id
+        "#,
+        sanitized_token
+    )
+        .fetch_optional(pool.get_ref())
+        .await;
+
+    match result {
+        Ok(Some(_)) => {
+            info!("Email verified successfully");
+            Ok(HttpResponse::Found()
+                .append_header((actix_web::http::header::LOCATION, "/email_verified.html"))
+                .finish())
+        },
+        Ok(None) => {
+            warn!("Invalid or expired verification token");
+            Ok(HttpResponse::BadRequest().content_type("text/html").body(
+                "<html><body><h1>Invalid or Expired Verification Token</h1><p>Please request a new verification email.</p></body></html>"
+            ))
+        },
+        Err(e) => {
+            error!("Failed to verify email: {:?}", e);
+            Ok(HttpResponse::InternalServerError().content_type("text/html").body(
+                "<html><body><h1>Error</h1><p>An error occurred while verifying your email. Please try again later.</p></body></html>"
+            ))
+        }
+    }
+}
+
 /// Handler for getting user information
 #[get("/users/{id}")]
 pub async fn get_user(
@@ -465,7 +376,6 @@ pub async fn delete_user(
         Err(_) => HttpResponse::Unauthorized().json("Invalid token"),
     }
 }
-
 
 /// Generate a random verification token
 fn generate_verification_token() -> String {
