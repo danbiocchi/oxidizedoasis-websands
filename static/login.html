@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OxidizedOasis - Login or Sign Up</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/css/styles.css">
+    <style>
+        #response {
+            position: relative;
+            padding-right: 30px;
+        }
+        #closeMessage {
+            position: absolute;
+            right: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            cursor: pointer;
+            font-weight: bold;
+        }
+        .navbar {
+            background-color: #3498db;
+            padding: 1rem;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .navbar ul {
+            list-style-type: none;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: flex-start;
+        }
+        .navbar li {
+            margin-right: 20px;
+        }
+        .navbar a {
+            color: white;
+            text-decoration: none;
+            font-weight: 500;
+            font-size: 1.1em;
+            transition: color 0.3s ease;
+        }
+        .navbar a:hover {
+            color: #ecf0f1;
+        }
+    </style>
+</head>
+<body>
+<nav class="navbar">
+    <ul>
+        <li><a href="/">Home</a></li>
+        <li><a href="/login.html">Login</a></li>
+        <li><a href="/about.html">About</a></li>
+        <li><a href="/contact">Contact</a></li>
+    </ul>
+</nav>
+<div class="container">
+    <h1 id="authTitle">Log In to OxidizedOasis</h1>
+    <form id="loginForm">
+        <input type="text" id="loginUsername" name="username" placeholder="Username" required minlength="3" maxlength="50">
+        <input type="password" id="loginPassword" name="password" placeholder="Password" required minlength="8" maxlength="100">
+        <button type="submit" id="loginButton">Log In</button>
+    </form>
+    <form id="registerForm" style="display: none;">
+        <input type="text" id="registerUsername" name="username" placeholder="Username" required minlength="3" maxlength="50">
+        <input type="email" id="registerEmail" name="email" placeholder="Email" required>
+        <input type="password" id="registerPassword" name="password" placeholder="Password" required minlength="8" maxlength="100">
+        <div class="password-requirements">
+            <div class="requirement" id="length">At least 8 characters long</div>
+            <div class="requirement" id="uppercase">Contains an uppercase letter</div>
+            <div class="requirement" id="lowercase">Contains a lowercase letter</div>
+            <div class="requirement" id="number">Contains a number</div>
+            <div class="requirement" id="special">Contains a special character</div>
+        </div>
+        <button type="submit" id="registerButton">Sign Up</button>
+    </form>
+    <p id="response"></p>
+    <p id="switchText">New to OxidizedOasis? <a href="javascript:void(0);" id="switchAuth">Sign up</a></p>
+</div>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const loginForm = document.getElementById('loginForm');
+        const registerForm = document.getElementById('registerForm');
+        const authTitle = document.getElementById('authTitle');
+        const switchAuth = document.getElementById('switchAuth');
+        const switchText = document.getElementById('switchText');
+        const responseElem = document.getElementById('response');
+        const passwordRequirements = document.querySelector('.password-requirements');
+        let isLoginMode = true;
+        let fadeOutTimeout;
+
+        function showResponse(message, isError = false) {
+            responseElem.innerHTML = `
+                ${message}
+                <span id="closeMessage">&times;</span>
+            `;
+            responseElem.className = isError ? 'error-message' : 'success-message';
+            responseElem.style.opacity = '1';
+            responseElem.style.display = 'block';
+
+            // Clear any existing timeout
+            if (fadeOutTimeout) {
+                clearTimeout(fadeOutTimeout);
+            }
+
+            // Set a new timeout to fade out the message
+            fadeOutTimeout = setTimeout(() => {
+                fadeOutMessage();
+            }, 10000); // 10 seconds
+
+            // Add click event listener to close button
+            document.getElementById('closeMessage').addEventListener('click', function() {
+                clearResponse();
+            });
+        }
+
+        function fadeOutMessage() {
+            responseElem.classList.add('fade-out');
+            setTimeout(() => {
+                clearResponse();
+            }, 500); // Wait for fade out animation to complete
+        }
+
+        function clearResponse() {
+            if (fadeOutTimeout) {
+                clearTimeout(fadeOutTimeout);
+            }
+            responseElem.textContent = '';
+            responseElem.className = '';
+            responseElem.style.display = 'none';
+            responseElem.classList.remove('fade-out');
+        }
+
+        function toggleAuthMode() {
+            isLoginMode = !isLoginMode;
+            authTitle.textContent = isLoginMode ? 'Log In to OxidizedOasis' : 'Sign Up for OxidizedOasis';
+            loginForm.style.display = isLoginMode ? 'block' : 'none';
+            registerForm.style.display = isLoginMode ? 'none' : 'block';
+            switchText.innerHTML = isLoginMode
+                ? 'New to OxidizedOasis? <a href="javascript:void(0);" id="switchAuth">Sign up</a>'
+                : 'Already have an account? <a href="javascript:void(0);" id="switchAuth">Log in</a>';
+            passwordRequirements.style.display = isLoginMode ? 'none' : 'block';
+            clearResponse();
+        }
+
+        function checkPasswordRequirements() {
+            const password = document.getElementById('registerPassword').value;
+            const requirements = {
+                length: password.length >= 8,
+                uppercase: /[A-Z]/.test(password),
+                lowercase: /[a-z]/.test(password),
+                number: /[0-9]/.test(password),
+                special: /[!@#$%^&*(),.?":{}|<>]/.test(password)
+            };
+
+            let allMet = true;
+            for (const [req, met] of Object.entries(requirements)) {
+                const element = document.getElementById(req);
+                if (met) {
+                    element.classList.add('met');
+                } else {
+                    element.classList.remove('met');
+                    allMet = false;
+                }
+            }
+
+            document.getElementById('registerButton').disabled = !allMet;
+        }
+
+        document.body.addEventListener('click', function(e) {
+            if (e.target && e.target.id === 'switchAuth') {
+                e.preventDefault();
+                toggleAuthMode();
+            }
+        });
+
+        loginForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            const formData = new FormData(loginForm);
+            const data = Object.fromEntries(formData.entries());
+
+            fetch('/users/login', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(data),
+            })
+                .then(response => response.json())
+                .then(result => {
+                    if (result.token) {
+                        localStorage.setItem('token', result.token);
+                        localStorage.setItem('userId', result.user.id);
+                        localStorage.setItem('username', result.user.username);
+                        window.location.href = '/dashboard.html';
+                    } else {
+                        showResponse(result.message || 'An error occurred', true);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    showResponse('An error occurred', true);
+                });
+        });
+
+        registerForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            const formData = new FormData(registerForm);
+            const data = Object.fromEntries(formData.entries());
+
+            fetch('/users/register', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(data),
+            })
+                .then(response => response.json())
+                .then(result => {
+                    if (result.email) {
+                        showResponse(`Registration successful! Please check your email at: ${result.email}`);
+                    } else {
+                        showResponse(result.message || 'An error occurred', true);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    showResponse('An error occurred', true);
+                });
+        });
+
+        // Check if user is already logged in
+        const token = localStorage.getItem('token');
+        if (token) {
+            window.location.href = '/dashboard.html';
+        }
+
+        document.getElementById('registerPassword').addEventListener('input', checkPasswordRequirements);
+    });
+</script>
+</body>
+</html>
