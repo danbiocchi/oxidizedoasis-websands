@@ -256,8 +256,7 @@ async fn main() -> std::io::Result<()> {
                     .route("/dashboard", web::get().to(handlers::admin::admin_dashboard))
             )
             // Serve static files
-            .service(fs::Files::new("/css", "./static/css").show_files_listing())
-            .service(fs::Files::new("/", "./static").index_file("index.html"))
+            .service(fs::Files::new("/", "./frontend/dist").index_file("index.html"))
             // Custom route for token failure
             .service(web::resource("/token_failure.html").to(|| async {
                 HttpResponse::Ok().content_type("text/html").body(include_str!("../static/token_failure.html"))
