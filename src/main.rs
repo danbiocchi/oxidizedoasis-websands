@@ -1,4 +1,3 @@
-use actix_web::{web, App, HttpServer, HttpResponse, http};
 use sqlx::postgres::{PgPoolOptions, Postgres};
 use sqlx::Connection;
 use log::{info, debug, error, warn};
@@ -19,6 +18,7 @@ use crate::email::{EmailServiceTrait, RealEmailService};
 mod config;
 use config::Config;
 use std::sync::Arc;
+use actix_web::{App, http, HttpResponse, HttpServer, web};
 
 mod handlers;
 mod models;

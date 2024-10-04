@@ -10,4 +10,4 @@ web-sys = "0.3"
 yew-router = "0.18.0"
 
 [lib]
-crate-type = ["cdylib", "rlib"]
+crate-type = ["cdylib"]
