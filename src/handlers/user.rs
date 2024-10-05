@@ -13,25 +13,21 @@ use std::convert::TryFrom;
 use crate::validation::{UserInput, LoginInput, validate_and_sanitize_user_input, validate_and_sanitize_login_input, sanitize_input};
 use std::sync::Arc;
 
-/// Struct to represent the token query parameter
 #[derive(Deserialize)]
 pub struct TokenQuery {
     token: String,
 }
 
 impl TokenQuery {
-    /// Getter method for token
     pub fn token(&self) -> &str {
         &self.token
     }
 }
 
-/// Implementation of TryFrom for TokenQuery to validate the token format
 impl TryFrom<web::Query<TokenQuery>> for TokenQuery {
     type Error = actix_web::Error;
 
     fn try_from(query: web::Query<TokenQuery>) -> Result<Self, Self::Error> {
-        // Validate token: ensure it's exactly 32 alphanumeric characters
         if !query.token.chars().all(|c| c.is_ascii_alphanumeric()) || query.token.len() != 32 {
             return Err(actix_web::error::ErrorBadRequest("Invalid token format"));
         }
@@ -39,7 +35,6 @@ impl TryFrom<web::Query<TokenQuery>> for TokenQuery {
     }
 }
 
-/// Handler for user registration
 pub async fn create_user(
     pool: web::Data<PgPool>,
     user: web::Json<UserInput>,
@@ -50,26 +45,27 @@ pub async fn create_user(
             debug!("Received create_user request at /users/register");
             info!("Attempting to create user: {:?}", validated_user);
 
-            // Hash the password
             let password_hash = match validated_user.password {
                 Some(password) => match hash(&password, DEFAULT_COST) {
                     Ok(hash) => hash,
                     Err(e) => {
                         error!("Failed to hash password: {:?}", e);
-                        return HttpResponse::InternalServerError().json("Failed to create user");
+                        return HttpResponse::InternalServerError().json(serde_json::json!({
+                            "error": "Internal server error",
+                            "message": "Failed to create user"
+                        }));
                     }
                 },
-                None => return HttpResponse::BadRequest().json("Password is required for user creation"),
+                None => return HttpResponse::BadRequest().json(serde_json::json!({
+                    "error": "Bad request",
+                    "message": "Password is required for user creation"
+                })),
             };
 
-            // Generate verification token and expiration
             let verification_token = generate_verification_token();
             let verification_token_expires_at = Utc::now() + Duration::hours(24);
-
-            // Get current timestamp for created_at and updated_at
             let now = Utc::now();
 
-            // Insert new user into the database
             let result = sqlx::query_as!(
                 User,
                 r#"INSERT INTO users (id, username, email, password_hash, is_email_verified, verification_token, verification_token_expires_at, created_at, updated_at, role)
@@ -84,14 +80,13 @@ pub async fn create_user(
                 verification_token_expires_at,
                 now,
                 now,
-                "user" // Set default role to "user"
+                "user"
             )
                 .fetch_one(pool.get_ref())
                 .await;
 
             match result {
                 Ok(user) => {
-                    // Send verification email
                     let email_service = email_service.get_ref();
                     match email_service.send_verification_email(user.email.as_deref().unwrap_or_default(), &verification_token) {
                         Ok(_) => {
@@ -105,30 +100,40 @@ pub async fn create_user(
                         },
                         Err(e) => {
                             error!("Failed to send verification email: {:?}", e);
-                            HttpResponse::InternalServerError().json("User created but failed to send verification email")
+                            HttpResponse::InternalServerError().json(serde_json::json!({
+                                "error": "Internal server error",
+                                "message": "User created but failed to send verification email"
+                            }))
                         }
                     }
                 },
                 Err(e) => {
                     error!("Failed to create user: {:?}", e);
-                    HttpResponse::InternalServerError().json(format!("Failed to create user: {:?}", e))
+                    HttpResponse::InternalServerError().json(serde_json::json!({
+                        "error": "Internal server error",
+                        "message": "Failed to create user"
+                    }))
                 }
             }
         },
         Err(errors) => {
-            HttpResponse::BadRequest().json(errors.into_iter().map(|e| e.to_string()).collect::<Vec<String>>())
+            HttpResponse::BadRequest().json(serde_json::json!({
+                "error": "Bad request",
+                "messages": errors.into_iter().map(|e| e.to_string()).collect::<Vec<String>>()
+            }))
         }
     }
 }
 
-/// Handler for user login
 pub async fn login_user(pool: web::Data<PgPool>, user: web::Json<LoginInput>) -> impl Responder {
     let validated_user = match validate_and_sanitize_login_input(user.into_inner()) {
         Ok(user) => user,
-        Err(errors) => return HttpResponse::BadRequest().json(errors.into_iter().map(|e| e.to_string()).collect::<Vec<String>>()),
+        Err(errors) => return HttpResponse::BadRequest().json(serde_json::json!({
+            "error": "Bad request",
+            "messages": errors.into_iter().map(|e| e.to_string()).collect::<Vec<String>>()
+        })),
     };
 
-    // Fetch user from database
     let user_result = sqlx::query_as!(
         User,
         "SELECT * FROM users WHERE username = $1",
@@ -139,18 +144,16 @@ pub async fn login_user(pool: web::Data<PgPool>, user: web::Json<LoginInput>) ->
 
     match user_result {
         Ok(Some(db_user)) => {
-            // Check if email is verified
             if !db_user.is_email_verified {
                 return HttpResponse::Unauthorized().json(serde_json::json!({
+                    "error": "Unauthorized",
                     "message": "Email has not been verified yet. Please check your email for the verification link.",
                     "error_type": "email_not_verified"
                 }));
             }
 
-            // Verify password
             match verify(&validated_user.password, &db_user.password_hash) {
                 Ok(true) => {
-                    // Generate JWT token
                     let jwt_secret = std::env::var("JWT_SECRET").expect("JWT_SECRET must be set");
                     match auth::create_jwt(db_user.id, &jwt_secret) {
                         Ok(token) => {
@@ -163,26 +166,40 @@ pub async fn login_user(pool: web::Data<PgPool>, user: web::Json<LoginInput>) ->
                         },
                         Err(e) => {
                             error!("Failed to create JWT: {:?}", e);
-                            HttpResponse::InternalServerError().json("Error during login")
+                            HttpResponse::InternalServerError().json(serde_json::json!({
+                                "error": "Internal server error",
+                                "message": "Error during login"
+                            }))
                         }
                     }
                 },
-                Ok(false) => HttpResponse::Unauthorized().json("Invalid username or password"),
+                Ok(false) => HttpResponse::Unauthorized().json(serde_json::json!({
+                    "error": "Unauthorized",
+                    "message": "Invalid username or password"
+                })),
                 Err(e) => {
                     error!("Error verifying password: {:?}", e);
-                    HttpResponse::InternalServerError().json("Error verifying password")
+                    HttpResponse::InternalServerError().json(serde_json::json!({
+                        "error": "Internal server error",
+                        "message": "Error verifying password"
+                    }))
                 },
             }
         },
-        Ok(None) => HttpResponse::Unauthorized().json("Invalid username or password"),
+        Ok(None) => HttpResponse::Unauthorized().json(serde_json::json!({
+            "error": "Unauthorized",
+            "message": "Invalid username or password"
+        })),
         Err(e) => {
             error!("Database error during login: {:?}", e);
-            HttpResponse::InternalServerError().json("Error logging in")
+            HttpResponse::InternalServerError().json(serde_json::json!({
+                "error": "Internal server error",
+                "message": "Error logging in"
+            }))
         }
     }
 }
 
-/// Handler for email verification
 pub async fn verify_email(
     pool: web::Data<PgPool>,
     token_query: web::Query<TokenQuery>,
@@ -192,7 +209,6 @@ pub async fn verify_email(
 
     debug!("Received email verification request with token: {}", sanitized_token);
 
-    // Update user's email verification status
     let result = sqlx::query!(
         r#"
         UPDATE users
@@ -227,7 +243,6 @@ pub async fn verify_email(
     }
 }
 
-/// Handler for getting user information
 #[get("/users/{id}")]
 pub async fn get_user(
     pool: web::Data<PgPool>,
@@ -237,10 +252,8 @@ pub async fn get_user(
     let user_id = id.into_inner();
     let jwt_secret = std::env::var("JWT_SECRET").expect("JWT_SECRET must be set");
 
-    // Validate JWT and check user authorization
     match auth::validate_jwt(auth.token(), &jwt_secret) {
         Ok(claims) if claims.sub == user_id => {
-            // Proceed with fetching user info
             let result = sqlx::query_as!(
                 User,
                 "SELECT * FROM users WHERE id = $1",
@@ -271,12 +284,17 @@ pub async fn get_user(
                 }
             }
         },
-        Ok(_) => HttpResponse::Forbidden().json("Access denied: You can only view your own information"),
-        Err(_) => HttpResponse::Unauthorized().json("Invalid token"),
+        Ok(_) => HttpResponse::Forbidden().json(serde_json::json!({
+            "error": "Forbidden",
+            "message": "Access denied: You can only view your own information"
+        })),
+        Err(_) => HttpResponse::Unauthorized().json(serde_json::json!({
+            "error": "Unauthorized",
+            "message": "Invalid token"
+        })),
     }
 }
 
-/// Handler for updating user information
 #[put("/users/{id}")]
 pub async fn update_user(
     pool: web::Data<PgPool>,
@@ -287,12 +305,14 @@ pub async fn update_user(
     let user_id = id.into_inner();
     let jwt_secret = std::env::var("JWT_SECRET").expect("JWT_SECRET must be set");
 
-    // Validate JWT and check user authorization
     match auth::validate_jwt(auth.token(), &jwt_secret) {
         Ok(claims) if claims.sub == user_id => {
             let validated_user = match validate_and_sanitize_user_input(user_input.into_inner()) {
                 Ok(user) => user,
-                Err(errors) => return HttpResponse::BadRequest().json(errors.into_iter().map(|e| e.to_string()).collect::<Vec<String>>()),
+                Err(errors) => return HttpResponse::BadRequest().json(serde_json::json!({
+                    "error": "Bad Request",
+                    "messages": errors.into_iter().map(|e| e.to_string()).collect::<Vec<String>>()
+                })),
             };
 
             let current_user = sqlx::query_as!(User, "SELECT * FROM users WHERE id = $1", user_id)
@@ -304,7 +324,7 @@ pub async fn update_user(
                     let new_username = validated_user.username;
                     let new_password_hash = match validated_user.password {
                         Some(password) => hash(&password, DEFAULT_COST).unwrap(),
-                        None => current_user.password_hash,  // Keep the existing password if not provided
+                        None => current_user.password_hash,
                     };
                     let result = sqlx::query_as!(
                         User,
@@ -329,19 +349,34 @@ pub async fn update_user(
                         },
                         Err(e) => {
                             error!("Failed to update user: {:?}", e);
-                            HttpResponse::InternalServerError().json("Failed to update user")
+                            HttpResponse::InternalServerError().json(serde_json::json!({
+                                "error": "Internal Server Error",
+                                "message": "Failed to update user"
+                            }))
                         }
                     }
                 },
-                Ok(None) => HttpResponse::NotFound().json("User not found"),
+                Ok(None) => HttpResponse::NotFound().json(serde_json::json!({
+                    "error": "Not Found",
+                    "message": "User not found"
+                })),
                 Err(e) => {
                     error!("Failed to get user for update: {:?}", e);
-                    HttpResponse::InternalServerError().json("Failed to update user")
+                    HttpResponse::InternalServerError().json(serde_json::json!({
+                        "error": "Internal Server Error",
+                        "message": "Failed to update user"
+                    }))
                 }
             }
         },
-        Ok(_) => HttpResponse::Forbidden().json("Access denied: You can only update your own information"),
-        Err(_) => HttpResponse::Unauthorized().json("Invalid token"),
+        Ok(_) => HttpResponse::Forbidden().json(serde_json::json!({
+            "error": "Forbidden",
+            "message": "Access denied: You can only update your own information"
+        })),
+        Err(_) => HttpResponse::Unauthorized().json(serde_json::json!({
+            "error": "Unauthorized",
+            "message": "Invalid token"
+        })),
     }
 }
 

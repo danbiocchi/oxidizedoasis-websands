@@ -1,13 +1,20 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <meta charset="utf-8" />
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>OxidizedOasis-WebSands</title>
-    <link rel="stylesheet" href="/styles-a064ec8b41290c8d.css" integrity="sha384&#x2D;ySygxbVFBc&#x2F;oT8ySS5ty5tiDT8QqxF&#x2B;F2zLARcjWrDGJxP8OOJ4vfS5SzUixS&#x2F;Ew"/>
+    <link rel="stylesheet" href="/styles-f0e5a0479aeaa4fe.css" integrity="sha384&#x2D;rN5nsuk88aVeuvKvrfMVqtKO1ys7SVyynuCOAd&#x2F;7yJkyItmmz3tmDlscsTo2Bqsr"/>
     
-<script type="module" nonce="B6eZYCWtwbce3G3gpncFYQ==">
-import init, * as bindings from '/frontend-166368bb64ed55bc.js';
-const wasm = await init('/frontend-166368bb64ed55bc_bg.wasm');
+
+<link rel="modulepreload" href="/frontend-66d7e62e6edead99.js" crossorigin=anonymous integrity="sha384-efyG7wzTnpTJMjCBjmuYjF2B9C8F5AKNOrjtm1JTVho8aVSqQNmHrLWy9OgogrSa">
+<link rel="preload" href="/frontend-66d7e62e6edead99_bg.wasm" crossorigin=anonymous integrity="sha384-D6fb1xpT9toNUDxgzpzdMI8SFuRnsB2uTuE4QqcQNKCol7j+S8kjeJIOMPJDi3a9" as="fetch" type="application/wasm"></head>
+    <body>
+    <div id="app"></div>
+    
+<script type="module" nonce="lvvYCQgx05irlJ0D8IlGyA==">
+import init, * as bindings from '/frontend-66d7e62e6edead99.js';
+const wasm = await init('/frontend-66d7e62e6edead99_bg.wasm');
 
 
 window.wasmBindings = bindings;
@@ -15,11 +22,5 @@ window.wasmBindings = bindings;
 
 dispatchEvent(new CustomEvent("TrunkApplicationStarted", {detail: {wasm}}));
 
-</script>
-
-<link rel="modulepreload" href="/frontend-166368bb64ed55bc.js" crossorigin=anonymous integrity="sha384-ncMZ54i9p4wPwEtb9dpLMEm4p0tjH81nRKZV5FmFjA+laGQwCbqhCyJdfoKkNWyO">
-<link rel="preload" href="/frontend-166368bb64ed55bc_bg.wasm" crossorigin=anonymous integrity="sha384-g6DjZQVPatu2IfcC5X6Q3IYOJBQUktTrBskNiZqmqicenjmZbINMYTnATtsxZiIF" as="fetch" type="application/wasm"></head>
-<body>
-<div id="app"></div>
-</body>
+</script></body>
 </html>
