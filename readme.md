@@ -1,6 +1,6 @@
 # OxidizedOasis-WebSands
 
-OxidizedOasis-WebSands is a robust, high-performance web application built with Rust, focusing on efficient user management and authentication. This project demonstrates the power of Rust in web development, utilizing the Actix-web framework to create a secure, scalable user management system.
+OxidizedOasis-WebSands is a robust, high-performance web application built with Rust, focusing on efficient user management and authentication. This project demonstrates the power of Rust in full-stack web development, utilizing the Actix-web framework for the backend and Yew for a dynamic frontend.
 
 <p align="center">
   <img src="static/images/signup-page-screenshot.png" alt="Login Page Screenshot" width="600">
@@ -32,7 +32,7 @@ Comprehensive documentation for OxidizedOasis-WebSands is available to help deve
 - 🌐 Cross-Origin Resource Sharing (CORS) configuration for API security
 - 🔍 Comprehensive input validation and error handling
 - 📊 Efficient CRUD operations for user management
-- 🎨 Modern, responsive frontend with smooth animations
+- 🎨 Modern, responsive frontend with Yew framework
 - 📱 Mobile-friendly design for seamless user experience across devices
 - 🔧 Easily extensible architecture for adding new features
 - 🔄 Database migrations for easy schema management and updates
@@ -47,12 +47,12 @@ Comprehensive documentation for OxidizedOasis-WebSands is available to help deve
     - [jsonwebtoken](https://github.com/Keats/jsonwebtoken) - JWT implementation in Rust
     - [bcrypt](https://docs.rs/bcrypt/latest/bcrypt/) - Easily hash and verify passwords using bcrypt
 
+- **Frontend**:
+    - [Yew](https://yew.rs/) - A modern web framework for creating multi-threaded frontend apps with WebAssembly
+    - [Trunk](https://trunkrs.dev/) - Build, bundle & ship your Rust WASM application to the web
+
 - **Database**:
     - [PostgreSQL](https://www.postgresql.org/) - The World's Most Advanced Open Source Relational Database
-
-- **Frontend**:
-    - HTML5, CSS3, and JavaScript
-    - Custom CSS with modern animations for an engaging user interface
 
 - **Development & Deployment**:
     - [Docker](https://www.docker.com/) - For containerization and easy deployment
@@ -66,6 +66,8 @@ Before you begin, ensure you have the following installed:
 - [Rust](https://www.rust-lang.org/tools/install) (latest stable version)
 - [PostgreSQL](https://www.postgresql.org/download/) (version 13 or later)
 - [Docker](https://docs.docker.com/get-docker/) (optional, for containerized deployment)
+- [Trunk](https://trunkrs.dev/) (`cargo install trunk`)
+- [wasm32-unknown-unknown target](https://rustwasm.github.io/docs/book/game-of-life/setup.html) (`rustup target add wasm32-unknown-unknown`)
 
 ### Installation
 
@@ -175,14 +177,26 @@ Before you begin, ensure you have the following installed:
    ```
    Replace both files placeholders(.env and .env.test) with your actual database, SMTP, and other credentials.
 
-3. Build and run the project:
+3. Build the frontend:
+   ```sh
+   cd frontend
+   trunk build
+   cd ..
+   ```
+
+4. Build the backend:
+   ```sh
+   cargo build
+   ```
+
+5. Run the project:
    ```sh
    cargo run
    ```
 
-4. The application will automatically create the database if it doesn't exist, run all necessary migrations, and start the server.
+6. The application will automatically create the database if it doesn't exist, run all necessary migrations, and start the server.
 
-5. Visit `http://localhost:8080` in your browser to access the application.
+7. Visit `http://localhost:8080` in your browser to access the application.
 
 ## 🔧 Configuration
 
@@ -228,6 +242,7 @@ Project Link: [https://github.com/danbiocchi/oxidizedoasis-websands](https://git
 
 - [Rust](https://www.rust-lang.org/)
 - [Actix-web](https://actix.rs/)
+- [Yew](https://yew.rs/)
 - [SQLx](https://github.com/launchbadge/sqlx)
 - [PostgreSQL](https://www.postgresql.org/)
 - [JSON Web Tokens](https://jwt.io/)
