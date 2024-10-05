@@ -11,7 +11,7 @@
 # Ignore IDE-specific files
 .vscode/
 .idea/
-.frontend/dist/*
+frontend/dist/
 
 
 # Ignore OS-generated files
