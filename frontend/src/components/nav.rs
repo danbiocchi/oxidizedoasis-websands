@@ -29,11 +29,11 @@ pub fn nav() -> Html {
                         <li><Link<Route> to={Route::Dashboard}>{ "Dashboard" }</Link<Route>></li>
                     }
                 </ul>
-                <div class="nav-login">
+                <div class="navbar-auth">
                     if auth_context.is_authenticated {
-                        <button onclick={logout}>{ "Logout" }</button>
+                        <button class="logout-button" onclick={logout}>{ "Logout" }</button>
                     } else {
-                        <Link<Route> to={Route::Login}>{ "Login" }</Link<Route>>
+                        <button class="login-button" onclick={Callback::from(move |_| navigator.push(&Route::Login))}>{ "Login" }</button>
                     }
                 </div>
             </div>
