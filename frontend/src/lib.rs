@@ -10,6 +10,7 @@ mod services;
 use components::nav::Nav;
 use routes::{Route, switch};
 use services::auth_context::AuthContext;
+use components::footer::Footer;
 
 #[wasm_bindgen(start)]
 pub fn run_app() -> Result<(), JsValue> {
@@ -34,6 +35,7 @@ fn app() -> Html {
             <BrowserRouter>
                 <Nav />
                 <Switch<Route> render={switch} />
+                <Footer />
             </BrowserRouter>
         </ContextProvider<AuthContext>>
     }
