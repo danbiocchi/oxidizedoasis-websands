@@ -233,7 +233,7 @@ async fn main() -> std::io::Result<()> {
                         .add(("X-Content-Type-Options", "nosniff"))
                         .add(("Referrer-Policy", "strict-origin-when-cross-origin"))
             )
-            // Public routes with rate limiting
+            // Public pages with rate limiting
             .service(
                 web::scope("/users")
                     .wrap(Governor::new(&governor_conf))
@@ -241,7 +241,7 @@ async fn main() -> std::io::Result<()> {
                     .route("/login", web::post().to(handlers::user::login_user))
                     .route("/verify", web::get().to(handlers::user::verify_email))
             )
-            // Protected API routes
+            // Protected API pages
             .service(
                 web::scope("/api")
                     .wrap(HttpAuthentication::bearer(validator))
@@ -249,7 +249,7 @@ async fn main() -> std::io::Result<()> {
                     .service(handlers::user::update_user)
                     .service(handlers::user::delete_user)
             )
-            // Admin routes with separate authentication
+            // Admin pages with separate authentication
             .service(
                 web::scope("/admin")
                     .wrap(HttpAuthentication::bearer(admin_validator))
@@ -261,7 +261,7 @@ async fn main() -> std::io::Result<()> {
             .service(web::resource("/token_failure.html").to(|| async {
                 HttpResponse::Ok().content_type("text/html").body(include_str!("../static/token_failure.html"))
             }))
-            // Default service for unhandled routes
+            // Default service for unhandled pages
             .default_service(web::route().to(|req: actix_web::HttpRequest| async move {
                 error!("Unhandled request: {:?}", req);
                 HttpResponse::NotFound().json(serde_json::json!({

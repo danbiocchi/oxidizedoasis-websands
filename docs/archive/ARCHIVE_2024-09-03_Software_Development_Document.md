@@ -969,7 +969,7 @@ HttpServer::new(move || {
                 .route("/login", web::post().to(handlers::user::login_user))
                 .route("/verify", web::get().to(handlers::user::verify_email))
         )
-        // Other routes...
+        // Other pages...
 })
 ```
 
@@ -1200,7 +1200,7 @@ async fn main() -> std::io::Result<()> {
                     .route("/login", web::post().to(handlers::user::login_user))
                     .route("/verify", web::get().to(handlers::user::verify_email))
             )
-            // ... other routes and configurations ...
+            // ... other pages and configurations ...
     })
     .bind(server_addr)?
     .run()
