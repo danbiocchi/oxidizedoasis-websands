@@ -126,7 +126,7 @@ pub fn login() -> Html {
 
     html! {
         <main class="login-content">
-            <div class="login-container">
+            <div class="auth-form-container">
                 <h1>{"Login to OxidizedOasis"}</h1>
                 <form {onsubmit} class="login-form">
                     <div class="form-group">

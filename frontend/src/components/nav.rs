@@ -19,6 +19,16 @@ pub fn nav() -> Html {
         })
     };
 
+    let login_click = Callback::from({
+        let navigator = navigator.clone();
+        move |_| navigator.push(&Route::Login)
+    });
+
+    let register_click = Callback::from({
+        let navigator = navigator.clone();
+        move |_| navigator.push(&Route::Register)
+    });
+
     html! {
         <nav class="navbar">
             <div class="navbar-container">
@@ -29,11 +39,12 @@ pub fn nav() -> Html {
                         <li><Link<Route> to={Route::Dashboard}>{ "Dashboard" }</Link<Route>></li>
                     }
                 </ul>
-                <div class="navbar-auth">
+                <div class="auth-buttons">
                     if auth_context.is_authenticated {
-                        <button class="logout-button" onclick={logout}>{ "Logout" }</button>
+                        <button class="auth-button logout-button" onclick={logout}>{ "Logout" }</button>
                     } else {
-                        <button class="login-button" onclick={Callback::from(move |_| navigator.push(&Route::Login))}>{ "Login" }</button>
+                        <button onclick={login_click} class="auth-button login-button">{ "Login" }</button>
+                        <button onclick={register_click} class="auth-button register-button">{ "Register" }</button>
                     }
                 </div>
             </div>

@@ -1,6 +1,6 @@
 use yew::prelude::*;
 use yew_router::prelude::*;
-use crate::pages::{Home, About, Login, Dashboard};
+use crate::pages::{Home, About, Login, Dashboard, Register};
 use crate::services::auth;
 
 #[derive(Clone, Routable, PartialEq)]
@@ -13,6 +13,8 @@ pub enum Route {
     Login,
     #[at("/dashboard")]
     Dashboard,
+    #[at("/register")]
+    Register,
 }
 
 pub fn switch(routes: Route) -> Html {
@@ -20,12 +22,7 @@ pub fn switch(routes: Route) -> Html {
         Route::Home => html! { <Home /> },
         Route::About => html! { <About /> },
         Route::Login => html! { <Login /> },
-        Route::Dashboard => {
-            if auth::is_authenticated() {
-                html! { <Dashboard /> }
-            } else {
-                html! { <Redirect<Route> to={Route::Login}/> }
-            }
-        },
+        Route::Dashboard => html! { <Dashboard /> },
+        Route::Register => html! { <Register /> },
     }
 }
