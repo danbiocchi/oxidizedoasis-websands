@@ -26,10 +26,9 @@ validator = { version = "0.16", features = ["derive"] }
 regex = "1.5"
 lazy_static = "1.4"
 ammonia = "4.0.0"
-actix-governor = "0.5"
+actix-governor = "0.6.0"
 actix-rt = "2.2"
 url = "2.5.2"
-sqlformat = "=0.2.6"
 
 [dev-dependencies]
 actix-rt = "2.2"
