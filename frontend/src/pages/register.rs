@@ -4,7 +4,6 @@ use web_sys::HtmlInputElement;
 use gloo::net::http::Request;
 use serde::{Deserialize, Serialize};
 use wasm_bindgen_futures::spawn_local;
-use crate::services::auth_context::AuthContext;
 use yew_router::prelude::*;
 use crate::routes::Route;
 use gloo::console::log;

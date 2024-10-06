@@ -1,4 +1,4 @@
-use jsonwebtoken::{encode, decode, Header, Validation, EncodingKey, DecodingKey, errors::Error as JwtError, errors::ErrorKind as JwtErrorKind};
+use jsonwebtoken::{encode, decode, Header, Validation, EncodingKey, DecodingKey};
 use serde::{Serialize, Deserialize};
 use chrono::{Utc, Duration};
 use uuid::Uuid;
@@ -20,11 +20,7 @@ pub struct Claims {
 ///
 /// # Returns
 /// * `Result<String, jsonwebtoken::errors::Error>` - The JWT token if successful, or an error
-pub fn create_jwt(user_id: Uuid, secret: &str) -> Result<String, JwtError> {
-    if secret.is_empty() {
-        return Err(JwtError::from(JwtErrorKind::InvalidToken));
-    }
-
+pub fn create_jwt(user_id: Uuid, secret: &str) -> Result<String, jsonwebtoken::errors::Error> {
     let expiration = Utc::now()
         .checked_add_signed(Duration::hours(24))
         .expect("valid timestamp")
@@ -36,7 +32,14 @@ pub fn create_jwt(user_id: Uuid, secret: &str) -> Result<String, JwtError> {
         iat: Utc::now().timestamp(),
     };
 
-    encode(&Header::default(), &claims, &EncodingKey::from_secret(secret.as_ref()))
+    encode(
+        &Header::default(),
+        &claims,
+        &EncodingKey::from_secret(secret.as_ref()),
+    ).map_err(|e| {
+        error!("Failed to create JWT: {:?}", e);
+        e
+    })
 }
 
 /// Validate a JWT token

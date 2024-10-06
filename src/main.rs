@@ -244,6 +244,7 @@ async fn main() -> std::io::Result<()> {
             .service(
                 web::scope("/api")
                     .wrap(HttpAuthentication::bearer(validator))
+                    .service(handlers::user::get_current_user)
                     .service(handlers::user::get_user)
                     .service(handlers::user::update_user)
                     .service(handlers::user::delete_user)

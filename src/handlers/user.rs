@@ -12,6 +12,7 @@ use serde::Deserialize;
 use std::convert::TryFrom;
 use crate::validation::{UserInput, LoginInput, validate_and_sanitize_user_input, validate_and_sanitize_login_input, sanitize_input};
 use std::sync::Arc;
+use serde_json::json;
 
 #[derive(Deserialize)]
 pub struct TokenQuery {
@@ -244,7 +245,6 @@ pub async fn verify_email(
         }
     }
 }
-
 #[get("/users/{id}")]
 pub async fn get_user(
     pool: web::Data<PgPool>,
@@ -255,7 +255,36 @@ pub async fn get_user(
     let jwt_secret = std::env::var("JWT_SECRET").expect("JWT_SECRET must be set");
 
     match auth::validate_jwt(auth.token(), &jwt_secret) {
-        Ok(claims) if claims.sub == user_id => {
+        Ok(claims) => {
+            if claims.sub != user_id {
+                warn!("Unauthorized access attempt: User {} tried to access data for user {}", claims.sub, user_id);
+                return HttpResponse::Forbidden().json(json!({
+                    "error": "Forbidden",
+                    "message": "Access denied: You can only view your own information"
+                }));
+            }
+            fetch_user_by_id(pool, user_id).await
+        },
+        Err(e) => {
+            warn!("Invalid token used for authentication: {:?}", e);
+            HttpResponse::Unauthorized().json(json!({
+                "error": "Unauthorized",
+                "message": "Invalid token"
+            }))
+        },
+    }
+}
+
+#[get("/users/me")]
+pub async fn get_current_user(
+    pool: web::Data<PgPool>,
+    auth: BearerAuth,
+) -> impl Responder {
+    let jwt_secret = std::env::var("JWT_SECRET").expect("JWT_SECRET must be set");
+
+    match auth::validate_jwt(auth.token(), &jwt_secret) {
+        Ok(claims) => {
+            let user_id = claims.sub;
             let result = sqlx::query_as!(
                 User,
                 "SELECT * FROM users WHERE id = $1",
@@ -266,17 +295,13 @@ pub async fn get_user(
 
             match result {
                 Ok(Some(user)) => {
-                    info!("User found: {:?}", user);
                     let user_response: UserResponse = user.into();
                     HttpResponse::Ok().json(user_response)
                 },
-                Ok(None) => {
-                    warn!("User not found for ID: {}", user_id);
-                    HttpResponse::NotFound().json(serde_json::json!({
-                        "error": "Not Found",
-                        "message": "User not found"
-                    }))
-                },
+                Ok(None) => HttpResponse::NotFound().json(serde_json::json!({
+                    "error": "Not Found",
+                    "message": "User not found"
+                })),
                 Err(e) => {
                     error!("Failed to get user: {:?}", e);
                     HttpResponse::InternalServerError().json(serde_json::json!({
@@ -286,14 +311,42 @@ pub async fn get_user(
                 }
             }
         },
-        Ok(_) => HttpResponse::Forbidden().json(serde_json::json!({
-            "error": "Forbidden",
-            "message": "Access denied: You can only view your own information"
-        })),
         Err(_) => HttpResponse::Unauthorized().json(serde_json::json!({
             "error": "Unauthorized",
             "message": "Invalid token"
         })),
+    }
+}
+
+async fn fetch_user_by_id(pool: web::Data<PgPool>, user_id: Uuid) -> HttpResponse {
+    let result = sqlx::query_as!(
+        User,
+        "SELECT * FROM users WHERE id = $1",
+        user_id
+    )
+        .fetch_optional(pool.get_ref())
+        .await;
+
+    match result {
+        Ok(Some(user)) => {
+            info!("User found: ID = {}", user_id);
+            let user_response: UserResponse = user.into();
+            HttpResponse::Ok().json(user_response)
+        },
+        Ok(None) => {
+            warn!("User not found: ID = {}", user_id);
+            HttpResponse::NotFound().json(json!({
+                "error": "Not Found",
+                "message": "User not found"
+            }))
+        },
+        Err(e) => {
+            error!("Database error while fetching user {}: {:?}", user_id, e);
+            HttpResponse::InternalServerError().json(json!({
+                "error": "Internal Server Error",
+                "message": "Failed to retrieve user information"
+            }))
+        }
     }
 }
 
