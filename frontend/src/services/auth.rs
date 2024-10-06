@@ -18,7 +18,6 @@ pub fn is_authenticated() -> bool {
     get_token().is_some()
 }
 
-#[warn(dead_code)]
 pub fn logout() {
     remove_token();
     // You might want to redirect to the login page or update app state here

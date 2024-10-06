@@ -31,7 +31,6 @@ struct User {
 
 #[function_component(Register)]
 pub fn register() -> Html {
-    let auth_context = use_context::<AuthContext>().expect("No auth context found");
     let form = use_state(RegisterForm::default);
     let error = use_state(|| None::<String>);
     let is_loading = use_state(|| false);

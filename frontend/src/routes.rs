@@ -1,7 +1,7 @@
 use yew::prelude::*;
 use yew_router::prelude::*;
 use crate::pages::{Home, About, Login, Dashboard, Register};
-use crate::services::auth;
+
 
 #[derive(Clone, Routable, PartialEq)]
 pub enum Route {
