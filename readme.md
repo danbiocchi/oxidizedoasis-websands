@@ -1,14 +1,19 @@
 # OxidizedOasis-WebSands
 
-OxidizedOasis-WebSands is a robust, high-performance web application built with Rust, focusing on efficient user management and authentication. This project demonstrates the power of Rust in full-stack web development, utilizing the Actix-web framework for the backend and Yew for a dynamic frontend.
+OxidizedOasis-WebSands is a robust, high-performance web application built with Rust, focusing on efficient user management and authentication. 
 
 <p align="center">
-  <img src="static/images/signup-page-screenshot.png" alt="Login Page Screenshot" width="600">
+    <img src="docs/images/homepic.png" alt="Home Page Screenshot" width="600">
+     <br></br>
+    <img src="docs/images/loginpic.png" alt="Login Page Screenshot" width="600">
+      <br></br>
+    <img src="docs/images/registerpic.png" alt="Register Page Screenshot" width="600">
 </p>
 
 ## 🌟 About This Project
 
 OxidizedOasis-WebSands is designed to provide a solid foundation for building scalable web applications with strong security features. Our goal is to showcase the capabilities of Rust in creating high-performance, secure web services while maintaining excellent developer ergonomics.
+This project demonstrates the power of Rust in full-stack web development, utilizing the Actix-web framework for the backend and Yew for a dynamic frontend.
 
 ## 📚 Documentation
 
