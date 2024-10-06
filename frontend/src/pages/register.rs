@@ -69,7 +69,7 @@ pub fn register() -> Html {
                             match resp.json::<RegisterResponse>().await {
                                 Ok(register_resp) => {
                                     log!("Registration successful: ", &register_resp.message);
-                                    navigator.push(&Route::Login);
+                                    navigator.push(&Route::RegistrationComplete);
                                 },
                                 Err(e) => {
                                     log!("Failed to parse registration response: ", e.to_string());

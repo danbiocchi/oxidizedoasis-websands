@@ -1,6 +1,6 @@
 use yew::prelude::*;
 use yew_router::prelude::*;
-use crate::pages::{Home, About, Login, Dashboard, Register, EmailVerified};
+use crate::pages::{Home, About, Login, Dashboard, Register, EmailVerified, RegistrationComplete};
 
 #[derive(Clone, Routable, PartialEq)]
 pub enum Route {
@@ -16,6 +16,8 @@ pub enum Route {
     Register,
     #[at("/email_verified")]
     EmailVerified,
+    #[at("/registration_complete")]
+    RegistrationComplete,
     #[not_found]
     #[at("/404")]
     NotFound,
@@ -29,6 +31,7 @@ pub fn switch(routes: Route) -> Html {
         Route::Dashboard => html! { <Dashboard /> },
         Route::Register => html! { <Register /> },
         Route::EmailVerified => html! { <EmailVerified /> },
+        Route::RegistrationComplete => html! { <RegistrationComplete /> },
         Route::NotFound => html! { <h1>{"404 Not Found"}</h1> },
     }
 }
