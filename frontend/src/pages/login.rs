@@ -162,6 +162,10 @@ pub fn login() -> Html {
                 if let Some(err) = &*error {
                     <p class="error-message">{err}</p>
                 }
+                <p class="auth-switch">
+                    { "Don't have an account? " }
+                    <Link<Route> to={Route::Register}>{ "Register" }</Link<Route>>
+                </p>
             </div>
         </main>
     }
