@@ -6,7 +6,6 @@ use actix_files as fs;
 use actix_cors::Cors;
 use actix_web_httpauth::middleware::HttpAuthentication;
 use env_logger::Env;
-use serde_json;
 use actix_governor::{Governor, GovernorConfigBuilder};
 use std::env;
 use std::time::Duration;
@@ -257,17 +256,11 @@ async fn main() -> std::io::Result<()> {
             )
             // Serve static files
             .service(fs::Files::new("/", "./frontend/dist").index_file("index.html"))
-            // Custom route for token failure
-            .service(web::resource("/token_failure.html").to(|| async {
-                HttpResponse::Ok().content_type("text/html").body(include_str!("../static/token_failure.html"))
-            }))
             // Default service for unhandled pages
-            .default_service(web::route().to(|req: actix_web::HttpRequest| async move {
-                error!("Unhandled request: {:?}", req);
-                HttpResponse::NotFound().json(serde_json::json!({
-                    "error": "Not Found",
-                    "message": "The requested resource could not be found."
-                }))
+            .default_service(web::route().to(|| async {
+                HttpResponse::Ok().content_type("text/html").body(
+                    std::fs::read_to_string("./frontend/dist/index.html").unwrap()
+                )
             }))
     })
         .bind(server_addr)?  // Bind the server to the specified address

@@ -302,3 +302,24 @@ button[type="submit"]:disabled {
     max-width: 1200px;
     margin: 0 auto;
 }
+
+.email-verified {
+    text-align: center;
+    padding: 2rem;
+    max-width: 600px;
+    margin: 0 auto;
+}
+
+.email-verified h1 {
+    color: #4CAF50;
+}
+
+.email-verified .button {
+    display: inline-block;
+    background-color: #4CAF50;
+    color: white;
+    padding: 10px 20px;
+    text-decoration: none;
+    border-radius: 5px;
+    margin-top: 1rem;
+}

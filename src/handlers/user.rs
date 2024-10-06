@@ -225,20 +225,22 @@ pub async fn verify_email(
         Ok(Some(_)) => {
             info!("Email verified successfully");
             Ok(HttpResponse::Found()
-                .append_header((actix_web::http::header::LOCATION, "/email_verified.html"))
+                .append_header((actix_web::http::header::LOCATION, "/email_verified"))
                 .finish())
         },
         Ok(None) => {
             warn!("Invalid or expired verification token");
-            Ok(HttpResponse::BadRequest().content_type("text/html").body(
-                "<html><body><h1>Invalid or Expired Verification Token</h1><p>Please request a new verification email.</p></body></html>"
-            ))
+            Ok(HttpResponse::BadRequest().json(serde_json::json!({
+                "error": "Invalid or expired token",
+                "message": "The verification link is invalid or has expired. Please request a new verification email."
+            })))
         },
         Err(e) => {
             error!("Failed to verify email: {:?}", e);
-            Ok(HttpResponse::InternalServerError().content_type("text/html").body(
-                "<html><body><h1>Error</h1><p>An error occurred while verifying your email. Please try again later.</p></body></html>"
-            ))
+            Ok(HttpResponse::InternalServerError().json(serde_json::json!({
+                "error": "Internal server error",
+                "message": "An error occurred while verifying your email. Please try again later."
+            })))
         }
     }
 }
