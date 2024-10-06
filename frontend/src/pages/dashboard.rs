@@ -156,7 +156,7 @@ impl Dashboard {
     fn view_user_info(&self) -> Html {
         html! {
             <section class="section card user-info">
-                <h2>{ "User Information 📋" }</h2>
+                <h2>{ "User Information 📋 " }</h2>
                 {
                     if let Some(user) = &self.user_info {
                         html! {
