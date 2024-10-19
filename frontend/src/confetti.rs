@@ -8,7 +8,7 @@ extern "C" {
     fn confetti(options: &JsValue);
 }
 
-pub fn trigger_confetti() {
+pub fn trigger_confetti() -> i32 {
     let window = window().expect("no global `window` exists");
 
     let confetti_rain = Closure::wrap(Box::new(move || {
@@ -33,9 +33,6 @@ pub fn trigger_confetti() {
     // Forget the closure to keep it alive
     confetti_rain.forget();
 
-    // Clear the interval after 3 seconds
-    let window_clone = window.clone();
-    let timeout_callback = Closure::once(move || {
-        window_clone.clear_interval_with_handle(interval_id);
-    });
+    // Return the interval ID
+    interval_id
 }
