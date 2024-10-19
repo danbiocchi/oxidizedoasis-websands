@@ -6,6 +6,7 @@ mod dashboard;
 mod register;
 mod email_verified;
 mod registration_complete;
+mod not_found;
 
 pub use home::Home;
 pub use about::About;

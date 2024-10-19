@@ -11,6 +11,7 @@ use crate::services::auth;
 use crate::routes::Route;
 use yew_router::prelude::*;
 
+
 const NOTES_STORAGE_KEY: &str = "dashboard_notes";
 
 #[derive(Clone, PartialEq)]
