@@ -7,14 +7,18 @@
     <link rel="stylesheet" href="/styles-b4d488e72b806f2d.css" integrity="sha384&#x2D;e&#x2F;fyGNtHGuhDKraRMcLDNlq5ewTvs8nnRnWHXwWX05OlxJQY5VoCipOrFb21wPLO"/>
     
 
-<link rel="modulepreload" href="/frontend-9d0f9947675e291e.js" crossorigin=anonymous integrity="sha384-iSKf3Kz2vAuPPZTQZrottWdXI0oUvHSoPAUM0Z4NNZLXONZOoOT5YIQ3ogEg4Mul">
-<link rel="preload" href="/frontend-9d0f9947675e291e_bg.wasm" crossorigin=anonymous integrity="sha384-k06UkAowiPSmn4cXg4/cHg9YKwDkboDbheMebeYOQS554WFGrKqQriWYomH+P5tB" as="fetch" type="application/wasm"></head>
+<link rel="modulepreload" href="/frontend-222b496848f6d212.js" crossorigin=anonymous integrity="sha384-KO7dPPxPXGuZlXgUkbLs84ImF/v3JonU0BajgQCN/rkTsYzivTICNKVeUZVcpUgl">
+<link rel="preload" href="/frontend-222b496848f6d212_bg.wasm" crossorigin=anonymous integrity="sha384-rn1B+7UVDltFoj65FBem247kzfgUd27zRfP1twkMuKXT2PmXnEi214TI8YjhWFFJ" as="fetch" type="application/wasm"></head>
     <body>
     <div id="app"></div>
-    
-<script type="module" nonce="NHvSkhT+7qU31laCTI9jbA==">
-import init, * as bindings from '/frontend-9d0f9947675e291e.js';
-const wasm = await init('/frontend-9d0f9947675e291e_bg.wasm');
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.5.1/dist/confetti.browser.min.js"></script>
+    <script type="module">
+        import init from '/frontend.js';
+        init('/frontend_bg.wasm');
+    </script>    
+<script type="module" nonce="XvNVvAnAmG9SDPYLGnb22Q==">
+import init, * as bindings from '/frontend-222b496848f6d212.js';
+const wasm = await init('/frontend-222b496848f6d212_bg.wasm');
 
 
 window.wasmBindings = bindings;
