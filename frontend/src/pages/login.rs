@@ -9,7 +9,6 @@ use yew_router::prelude::*;
 use crate::routes::Route;
 use gloo::console::log;
 
-
 #[derive(Default, Clone, Serialize)]
 struct LoginForm {
     username: String,
@@ -18,21 +17,24 @@ struct LoginForm {
 
 #[derive(Deserialize)]
 struct LoginResponse {
+    success: bool,
     message: String,
-    token: String,
-    user: User,
+    data: Option<LoginData>,
 }
 
 #[derive(Deserialize)]
-struct ErrorResponse {
-    message: String,
-    error_type: Option<String>,
+struct LoginData {
+    token: String,
+    user: User,
 }
 
 #[derive(Deserialize)]
 struct User {
     id: String,
     username: String,
+    email: String,
+    is_email_verified: bool,
+    created_at: String,
 }
 
 #[function_component(Login)]
@@ -72,38 +74,31 @@ pub fn login() -> Html {
 
                 match response {
                     Ok(resp) => {
-                        if resp.status() == 200 {
-                            match resp.json::<LoginResponse>().await {
-                                Ok(login_resp) => {
-                                    log!("Login successful: ", &login_resp.message);
-                                    auth::set_token(&login_resp.token);
-                                    set_auth.emit(true);
-                                    navigator.push(&Route::Dashboard);
-                                },
-                                Err(e) => {
-                                    log!("Failed to parse login response: ", e.to_string());
-                                    error.set(Some("An error occurred. Please try again.".to_string()));
-                                }
-                            }
-                        } else {
-                            match resp.json::<ErrorResponse>().await {
-                                Ok(err_resp) => {
-                                    log!("Login error: ", &err_resp.message);
-                                    if err_resp.error_type == Some("email_not_verified".to_string()) {
-                                        error.set(Some("Please verify your email before logging in.".to_string()));
+                        log!("Response status:", resp.status());
+
+                        match resp.json::<LoginResponse>().await {
+                            Ok(login_resp) => {
+                                if login_resp.success {
+                                    if let Some(data) = login_resp.data {
+                                        log!("Login successful");
+                                        auth::set_token(&data.token);
+                                        set_auth.emit(true);
+                                        navigator.push(&Route::Dashboard);
                                     } else {
-                                        error.set(Some(err_resp.message));
+                                        error.set(Some("Invalid server response".to_string()));
                                     }
-                                },
-                                Err(e) => {
-                                    log!("Failed to parse error response: ", e.to_string());
-                                    error.set(Some("An error occurred. Please try again.".to_string()));
+                                } else {
+                                    error.set(Some(login_resp.message));
                                 }
+                            },
+                            Err(e) => {
+                                log!("Failed to parse login response:", e.to_string());
+                                error.set(Some("An error occurred while processing the response".to_string()));
                             }
                         }
                     }
                     Err(e) => {
-                        log!("Network error: ", e.to_string());
+                        log!("Network error:", e.to_string());
                         error.set(Some("Network error. Please check your connection and try again.".to_string()));
                     }
                 }

@@ -1,4 +1,3 @@
-// frontend/src/pages/register.rs
 use yew::prelude::*;
 use gloo::net::http::Request;
 use serde::{Deserialize, Serialize};
@@ -17,7 +16,13 @@ struct RegisterForm {
 
 #[derive(Deserialize)]
 struct RegisterResponse {
+    success: bool,
     message: String,
+    data: Option<RegisterData>,
+}
+
+#[derive(Deserialize)]
+struct RegisterData {
     user: User,
 }
 
@@ -26,6 +31,8 @@ struct User {
     id: String,
     username: String,
     email: String,
+    is_email_verified: bool,
+    created_at: String,
 }
 
 #[function_component(Register)]
@@ -50,6 +57,12 @@ pub fn register() -> Html {
             let is_loading = is_loading.clone();
             let navigator = navigator.clone();
 
+            // Validate email is not empty
+            if form.email.trim().is_empty() {
+                error.set(Some("Email is required".to_string()));
+                return;
+            }
+
             is_loading.set(true);
             error.set(None);
 
@@ -64,24 +77,26 @@ pub fn register() -> Html {
 
                 match response {
                     Ok(resp) => {
-                        if resp.status() == 201 {
-                            match resp.json::<RegisterResponse>().await {
-                                Ok(register_resp) => {
-                                    log!("Registration successful: ", &register_resp.message);
+                        let status = resp.status();
+                        log!("Response status:", status);
+
+                        match resp.json::<RegisterResponse>().await {
+                            Ok(data) => {
+                                log!("Registration response:", &data.message);
+                                if data.success {
                                     navigator.push(&Route::RegistrationComplete);
-                                },
-                                Err(e) => {
-                                    log!("Failed to parse registration response: ", e.to_string());
-                                    error.set(Some("An error occurred. Please try again.".to_string()));
+                                } else {
+                                    error.set(Some(data.message));
                                 }
+                            },
+                            Err(e) => {
+                                log!("Failed to parse response:", e.to_string());
+                                error.set(Some("An error occurred while processing the response".to_string()));
                             }
-                        } else {
-                            let err_message = resp.text().await.unwrap_or_else(|_| "An error occurred".to_string());
-                            error.set(Some(err_message));
                         }
                     }
                     Err(e) => {
-                        log!("Network error: ", e.to_string());
+                        log!("Network error:", e.to_string());
                         error.set(Some("Network error. Please check your connection and try again.".to_string()));
                     }
                 }
@@ -92,12 +107,19 @@ pub fn register() -> Html {
     let oninput = {
         let form = form.clone();
         let password_requirements = password_requirements.clone();
+        let error = error.clone();
+
         Callback::from(move |e: InputEvent| {
             let input: HtmlInputElement = e.target_unchecked_into();
             let mut new_form = (*form).clone();
             match input.name().as_str() {
                 "username" => new_form.username = input.value(),
-                "email" => new_form.email = input.value(),
+                "email" => {
+                    new_form.email = input.value();
+                    if !new_form.email.trim().is_empty() {
+                        error.set(None);
+                    }
+                },
                 "password" => {
                     new_form.password = input.value();
                     let password = &new_form.password;
@@ -115,71 +137,75 @@ pub fn register() -> Html {
         })
     };
 
+    let form_is_valid = !form.email.trim().is_empty()
+        && !form.username.trim().is_empty()
+        && password_requirements.iter().all(|&x| x);
+
     html! {
-    <div class="auth-form-container">
-        <h2>{ "Sign Up to OxidizedOasis" }</h2>
-        <form {onsubmit}>
-            <div class="form-group">
-                <label for="username">{ "Username" }</label>
-                <input
-                    type="text"
-                    id="username"
-                    name="username"
-                    value={form.username.clone()}
-                    oninput={oninput.clone()}
-                    required=true
-                />
-            </div>
-            <div class="form-group">
-                <label for="email">{ "Email" }</label>
-                <input
-                    type="email"
-                    id="email"
-                    name="email"
-                    value={form.email.clone()}
-                    oninput={oninput.clone()}
-                    required=true
-                />
-            </div>
-            <div class="form-group">
-                <label for="password">{ "Password" }</label>
-                <input
-                    type="password"
-                    id="password"
-                    name="password"
-                    value={form.password.clone()}
-                    oninput={oninput.clone()}
-                    required=true
-                />
-            </div>
-            <div class="password-requirements">
-                <div class={classes!("requirement", password_requirements[0].then(|| "met"))}>
-                    { "At least 8 characters" }
+        <div class="auth-form-container">
+            <h2>{ "Sign Up to OxidizedOasis" }</h2>
+            <form {onsubmit}>
+                <div class="form-group">
+                    <label for="username">{ "Username" }</label>
+                    <input
+                        type="text"
+                        id="username"
+                        name="username"
+                        value={form.username.clone()}
+                        oninput={oninput.clone()}
+                        required=true
+                    />
                 </div>
-                <div class={classes!("requirement", password_requirements[1].then(|| "met"))}>
-                    { "Uppercase letter" }
+                <div class="form-group">
+                    <label for="email">{ "Email" }</label>
+                    <input
+                        type="email"
+                        id="email"
+                        name="email"
+                        value={form.email.clone()}
+                        oninput={oninput.clone()}
+                        required=true
+                    />
                 </div>
-                <div class={classes!("requirement", password_requirements[2].then(|| "met"))}>
-                    { "Lowercase letter" }
+                <div class="form-group">
+                    <label for="password">{ "Password" }</label>
+                    <input
+                        type="password"
+                        id="password"
+                        name="password"
+                        value={form.password.clone()}
+                        oninput={oninput.clone()}
+                        required=true
+                    />
                 </div>
-                <div class={classes!("requirement", password_requirements[3].then(|| "met"))}>
-                    { "Number" }
+                <div class="password-requirements">
+                    <div class={classes!("requirement", password_requirements[0].then(|| "met"))}>
+                        { "At least 8 characters" }
+                    </div>
+                    <div class={classes!("requirement", password_requirements[1].then(|| "met"))}>
+                        { "Uppercase letter" }
+                    </div>
+                    <div class={classes!("requirement", password_requirements[2].then(|| "met"))}>
+                        { "Lowercase letter" }
+                    </div>
+                    <div class={classes!("requirement", password_requirements[3].then(|| "met"))}>
+                        { "Number" }
+                    </div>
+                    <div class={classes!("requirement", password_requirements[4].then(|| "met"))}>
+                        { "Special character" }
+                    </div>
                 </div>
-                <div class={classes!("requirement", password_requirements[4].then(|| "met"))}>
-                    { "Special character" }
-                </div>
-            </div>
-            <button type="submit" disabled={*is_loading || !password_requirements.iter().all(|&x| x)}>
-                { if *is_loading { "Signing Up..." } else { "Sign Up" } }
-            </button>
-        </form>
-        if let Some(err) = &*error {
-            <p class="error-message">{ err }</p>
-        }
-        <p class="auth-switch">
-            { "Already have an account? " }
-            <Link<Route> to={Route::Login}>{ "Log in" }</Link<Route>>
-        </p>
-    </div>
+                <button type="submit" disabled={*is_loading || !form_is_valid}>
+                    { if *is_loading { "Signing Up..." } else { "Sign Up" } }
+                </button>
+            </form>
+            if let Some(err) = &*error {
+                <p class="error-message">{ err }</p>
+            }
+            <p class="auth-switch">
+                { "Already have an account? " }
+                <Link<Route> to={Route::Login}>{ "Log in" }</Link<Route>>
+            </p>
+        </div>
     }
 }

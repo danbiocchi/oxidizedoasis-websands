@@ -13,7 +13,7 @@ use sqlx::postgres::{PgPoolOptions, Postgres};
 use sqlx::migrate::MigrateDatabase;
 
 use crate::api::handlers::user_handler::create_handler as create_user_handler;
-use crate::api::routes::configure_routes;
+use crate::api::routes::{configure_routes, user_routes};
 use crate::core::email::EmailService;
 use crate::infrastructure::{
     AppConfig,           // Configuration
@@ -92,19 +92,13 @@ async fn main() -> std::io::Result<()> {
     let server_addr = format!("{}:{}", config.server.host, config.server.port);
     debug!("Server will be listening on: {}", server_addr);
 
-    // Create rate limiter
-    let governor_config = GovernorConfigBuilder::default()
-        .seconds_per_request(1) // Allow 2 requests per second per client
-        .burst_size(5) // Allow bursts of up to 5 requests
-        .finish()
-        .unwrap();
 
 
+    // Start HTTP server
     // Start HTTP server
     HttpServer::new(move || {
         App::new()
             // Middleware
-            .wrap(Governor::new(&governor_config))
             .wrap(configure_cors())
             .wrap(RequestLogger::new())
             .wrap(actix_web::middleware::Logger::default())
@@ -121,27 +115,10 @@ async fn main() -> std::io::Result<()> {
             .app_data(user_handler.clone())
             .app_data(web::Data::new(config.clone()))
 
-            // Public routes with rate limiting
-            .service(
-                web::scope("/users")
-                    .configure(configure_routes::public_routes)
-            )
+            // Register all routes using the main configure function
+            .configure(user_routes::configure)
 
-            // Protected API routes
-            .service(
-                web::scope("/api")
-                    .wrap(HttpAuthentication::bearer(jwt_auth_validator))
-                    .configure(configure_routes::protected_routes)
-            )
-
-            // Admin routes
-            .service(
-                web::scope("/admin")
-                    .wrap(HttpAuthentication::bearer(jwt_auth_validator))
-                    .configure(configure_routes::admin_routes)
-            )
-
-            // Static files and frontend
+            // Static files and frontend - These should come last
             .service(fs::Files::new("/", "./frontend/dist").index_file("index.html"))
             .default_service(web::route().to(|| async {
                 HttpResponse::Ok().content_type("text/html").body(

@@ -1,4 +1,3 @@
-// src/api/handlers/user_handler.rs
 use actix_web::{web, HttpResponse, Responder, http::header};
 use sqlx::PgPool;
 use uuid::Uuid;
@@ -36,19 +35,29 @@ impl UserHandler {
         debug!("Received create_user request");
 
         match self.user_service.create_user(user_input.into_inner()).await {
-            Ok((user, email)) => {
+            Ok((user, _)) => {
                 info!("User created successfully: {}", user.id);
-                HttpResponse::Created().json(ApiResponse::success_with_message(
-                    "User created successfully",
-                    json!({
-                        "user": user,
-                        "email": email
-                    })
-                ))
+                HttpResponse::Created().json(json!({
+                    "success": true,
+                    "message": "User created successfully. Please check your email for verification.",
+                    "data": {
+                        "user": {
+                            "id": user.id,
+                            "username": user.username,
+                            "email": user.email,
+                            "is_email_verified": user.is_email_verified,
+                            "created_at": user.created_at
+                        }
+                    }
+                }))
             },
             Err(e) => {
                 error!("Failed to create user: {:?}", e);
-                HttpResponse::BadRequest().json(ApiResponse::<()>::error(e.to_string()))
+                HttpResponse::BadRequest().json(json!({
+                    "success": false,
+                    "message": e.to_string(),
+                    "error": e.to_string()
+                }))
             }
         }
     }
@@ -60,27 +69,37 @@ impl UserHandler {
         match self.auth_service.login(login_input.into_inner()).await {
             Ok((token, user)) => {
                 info!("User logged in successfully: {}", user.id);
-                HttpResponse::Ok().json(ApiResponse::success_with_message(
-                    "Login successful",
-                    json!({
+                HttpResponse::Ok().json(json!({
+                    "success": true,
+                    "message": "Login successful",
+                    "data": {
                         "token": token,
-                        "user": user
-                    })
-                ))
+                        "user": {
+                            "id": user.id,
+                            "username": user.username,
+                            "email": user.email,
+                            "is_email_verified": user.is_email_verified,
+                            "created_at": user.created_at
+                        }
+                    }
+                }))
             },
             Err(e) => {
                 match e.to_string().as_str() {
                     "Email not verified" => {
-                        HttpResponse::Unauthorized().json(ApiResponse::<()>::error_with_type(
-                            "Email has not been verified yet. Please check your email for the verification link.",
-                            "email_not_verified"
-                        ))
+                        HttpResponse::Unauthorized().json(json!({
+                            "success": false,
+                            "message": "Email has not been verified yet. Please check your email for the verification link.",
+                            "error_type": "email_not_verified"
+                        }))
                     },
                     _ => {
                         error!("Login error: {:?}", e);
-                        HttpResponse::Unauthorized().json(ApiResponse::<()>::error(
-                            "Invalid username or password"
-                        ))
+                        HttpResponse::Unauthorized().json(json!({
+                            "success": false,
+                            "message": "Invalid username or password",
+                            "error": "Invalid credentials"
+                        }))
                     }
                 }
             }
@@ -103,9 +122,11 @@ impl UserHandler {
             },
             Err(e) => {
                 error!("Email verification failed: {:?}", e);
-                Ok(HttpResponse::BadRequest().json(ApiResponse::<()>::error(
-                    "The verification link is invalid or has expired"
-                )))
+                Ok(HttpResponse::BadRequest().json(json!({
+                    "success": false,
+                    "message": "The verification link is invalid or has expired",
+                    "error": "Invalid verification token"
+                })))
             }
         }
     }
@@ -119,22 +140,43 @@ impl UserHandler {
             Ok(claims) => {
                 if claims.sub != *user_id {
                     warn!("Unauthorized access attempt: User {} tried to access data for user {}", claims.sub, user_id);
-                    return HttpResponse::Forbidden().json(ApiResponse::<()>::error(
-                        "Access denied: You can only view your own information"
-                    ));
+                    return HttpResponse::Forbidden().json(json!({
+                        "success": false,
+                        "message": "Access denied: You can only view your own information",
+                        "error": "Unauthorized access"
+                    }));
                 }
 
                 match self.user_service.get_user_by_id(*user_id).await {
-                    Ok(user) => HttpResponse::Ok().json(ApiResponse::success(user)),
+                    Ok(user) => HttpResponse::Ok().json(json!({
+                        "success": true,
+                        "data": {
+                            "user": {
+                                "id": user.id,
+                                "username": user.username,
+                                "email": user.email,
+                                "is_email_verified": user.is_email_verified,
+                                "created_at": user.created_at
+                            }
+                        }
+                    })),
                     Err(e) => {
                         error!("Failed to fetch user: {:?}", e);
-                        HttpResponse::NotFound().json(ApiResponse::<()>::error("User not found"))
+                        HttpResponse::NotFound().json(json!({
+                            "success": false,
+                            "message": "User not found",
+                            "error": "Not found"
+                        }))
                     }
                 }
             },
             Err(e) => {
                 warn!("Invalid token: {:?}", e);
-                HttpResponse::Unauthorized().json(ApiResponse::<()>::error("Invalid token"))
+                HttpResponse::Unauthorized().json(json!({
+                    "success": false,
+                    "message": "Invalid token",
+                    "error": "Authentication failed"
+                }))
             }
         }
     }
@@ -146,16 +188,35 @@ impl UserHandler {
         match self.auth_service.validate_auth(auth.token()).await {
             Ok(claims) => {
                 match self.user_service.get_user_by_id(claims.sub).await {
-                    Ok(user) => HttpResponse::Ok().json(ApiResponse::success(user)),
+                    Ok(user) => HttpResponse::Ok().json(json!({
+                        "success": true,
+                        "data": {
+                            "user": {
+                                "id": user.id,
+                                "username": user.username,
+                                "email": user.email,
+                                "is_email_verified": user.is_email_verified,
+                                "created_at": user.created_at
+                            }
+                        }
+                    })),
                     Err(e) => {
                         error!("Failed to fetch current user: {:?}", e);
-                        HttpResponse::NotFound().json(ApiResponse::<()>::error("User not found"))
+                        HttpResponse::NotFound().json(json!({
+                            "success": false,
+                            "message": "User not found",
+                            "error": "Not found"
+                        }))
                     }
                 }
             },
             Err(e) => {
                 warn!("Invalid token: {:?}", e);
-                HttpResponse::Unauthorized().json(ApiResponse::<()>::error("Invalid token"))
+                HttpResponse::Unauthorized().json(json!({
+                    "success": false,
+                    "message": "Invalid token",
+                    "error": "Authentication failed"
+                }))
             }
         }
     }
@@ -169,22 +230,42 @@ impl UserHandler {
         match self.auth_service.validate_auth(auth.token()).await {
             Ok(claims) => {
                 if claims.sub != *user_id {
-                    return HttpResponse::Forbidden().json(ApiResponse::<()>::error(
-                        "Access denied: You can only update your own information"
-                    ));
+                    return HttpResponse::Forbidden().json(json!({
+                        "success": false,
+                        "message": "Access denied: You can only update your own information",
+                        "error": "Unauthorized access"
+                    }));
                 }
 
                 match self.user_service.update_user(*user_id, user_input.into_inner()).await {
-                    Ok(updated_user) => HttpResponse::Ok().json(ApiResponse::success(updated_user)),
+                    Ok(updated_user) => HttpResponse::Ok().json(json!({
+                        "success": true,
+                        "message": "User updated successfully",
+                        "data": {
+                            "user": {
+                                "id": updated_user.id,
+                                "username": updated_user.username,
+                                "email": updated_user.email,
+                                "is_email_verified": updated_user.is_email_verified,
+                                "created_at": updated_user.created_at
+                            }
+                        }
+                    })),
                     Err(e) => {
                         error!("Failed to update user: {:?}", e);
-                        HttpResponse::InternalServerError().json(ApiResponse::<()>::error(
-                            "Failed to update user"
-                        ))
+                        HttpResponse::InternalServerError().json(json!({
+                            "success": false,
+                            "message": "Failed to update user",
+                            "error": "Internal server error"
+                        }))
                     }
                 }
             },
-            Err(_) => HttpResponse::Unauthorized().json(ApiResponse::<()>::error("Invalid token"))
+            Err(_) => HttpResponse::Unauthorized().json(json!({
+                "success": false,
+                "message": "Invalid token",
+                "error": "Authentication failed"
+            }))
         }
     }
 
@@ -196,22 +277,33 @@ impl UserHandler {
         match self.auth_service.validate_auth(auth.token()).await {
             Ok(claims) => {
                 if claims.sub != *user_id {
-                    return HttpResponse::Forbidden().json(ApiResponse::<()>::error(
-                        "Access denied: You can only delete your own account"
-                    ));
+                    return HttpResponse::Forbidden().json(json!({
+                        "success": false,
+                        "message": "Access denied: You can only delete your own account",
+                        "error": "Unauthorized access"
+                    }));
                 }
 
                 match self.user_service.delete_user(*user_id).await {
-                    Ok(()) => HttpResponse::NoContent().finish(),
+                    Ok(()) => HttpResponse::Ok().json(json!({
+                        "success": true,
+                        "message": "User deleted successfully"
+                    })),
                     Err(e) => {
                         error!("Failed to delete user: {:?}", e);
-                        HttpResponse::InternalServerError().json(ApiResponse::<()>::error(
-                            "Failed to delete user"
-                        ))
+                        HttpResponse::InternalServerError().json(json!({
+                            "success": false,
+                            "message": "Failed to delete user",
+                            "error": "Internal server error"
+                        }))
                     }
                 }
             },
-            Err(_) => HttpResponse::Unauthorized().json(ApiResponse::<()>::error("Invalid token"))
+            Err(_) => HttpResponse::Unauthorized().json(json!({
+                "success": false,
+                "message": "Invalid token",
+                "error": "Authentication failed"
+            }))
         }
     }
 }
@@ -221,7 +313,7 @@ pub fn create_handler(pool: PgPool, email_service: Arc<dyn EmailServiceTrait>) -
     UserHandler::new(pool, email_service)
 }
 
-// Route handler functions that use the UserHandler instance
+// Route handler functions
 pub async fn create_user_handler(
     handler: web::Data<UserHandler>,
     user_input: web::Json<UserInput>,

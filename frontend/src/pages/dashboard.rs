@@ -4,26 +4,39 @@ use gloo::net::http::Request;
 use gloo::storage::{LocalStorage, Storage};
 use gloo::timers::callback::Interval;
 use wasm_bindgen_futures::spawn_local;
-use serde_json::Value as JsonValue;
-use chrono::DateTime;
+use serde::{Deserialize, Serialize};
+use chrono::{DateTime, Utc};
 use crate::services::auth;
 use crate::routes::Route;
 use yew_router::prelude::*;
+use gloo::console::log;
 
 const NOTES_STORAGE_KEY: &str = "dashboard_notes";
 
-#[derive(Clone, PartialEq)]
-struct UserInfo {
+#[derive(Deserialize)]
+struct DashboardResponse {
+    success: bool,
+    message: Option<String>,
+    data: Option<UserData>,
+}
+
+#[derive(Deserialize)]
+struct UserData {
+    user: User,
+}
+
+#[derive(Clone, PartialEq, Deserialize)]
+struct User {
+    id: String,
     username: String,
     email: String,
-    id: String,
     is_email_verified: bool,
     created_at: String,
 }
 
 pub enum DashboardMsg {
     FetchUserInfo,
-    UserInfoFetched(Result<UserInfo, String>),
+    UserInfoFetched(Result<User, String>),
     UpdateNotes(String),
     SaveNotes,
     NotesSaved(Result<(), String>),
@@ -32,7 +45,7 @@ pub enum DashboardMsg {
 }
 
 pub struct Dashboard {
-    user_info: Option<UserInfo>,
+    user_info: Option<User>,
     notes: String,
     error: Option<String>,
     timer: u32,
@@ -115,7 +128,9 @@ impl Component for Dashboard {
                 { self.view_notes(ctx) }
                 { self.view_session_timer() }
                 { self.view_error() }
-                <button onclick={ctx.link().callback(|_| DashboardMsg::Logout)}>{ "Logout" }</button>
+                <button onclick={ctx.link().callback(|_| DashboardMsg::Logout)} class="logout-button">
+                    { "Logout" }
+                </button>
             </div>
         }
     }
@@ -130,7 +145,7 @@ impl Dashboard {
                     <p>{ format!("Username: {}", user_info.username) }</p>
                     <p>{ format!("Email: {}", user_info.email) }</p>
                     <p>{ format!("Email Verified: {}", user_info.is_email_verified) }</p>
-                    <p>{ format!("Account Created At: {}", user_info.created_at) }</p>
+                    <p>{ format!("Account Created: {}", user_info.created_at) }</p>
                 </div>
             }
         } else {
@@ -149,8 +164,18 @@ impl Dashboard {
         html! {
             <div class="notes-section">
                 <h2>{ "Notes" }</h2>
-                <textarea value={self.notes.clone()} {oninput} />
-                <button onclick={ctx.link().callback(|_| DashboardMsg::SaveNotes)}>{ "Save Notes" }</button>
+                <textarea
+                    value={self.notes.clone()}
+                    {oninput}
+                    placeholder="Write your notes here..."
+                    class="notes-textarea"
+                />
+                <button
+                    onclick={ctx.link().callback(|_| DashboardMsg::SaveNotes)}
+                    class="save-button"
+                >
+                    { "Save Notes" }
+                </button>
             </div>
         }
     }
@@ -159,7 +184,11 @@ impl Dashboard {
         html! {
             <div class="session-timer">
                 <h2>{ "Session Timer ⏱️" }</h2>
-                <p>{ format!("Time elapsed: {:02}:{:02}:{:02}", self.timer / 3600, (self.timer / 60) % 60, self.timer % 60) }</p>
+                <p>{ format!("Time elapsed: {:02}:{:02}:{:02}",
+                    self.timer / 3600,
+                    (self.timer / 60) % 60,
+                    self.timer % 60)
+                }</p>
             </div>
         }
     }
@@ -177,31 +206,28 @@ impl Dashboard {
     }
 }
 
-async fn fetch_user_info() -> Result<UserInfo, String> {
+async fn fetch_user_info() -> Result<User, String> {
     let token = auth::get_token().ok_or("No auth token found")?;
 
-    log::debug!("Fetching user info with token: {}", token);
+    log!("Fetching user info with token");
 
     let response = Request::get("/api/users/me")
         .header("Authorization", &format!("Bearer {}", token))
         .send()
         .await
-        .map_err(|e| format!("Network error: {}", e))?;
+        .map_err(|e| format!("Network error: {}", e.to_string()))?;
 
     if response.status() != 200 {
         return Err(format!("Server error: HTTP {}", response.status()));
     }
 
-    let data: JsonValue = response.json().await.map_err(|e| format!("Failed to parse response: {}", e))?;
+    let data: DashboardResponse = response
+        .json()
+        .await
+        .map_err(|e| format!("Failed to parse response: {}", e.to_string()))?;
 
-    Ok(UserInfo {
-        username: data["username"].as_str().unwrap_or("N/A").to_string(),
-        email: data["email"].as_str().unwrap_or("N/A").to_string(),
-        id: data["id"].as_str().unwrap_or("N/A").to_string(),
-        is_email_verified: data["is_email_verified"].as_bool().unwrap_or(false),
-        created_at: data["created_at"].as_str()
-            .and_then(|date_str| DateTime::parse_from_rfc3339(date_str).ok())
-            .map(|date| date.format("%Y-%m-%d %H:%M:%S").to_string())
-            .unwrap_or_else(|| "N/A".to_string()),
-    })
+    match data.data {
+        Some(user_data) => Ok(user_data.user),
+        None => Err("No user data in response".to_string()),
+    }
 }
