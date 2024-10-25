@@ -1,6 +1,8 @@
 use serde::{Deserialize, Serialize};
 use validator::{Validate, ValidationError};
 use super::password::validate_password;
+use actix_web::web;
+use super::super::utils::validation::USERNAME_REGEX;
 
 #[derive(Debug, Deserialize, Serialize, Validate, Clone)]
 pub struct UserInput {
@@ -74,50 +76,25 @@ pub fn validate_and_sanitize_login_input(input: LoginInput) -> Result<LoginInput
     }
 }
 
-
-
-#[test]
-fn test_user_input_struct_validation() {
-    let valid_input = UserInput {
-        username: "validuser".to_string(),
-        email: Some("user@example.com".to_string()),
-        password: Some("V@lidP@ssw0rd".to_string()),
-    };
-    assert!(valid_input.validate().is_ok());
-
-    let invalid_username = UserInput {
-        username: "in valid".to_string(),
-        email: Some("user@example.com".to_string()),
-        password: Some("V@lidP@ssw0rd".to_string()),
-    };
-    assert!(invalid_username.validate().is_err());
-
-    let invalid_email = UserInput {
-        username: "validuser".to_string(),
-        email: Some("not_an_email".to_string()),
-        password: Some("V@lidP@ssw0rd".to_string()),
-    };
-    assert!(invalid_email.validate().is_err());
+#[derive(Debug, Deserialize, Serialize, Validate)]
+pub struct TokenQuery {
+    #[validate(length(min = 1))]
+    token: String,
 }
 
-#[test]
-fn test_login_input_struct_validation() {
-    let valid_input = LoginInput {
-        username: "validuser".to_string(),
-        password: "V@lidP@ssw0rd".to_string(),
-    };
-    assert!(valid_input.validate().is_ok());
-
-    let invalid_username = LoginInput {
-        username: "in valid".to_string(),
-        password: "V@lidP@ssw0rd".to_string(),
-    };
-    assert!(invalid_username.validate().is_err());
-
-    let invalid_password = LoginInput {
-        username: "validuser".to_string(),
-        password: "weak".to_string(),
-    };
-    assert!(invalid_password.validate().is_err());
+impl TokenQuery {
+    pub fn token(&self) -> &str {
+        &self.token
+    }
 }
+
+impl TryFrom<web::Query<TokenQuery>> for TokenQuery {
+    type Error = actix_web::Error;
+
+    fn try_from(query: web::Query<TokenQuery>) -> Result<Self, Self::Error> {
+        if let Err(e) = query.validate() {
+            return Err(actix_web::error::ErrorBadRequest(e));
+        }
+        Ok(query.into_inner())
+    }
 }

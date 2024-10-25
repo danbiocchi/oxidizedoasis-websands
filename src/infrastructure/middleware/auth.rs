@@ -1,10 +1,11 @@
+use crate::core::auth::jwt::validate_jwt;
 use actix_web::error::ResponseError;
 use actix_web::{dev::ServiceRequest, Error, HttpMessage, HttpResponse};
 use actix_web_httpauth::extractors::bearer::BearerAuth;
 use serde_json::json;
 use std::fmt;
 use log::{error, debug, info};
-use crate::core::auth::validate_jwt;
+
 
 #[derive(Debug)]
 pub struct AuthError {
@@ -26,7 +27,7 @@ impl ResponseError for AuthError {
     }
 }
 
-pub async fn validator(req: ServiceRequest, credentials: BearerAuth) -> Result<ServiceRequest, (Error, ServiceRequest)> {
+pub async fn jwt_auth_validator(req: ServiceRequest, credentials: BearerAuth) -> Result<ServiceRequest, (Error, ServiceRequest)> {
     let jwt_secret = std::env::var("JWT_SECRET").expect("JWT_SECRET must be set");
     let token = credentials.token();
 

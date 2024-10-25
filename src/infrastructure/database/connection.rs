@@ -1,5 +1,4 @@
 use sqlx::postgres::{PgPool, PgPoolOptions, Postgres};
-use sqlx::Connection;
 use std::time::Duration;
 use log::{info, debug};
 use sqlx::migrate::MigrateDatabase;

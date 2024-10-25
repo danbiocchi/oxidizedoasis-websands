@@ -4,3 +4,4 @@ mod templates;
 
 pub use service::{EmailService, EmailServiceTrait};
 pub use templates::EmailTemplate;
+

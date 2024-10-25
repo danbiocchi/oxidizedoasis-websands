@@ -5,7 +5,7 @@ use uuid::Uuid;
 use std::sync::Arc;
 use log::{debug, error, info, warn};
 use actix_web_httpauth::extractors::bearer::BearerAuth;
-
+use serde_json::json;
 use crate::core::user::{UserRepository, UserService};
 use crate::core::auth::AuthService;
 use crate::core::email::EmailServiceTrait;
@@ -48,7 +48,7 @@ impl UserHandler {
             },
             Err(e) => {
                 error!("Failed to create user: {:?}", e);
-                HttpResponse::BadRequest().json(ApiResponse::<()>::error(e))
+                HttpResponse::BadRequest().json(ApiResponse::<()>::error(e.to_string()))
             }
         }
     }
@@ -115,7 +115,7 @@ impl UserHandler {
         user_id: web::Path<Uuid>,
         auth: BearerAuth,
     ) -> impl Responder {
-        match self.auth_service.validate_token(auth.token()).await {
+        match self.auth_service.validate_auth(auth.token()).await {
             Ok(claims) => {
                 if claims.sub != *user_id {
                     warn!("Unauthorized access attempt: User {} tried to access data for user {}", claims.sub, user_id);
@@ -143,7 +143,7 @@ impl UserHandler {
         &self,
         auth: BearerAuth,
     ) -> impl Responder {
-        match self.auth_service.validate_token(auth.token()).await {
+        match self.auth_service.validate_auth(auth.token()).await {
             Ok(claims) => {
                 match self.user_service.get_user_by_id(claims.sub).await {
                     Ok(user) => HttpResponse::Ok().json(ApiResponse::success(user)),
@@ -166,7 +166,7 @@ impl UserHandler {
         user_input: web::Json<UserInput>,
         auth: BearerAuth,
     ) -> impl Responder {
-        match self.auth_service.validate_token(auth.token()).await {
+        match self.auth_service.validate_auth(auth.token()).await {
             Ok(claims) => {
                 if claims.sub != *user_id {
                     return HttpResponse::Forbidden().json(ApiResponse::<()>::error(
@@ -193,7 +193,7 @@ impl UserHandler {
         user_id: web::Path<Uuid>,
         auth: BearerAuth,
     ) -> impl Responder {
-        match self.auth_service.validate_token(auth.token()).await {
+        match self.auth_service.validate_auth(auth.token()).await {
             Ok(claims) => {
                 if claims.sub != *user_id {
                     return HttpResponse::Forbidden().json(ApiResponse::<()>::error(

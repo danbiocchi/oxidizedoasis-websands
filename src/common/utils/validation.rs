@@ -7,7 +7,7 @@ lazy_static! {
         r"^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$"
     ).unwrap();
 
-    static ref USERNAME_REGEX: Regex = Regex::new(r"^[a-zA-Z0-9_-]{3,50}$").unwrap();
+    pub static ref USERNAME_REGEX: Regex = Regex::new(r"^[a-zA-Z0-9_-]+$").unwrap();
 
     static ref PASSWORD_REGEX: Regex = Regex::new(
         r"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$"
@@ -16,10 +16,12 @@ lazy_static! {
 
 pub fn validate_length(value: &str, min: usize, max: usize) -> Result<(), ValidationError> {
     if value.len() < min || value.len() > max {
-        return Err(ValidationError::new(&format!(
-            "Length must be between {} and {} characters",
-            min, max
-        )));
+        // Use to_owned to convert the formatted string to an owned String
+        return Err(ValidationError {
+            code: "length".into(),
+            message: Some(format!("Length must be between {} and {} characters", min, max).to_owned().into()),
+            params: Default::default(),
+        });
     }
     Ok(())
 }

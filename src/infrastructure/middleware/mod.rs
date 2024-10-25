@@ -1,10 +1,11 @@
 // src/infrastructure/middleware/mod.rs
-mod auth;
-mod cors;
-mod logger;
 
+pub mod auth;
+pub mod cors;
+pub mod logger;
 pub(crate) mod rate_limit;
 
-pub use auth::validator as auth_validator;
+// Re-export commonly used middleware for convenience
+pub use auth::{jwt_auth_validator, AuthError};
 pub use cors::configure_cors;
 pub use logger::RequestLogger;

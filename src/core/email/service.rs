@@ -7,7 +7,8 @@ use std::sync::Arc;
 use crate::core::email::templates::EmailTemplate;
 
 pub trait EmailServiceTrait: Send + Sync {
-    fn send_verification_email(&self, to_email: &str, verification_token: &str) -> Result<(), Box<dyn Error>>;
+    fn send_verification_email<'a>(&'a self, to_email: &'a str, verification_token: &'a str) 
+        -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<(), Box<dyn Error>>> + Send + 'a>>;
     fn clone_box(&self) -> Arc<dyn EmailServiceTrait>;
 }
 
@@ -49,35 +50,38 @@ impl EmailService {
 }
 
 impl EmailServiceTrait for EmailService {
-    fn send_verification_email(&self, to_email: &str, verification_token: &str) -> Result<(), Box<dyn Error>> {
-        let base_url = Self::get_base_url();
-        let verification_url = format!("{}/users/verify?token={}", base_url, verification_token);
+    fn send_verification_email<'a>(&'a self, to_email: &'a str, verification_token: &'a str) 
+        -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<(), Box<dyn Error>>> + Send + 'a>> {
+        Box::pin(async move {
+            let base_url = Self::get_base_url();
+            let verification_url = format!("{}/users/verify?token={}", base_url, verification_token);
 
-        let template = EmailTemplate::Verification {
-            verification_url,
-            app_name: self.app_name.clone(),
-        };
+            let template = EmailTemplate::Verification {
+                verification_url,
+                app_name: self.app_name.clone(),
+            };
 
-        let email = Message::builder()
-            .from(format!("{} <{}>", self.email_from_name, self.from_email).parse()?)
-            .to(to_email.parse()?)
-            .subject(&self.email_verification_subject)
-            .header(ContentType::TEXT_HTML)
-            .body(template.render())?;
+            let email = Message::builder()
+                .from(format!("{} <{}>", self.email_from_name, self.from_email).parse()?)
+                .to(to_email.parse()?)
+                .subject(&self.email_verification_subject)
+                .header(ContentType::TEXT_HTML)
+                .body(template.render())?;
 
-        let creds = Credentials::new(self.smtp_username.clone(), self.smtp_password.clone());
+            let creds = Credentials::new(self.smtp_username.clone(), self.smtp_password.clone());
 
-        let mailer = SmtpTransport::relay(&self.smtp_server)?
-            .credentials(creds)
-            .build();
+            let mailer = SmtpTransport::relay(&self.smtp_server)?
+                .credentials(creds)
+                .build();
 
-        match mailer.send(&email) {
-            Ok(_) => Ok(()),
-            Err(e) => {
-                error!("Could not send email: {:?}", e);
-                Err(Box::new(e))
+            match mailer.send(&email) {
+                Ok(_) => Ok(()),
+                Err(e) => {
+                    error!("Could not send email: {:?}", e);
+                    Err(Box::new(e) as Box<dyn Error>)  // Add explicit conversion here
+                }
             }
-        }
+        })
     }
 
     fn clone_box(&self) -> Arc<dyn EmailServiceTrait> {

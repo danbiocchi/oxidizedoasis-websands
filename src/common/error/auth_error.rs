@@ -4,17 +4,18 @@ use crate::common::error::{ApiError, ApiErrorType};
 
 #[derive(Debug, Display)]
 pub enum AuthErrorType {
-    #[display(fmt = "Invalid credentials")]
+    #[display("Invalid credentials")]
     InvalidCredentials,
-    #[display(fmt = "Token expired")]
+    #[display("Token expired")]
     TokenExpired,
-    #[display(fmt = "Invalid token")]
+    #[display("Invalid token")]
     InvalidToken,
-    #[display(fmt = "Email not verified")]
+    #[display("Email not verified")]
     EmailNotVerified,
 }
 
 #[derive(Debug, Display)]
+#[display("{message}")]
 pub struct AuthError {
     pub error_type: AuthErrorType,
     pub message: String,

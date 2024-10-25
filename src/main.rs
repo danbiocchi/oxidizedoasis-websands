@@ -1,6 +1,7 @@
 use std::env;
 use std::sync::Arc;
 use std::time::Duration;
+use actix_governor::{Governor, GovernorConfigBuilder};
 
 use actix_files as fs;
 use actix_web::{App, HttpResponse, HttpServer, web};
@@ -14,15 +15,16 @@ use sqlx::migrate::MigrateDatabase;
 use crate::api::handlers::user_handler::create_handler as create_user_handler;
 use crate::api::routes::configure_routes;
 use crate::core::email::EmailService;
-use crate::infrastructure::config::AppConfig;
-use crate::infrastructure::database::create_pool;
-use crate::infrastructure::middleware::{
-    auth_validator,
-    configure_cors,
-    RequestLogger,
-    rate_limit::RateLimiter,
+use crate::infrastructure::{
+    AppConfig,           // Configuration
+    create_pool,         // Database connection pool creator
+    run_migrations,      // Function to run database migrations
+    DatabasePool,        // Type alias for PgPool
+    jwt_auth_validator,           // JWT validator middleware
+    AuthError,           // Authentication error type
+    configure_cors,      // CORS configuration middleware
+    RequestLogger,       // Request logger middleware
 };
-
 mod api;
 mod common;
 mod core;
@@ -91,12 +93,18 @@ async fn main() -> std::io::Result<()> {
     debug!("Server will be listening on: {}", server_addr);
 
     // Create rate limiter
-    let rate_limiter = RateLimiter::new(5, Duration::from_secs(60)); // 5 requests per 60 seconds
+    let governor_config = GovernorConfigBuilder::default()
+        .seconds_per_request(1) // Allow 2 requests per second per client
+        .burst_size(5) // Allow bursts of up to 5 requests
+        .finish()
+        .unwrap();
+
 
     // Start HTTP server
     HttpServer::new(move || {
         App::new()
             // Middleware
+            .wrap(Governor::new(&governor_config))
             .wrap(configure_cors())
             .wrap(RequestLogger::new())
             .wrap(actix_web::middleware::Logger::default())
@@ -116,21 +124,20 @@ async fn main() -> std::io::Result<()> {
             // Public routes with rate limiting
             .service(
                 web::scope("/users")
-                    .wrap(rate_limiter.clone())  // Apply the rate limiter to the /users scope
                     .configure(configure_routes::public_routes)
             )
 
             // Protected API routes
             .service(
                 web::scope("/api")
-                    .wrap(HttpAuthentication::bearer(auth_validator))
+                    .wrap(HttpAuthentication::bearer(jwt_auth_validator))
                     .configure(configure_routes::protected_routes)
             )
 
             // Admin routes
             .service(
                 web::scope("/admin")
-                    .wrap(HttpAuthentication::bearer(auth_validator))
+                    .wrap(HttpAuthentication::bearer(jwt_auth_validator))
                     .configure(configure_routes::admin_routes)
             )
 

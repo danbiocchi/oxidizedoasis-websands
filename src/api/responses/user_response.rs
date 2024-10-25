@@ -26,4 +26,22 @@ impl<T: Serialize> ApiResponse<T> {
             error: Some(message.into()),
         }
     }
+
+    pub fn success_with_message(message: &str, data: T) -> Self {
+        Self {
+            success: true,
+            message: Some(message.to_string()),
+            data: Some(data),
+            error: None,
+        }
+    }
+
+    pub fn error_with_type(message: impl Into<String>, error_type: impl Into<String>) -> Self {
+        Self {
+            success: false,
+            message: Some(message.into()),
+            data: None,
+            error: Some(error_type.into()),
+        }
+    }
 }

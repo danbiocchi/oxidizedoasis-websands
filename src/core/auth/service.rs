@@ -1,5 +1,4 @@
 // src/core/auth/service.rs
-use std::sync::Arc;
 use sqlx::PgPool;
 use bcrypt::verify;
 use crate::common::{
@@ -7,7 +6,7 @@ use crate::common::{
     validation::LoginInput,
 };
 use crate::core::user::{User, UserRepository};
-use super::jwt::{create_jwt, validate_jwt};
+use super::jwt::{create_jwt, validate_jwt, Claims};
 
 pub struct AuthService {
     user_repository: UserRepository,
@@ -47,10 +46,11 @@ impl AuthService {
         Ok((token, user))
     }
 
-    pub async fn validate_auth(&self, token: &str) -> Result<User, AuthError> {
+    pub async fn validate_auth(&self, token: &str) -> Result<Claims, AuthError> {
         let claims = validate_jwt(token, &self.jwt_secret)
             .map_err(|_| AuthError::new(AuthErrorType::InvalidToken))?;
 
+        // Verify the user exists and is verified
         let user = self.user_repository.find_by_id(claims.sub)
             .await
             .map_err(|_| AuthError::new(AuthErrorType::InvalidToken))?
@@ -60,6 +60,6 @@ impl AuthService {
             return Err(AuthError::new(AuthErrorType::EmailNotVerified));
         }
 
-        Ok(user)
+        Ok(claims)
     }
 }

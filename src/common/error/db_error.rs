@@ -6,13 +6,13 @@ use crate::common::error::{ApiError, ApiErrorType};
 
 #[derive(Debug, Display)]
 pub enum DbError {
-    #[display(fmt = "Database connection error: {}", _0)]
+    #[display("Database connection error: {}", _0)]
     ConnectionError(String),
-    #[display(fmt = "Database query error: {}", _0)]
+    #[display("Database query error: {}", _0)]
     QueryError(String),
-    #[display(fmt = "Record not found")]
+    #[display("Record not found")]
     NotFound,
-    #[display(fmt = "Duplicate record")]
+    #[display("Duplicate record")]
     DuplicateRecord,
 }
 

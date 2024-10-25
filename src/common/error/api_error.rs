@@ -3,7 +3,7 @@ use derive_more::Display;
 use serde::Serialize;
 
 #[derive(Debug, Display, Serialize)]
-#[display(fmt = "{}", message)]
+#[display("{message}")]
 pub struct ApiError {
     pub message: String,
     pub error_type: ApiErrorType,
@@ -13,17 +13,17 @@ pub struct ApiError {
 
 #[derive(Debug, Display, Serialize)]
 pub enum ApiErrorType {
-    #[display(fmt = "Validation error")]
+    #[display("Validation error")]
     Validation,
-    #[display(fmt = "Authentication error")]
+    #[display("Authentication error")]
     Authentication,
-    #[display(fmt = "Authorization error")]
+    #[display("Authorization error")]
     Authorization,
-    #[display(fmt = "Not found")]
+    #[display("Not found")]
     NotFound,
-    #[display(fmt = "Database error")]
+    #[display("Database error")]
     Database,
-    #[display(fmt = "Internal server error")]
+    #[display("Internal server error")]
     Internal,
 }
 

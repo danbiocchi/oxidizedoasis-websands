@@ -2,12 +2,11 @@
 use std::sync::Arc;
 use bcrypt::{hash, DEFAULT_COST};
 use uuid::Uuid;
-use chrono::Utc;
 use log::{debug, error, info};
 
 use crate::common::{
-    error::{ApiError, ApiErrorType},
-    utils::{generate_secure_token, add_hours},
+    error::{ApiError, ApiErrorType, DbError},
+    utils::generate_secure_token,
     validation::{UserInput, validate_and_sanitize_user_input},
 };
 use crate::core::email::EmailServiceTrait;
@@ -29,40 +28,42 @@ impl UserService {
     pub async fn create_user(&self, input: UserInput) -> Result<(User, String), ApiError> {
         debug!("Creating new user with username: {}", input.username);
 
-        let validated_input = validate_and_sanitize_user_input(input)?;
+        let validated_input = validate_and_sanitize_user_input(input)
+            .map_err(|_| ApiError::new("Invalid input", ApiErrorType::Validation))?;
 
         // Validate and hash password
-        let password_hash = match &validated_input.password {
-            Some(password) => hash(password.as_bytes(), DEFAULT_COST)
+        let password_hash = if let Some(ref password) = validated_input.password {
+            Some(hash(password.as_bytes(), DEFAULT_COST)
                 .map_err(|e| {
                     error!("Failed to hash password: {}", e);
                     ApiError::new("Failed to process password", ApiErrorType::Internal)
-                })?,
-            None => {
-                debug!("Password not provided for new user");
-                return Err(ApiError::new("Password is required", ApiErrorType::Validation));
-            }
+                })?)
+        } else {
+            debug!("Password not provided for new user");
+            return Err(ApiError::new("Password is required", ApiErrorType::Validation));
         };
 
         // Generate verification token
         let verification_token = generate_secure_token();
+        let token_for_email = verification_token.clone();  // First clone for email
+        let token_for_return = verification_token.clone(); // Second clone for return value
 
         // Create user in database
         let user = self.repository.create(
             &validated_input,
-            password_hash,
-            verification_token.clone()
+            password_hash.unwrap(),
+            verification_token
         )
             .await
             .map_err(|e| {
                 error!("Database error while creating user: {}", e);
-                ApiError::from(e)
+                ApiError::from(DbError::from(e))
             })?;
 
         // Send verification email if email provided
         if let Some(email) = &user.email {
             debug!("Sending verification email to: {}", email);
-            if let Err(e) = self.email_service.send_verification_email(email, &verification_token).await {
+            if let Err(e) = self.email_service.send_verification_email(email, &token_for_email).await {
                 error!("Failed to send verification email: {}", e);
                 // We don't return an error here as the user was created successfully
                 // Instead, we log the error and the user can request a new verification email
@@ -70,7 +71,7 @@ impl UserService {
         }
 
         info!("Successfully created user: {}", user.id);
-        Ok((user, verification_token))
+        Ok((user, token_for_return))
     }
 
     pub async fn verify_email(&self, token: &str) -> Result<(), ApiError> {
@@ -90,7 +91,7 @@ impl UserService {
             },
             Err(e) => {
                 error!("Database error while verifying email: {}", e);
-                Err(ApiError::from(e))
+                Err(ApiError::from(DbError::from(e)))
             }
         }
     }
@@ -100,7 +101,7 @@ impl UserService {
 
         self.repository.find_by_id(id)
             .await
-            .map_err(ApiError::from)?
+            .map_err(|e| ApiError::from(DbError::from(e)))?
             .ok_or_else(|| {
                 debug!("User not found: {}", id);
                 ApiError::new("User not found", ApiErrorType::NotFound)
@@ -110,8 +111,9 @@ impl UserService {
     pub async fn update_user(&self, id: Uuid, input: UserInput) -> Result<User, ApiError> {
         debug!("Updating user: {}", id);
 
-        let validated_input = validate_and_sanitize_user_input(input)?;
-
+        let validated_input = validate_and_sanitize_user_input(input)
+            .map_err(|_| ApiError::new("Invalid input", ApiErrorType::Validation))?;
+        
         let password_hash = if let Some(ref password) = validated_input.password {
             Some(hash(password.as_bytes(), DEFAULT_COST)
                 .map_err(|e| {
@@ -126,7 +128,7 @@ impl UserService {
             .await
             .map_err(|e| {
                 error!("Failed to update user {}: {}", id, e);
-                ApiError::from(e)
+                ApiError::from(DbError::from(e))  // Convert sqlx::Error -> DbError -> ApiError
             })
     }
 
@@ -137,7 +139,7 @@ impl UserService {
             .await
             .map_err(|e| {
                 error!("Database error while deleting user {}: {}", id, e);
-                ApiError::from(e)
+                ApiError::from(DbError::from(e))  // Convert sqlx::Error -> DbError -> ApiError
             })?;
 
         if deleted {
@@ -156,7 +158,7 @@ impl UserService {
             .await
             .map_err(|e| {
                 error!("Database error while checking email verification: {}", e);
-                ApiError::from(e)
+                ApiError::from(DbError::from(e))  // Convert sqlx::Error -> DbError -> ApiError
             })
     }
 
@@ -180,7 +182,7 @@ impl UserService {
         // Update verification token in database
         self.repository.update_verification_token(user_id, &verification_token)
             .await
-            .map_err(ApiError::from)?;
+            .map_err(|e| ApiError::from(DbError::from(e)))?;
 
         // Send new verification email
         self.email_service.send_verification_email(&email, &verification_token)
