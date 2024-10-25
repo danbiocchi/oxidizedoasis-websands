@@ -1,20 +1,20 @@
 use sqlx::postgres::{PgPool, PgPoolOptions, Postgres};
 use sqlx::Connection;
 use std::time::Duration;
-use log::{info, debug, error};
+use log::{info, debug};
 use sqlx::migrate::MigrateDatabase;
 use crate::infrastructure::AppConfig;
 
 pub type DatabasePool = PgPool;
 
-pub async fn create_pool(x: &AppConfig) -> Result<DatabasePool, Box<dyn std::error::Error>> {
+pub async fn create_pool(_x: &AppConfig) -> Result<DatabasePool, Box<dyn std::error::Error>> {
     let database_url = std::env::var("DATABASE_URL")
         .map_err(|_| "DATABASE_URL is not set in the environment variables")?;
     let su_database_url = std::env::var("SU_DATABASE_URL")
         .map_err(|_| "SU_DATABASE_URL is not set in the environment variables")?;
     let db_name = std::env::var("DB_NAME")
         .map_err(|_| "DB_NAME is not set in the environment variables")?;
-    let db_user = std::env::var("DB_USER")
+    let _db_user = std::env::var("DB_USER")
         .map_err(|_| "DB_USER is not set in the environment variables")?;
 
     debug!("Setting up database connection...");

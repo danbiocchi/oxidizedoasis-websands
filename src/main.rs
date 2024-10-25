@@ -20,7 +20,7 @@ use crate::infrastructure::middleware::{
     auth_validator,
     configure_cors,
     RequestLogger,
-    rate_limit::configure_rate_limit,
+    rate_limit::RateLimiter,
 };
 
 mod api;
@@ -90,6 +90,9 @@ async fn main() -> std::io::Result<()> {
     let server_addr = format!("{}:{}", config.server.host, config.server.port);
     debug!("Server will be listening on: {}", server_addr);
 
+    // Create rate limiter
+    let rate_limiter = RateLimiter::new(5, Duration::from_secs(60)); // 5 requests per 60 seconds
+
     // Start HTTP server
     HttpServer::new(move || {
         App::new()
@@ -113,7 +116,7 @@ async fn main() -> std::io::Result<()> {
             // Public routes with rate limiting
             .service(
                 web::scope("/users")
-                    .wrap(configure_rate_limit())
+                    .wrap(rate_limiter.clone())  // Apply the rate limiter to the /users scope
                     .configure(configure_routes::public_routes)
             )
 
