@@ -1,16 +1,14 @@
+use web_sys::HtmlTextAreaElement;
 use yew::prelude::*;
 use gloo::net::http::Request;
-use gloo::console::log;
 use gloo::storage::{LocalStorage, Storage};
 use gloo::timers::callback::Interval;
 use wasm_bindgen_futures::spawn_local;
 use serde_json::Value as JsonValue;
 use chrono::DateTime;
-use web_sys::HtmlTextAreaElement;
 use crate::services::auth;
 use crate::routes::Route;
 use yew_router::prelude::*;
-
 
 const NOTES_STORAGE_KEY: &str = "dashboard_notes";
 
@@ -78,39 +76,23 @@ impl Component for Dashboard {
             }
             DashboardMsg::UserInfoFetched(result) => {
                 match result {
-                    Ok(info) => {
-                        self.user_info = Some(info);
-                        self.error = None;
-                    }
-                    Err(e) => {
-                        self.error = Some(format!("Failed to fetch user info: {}", e));
-                        log!("Error fetching user info: {}", e);
-                    }
+                    Ok(user_info) => self.user_info = Some(user_info),
+                    Err(error) => self.error = Some(error),
                 }
                 true
             }
             DashboardMsg::UpdateNotes(new_notes) => {
                 self.notes = new_notes;
-                true
+                false
             }
             DashboardMsg::SaveNotes => {
-                let notes = self.notes.clone();
-                let link = ctx.link().clone();
-                spawn_local(async move {
-                    let result = LocalStorage::set(NOTES_STORAGE_KEY, notes);
-                    link.send_message(DashboardMsg::NotesSaved(result.map_err(|e| e.to_string())));
-                });
+                let result = LocalStorage::set(NOTES_STORAGE_KEY, &self.notes);
+                ctx.link().send_message(DashboardMsg::NotesSaved(result.map_err(|e| e.to_string())));
                 false
             }
             DashboardMsg::NotesSaved(result) => {
-                match result {
-                    Ok(_) => {
-                        log!("Notes saved successfully");
-                    }
-                    Err(e) => {
-                        self.error = Some(format!("Failed to save notes: {}", e));
-                        log!("Error saving notes: {}", e);
-                    }
+                if let Err(error) = result {
+                    self.error = Some(error);
                 }
                 true
             }
@@ -127,27 +109,13 @@ impl Component for Dashboard {
     }
 
     fn view(&self, ctx: &Context<Self>) -> Html {
-        let on_notes_change = ctx.link().callback(|e: InputEvent| {
-            let input: HtmlTextAreaElement = e.target_unchecked_into();
-            DashboardMsg::UpdateNotes(input.value())
-        });
-
-        let on_save_notes = ctx.link().callback(|_| DashboardMsg::SaveNotes);
-
         html! {
-            <div class="dashboard-container">
-                <header class="dashboard-header">
-                    <h1>{ "Welcome to Your Dashboard 👋" }</h1>
-                </header>
-
-                <main class="dashboard-main" role="main">
-                    { self.view_user_info() }
-                    { self.view_notepad(on_notes_change, on_save_notes) }
-                </main>
-
+            <div class="dashboard">
+                { self.view_user_info() }
+                { self.view_notes(ctx) }
                 { self.view_session_timer() }
-
                 { self.view_error() }
+                <button onclick={ctx.link().callback(|_| DashboardMsg::Logout)}>{ "Logout" }</button>
             </div>
         }
     }
@@ -155,53 +123,41 @@ impl Component for Dashboard {
 
 impl Dashboard {
     fn view_user_info(&self) -> Html {
-        html! {
-            <section class="section card user-info">
-                <h2>{ "User Information 📋 " }</h2>
-                {
-                    if let Some(user) = &self.user_info {
-                        html! {
-                            <div class="info-grid">
-                                { self.info_item("Username:  ", &user.username) }
-                                { self.info_item("User ID:  ", &user.id) }
-                                { self.info_item("Email:  ", &user.email) }
-                                { self.info_item("Email Verified:  ", if user.is_email_verified { "Yes" } else { "No" }) }
-                                { self.info_item("Account Created:  ", &user.created_at) }
-                            </div>
-                        }
-                    } else {
-                        html! { <p>{ "Loading user information..." }</p> }
-                    }
-                }
-            </section>
+        if let Some(user_info) = &self.user_info {
+            html! {
+                <div class="user-info">
+                    <h2>{ "User Info" }</h2>
+                    <p>{ format!("Username: {}", user_info.username) }</p>
+                    <p>{ format!("Email: {}", user_info.email) }</p>
+                    <p>{ format!("Email Verified: {}", user_info.is_email_verified) }</p>
+                    <p>{ format!("Account Created At: {}", user_info.created_at) }</p>
+                </div>
+            }
+        } else {
+            html! {
+                <p>{ "Loading user info..." }</p>
+            }
         }
     }
 
-    fn info_item(&self, label: &str, value: &str) -> Html {
+    fn view_notes(&self, ctx: &Context<Self>) -> Html {
+        let oninput = ctx.link().callback(|e: InputEvent| {
+            let input: HtmlTextAreaElement = e.target_unchecked_into();
+            DashboardMsg::UpdateNotes(input.value())
+        });
+
         html! {
-            <div class="info-item">
-                <span class="info-label">{ label }</span>
-                <span class="info-value">{ value }</span>
+            <div class="notes-section">
+                <h2>{ "Notes" }</h2>
+                <textarea value={self.notes.clone()} {oninput} />
+                <button onclick={ctx.link().callback(|_| DashboardMsg::SaveNotes)}>{ "Save Notes" }</button>
             </div>
-        }
-    }
-
-    fn view_notepad(&self, on_notes_change: Callback<InputEvent>, on_save_notes: Callback<MouseEvent>) -> Html {
-        html! {
-            <section class="section card notepad">
-                <h2>{ "Quick Notepad 📝" }</h2>
-                <textarea
-                    value={self.notes.clone()}
-                    oninput={on_notes_change}
-                />
-                <button onclick={on_save_notes}>{ "Save Notes 💾" }</button>
-            </section>
         }
     }
 
     fn view_session_timer(&self) -> Html {
         html! {
-            <div class="card session-timer">
+            <div class="session-timer">
                 <h2>{ "Session Timer ⏱️" }</h2>
                 <p>{ format!("Time elapsed: {:02}:{:02}:{:02}", self.timer / 3600, (self.timer / 60) % 60, self.timer % 60) }</p>
             </div>
@@ -230,25 +186,14 @@ async fn fetch_user_info() -> Result<UserInfo, String> {
         .header("Authorization", &format!("Bearer {}", token))
         .send()
         .await
-        .map_err(|e| {
-            log::error!("Network error: {:?}", e);
-            format!("Network error: {}", e)
-        })?;
+        .map_err(|e| format!("Network error: {}", e))?;
 
     if response.status() != 200 {
-        let error_message = format!("Server error: HTTP {}", response.status());
-        log::error!("{}", error_message);
-        return Err(error_message);
+        return Err(format!("Server error: HTTP {}", response.status()));
     }
 
-    let data: JsonValue = response.json()
-        .await
-        .map_err(|e| {
-            log::error!("Failed to parse response: {:?}", e);
-            format!("Failed to parse response: {}", e)
-        })?;
+    let data: JsonValue = response.json().await.map_err(|e| format!("Failed to parse response: {}", e))?;
 
-    log::debug!("Received user data: {:?}", data);
     Ok(UserInfo {
         username: data["username"].as_str().unwrap_or("N/A").to_string(),
         email: data["email"].as_str().unwrap_or("N/A").to_string(),

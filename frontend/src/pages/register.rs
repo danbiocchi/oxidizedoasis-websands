@@ -6,6 +6,7 @@ use wasm_bindgen_futures::spawn_local;
 use yew_router::prelude::*;
 use crate::routes::Route;
 use gloo::console::log;
+use web_sys::HtmlInputElement;
 
 #[derive(Default, Clone, Serialize)]
 struct RegisterForm {

@@ -11,8 +11,10 @@ mod confetti;
 use components::nav::Nav;
 use routes::{Route, switch};
 use services::auth_context::AuthContext;
+
 use components::footer::Footer;
-use crate::services::confetti_context::ConfettiContext;
+use services::confetti_context::ConfettiContext;
+
 
 #[wasm_bindgen(start)]
 pub fn run_app() -> Result<(), JsValue> {
