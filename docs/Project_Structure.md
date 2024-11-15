@@ -1,174 +1,101 @@
 # Project Structure
+frontend/
+├── dist/                    # Build output directory
+├── src/
+│   ├── components/          # Reusable UI components
+│   │   ├── mod.rs          # Components module declarations
+│   │   ├── nav.rs          # Navigation bar component
+│   │   ├── footer.rs       # Footer component
+│   │   ├── dashboard.rs    # Dashboard component
+│   │   ├── login.rs        # Login form component
+│   │   └── not_found.rs    # 404 page component
+│   │
+│   ├── pages/              # Page-level components
+│   │   ├── mod.rs          # Pages module declarations
+│   │   ├── home.rs         # Home page
+│   │   ├── about.rs        # About page
+│   │   ├── dashboard.rs    # Dashboard page
+│   │   ├── login.rs        # Login page
+│   │   ├── register.rs     # Registration page
+│   │   ├── email_verified.rs  # Email verification confirmation
+│   │   └── registration_complete.rs  # Registration success
+│   │
+│   ├── services/           # Business logic and state management
+│   │   ├── lib.rs          # Library entry point
+│   │   ├── confetti.rs     # Confetti animation service
+│   │   └── auth.rs         # Authentication service
+│   │
+│   ├── routes.rs           # Route definitions
+│   └── lib.rs              # Main application entry
+│
+├── static/
+│   └── styles.css          # Global styles
+│
+├── Cargo.toml              # Dependencies and build configuration
+├── index.html             # HTML template
+└── Trunk.toml             # Trunk bundler configuration
 
-.
-.\.idea
-.\docs
-.\frontend
-.\migrations
-.\src
-.\static
-.\tests
-.\.env
-.\.env.test
-.\.gitignore
-.\Cargo.lock
-.\Cargo.toml
-.\readme.md
-.\.idea
-.\.idea\.gitignore
-.\.idea\modules.xml
-.\.idea\oxidizedoasis-websands.iml
-.\.idea\vcs.xml
-.\.idea\workspace.xml
-.\docs
-.\docs\archive
-.\docs\images
-.\docs\Logging_Plan.md
-.\docs\Project_Structure.md
-.\docs\Security_Audit.md
-.\docs\Security_Backlog.md
-.\docs\Software_Development_Document.md
-.\docs\Testing_Backlog.md
-.\docs\User_Guide.md
-.\docs\yew-conversion-plan.md
-.\docs\yew-project-structure.md
-.\docs\archive
-.\docs\archive\ARCHIVE_2024-09-03_Software_Development_Document.md
-.\docs\images
-.\docs\images\email_verified.png
-.\docs\images\homepic.png
-.\docs\images\loginpic.png
-.\docs\images\login_dashboard.png
-.\docs\images\registerpic.png
-.\frontend
-.\frontend\dist
-.\frontend\src
-.\frontend\static
-.\frontend\Cargo.toml
-.\frontend\index.html
-.\frontend\Trunk.toml
-.\frontend\dist
-.\frontend\dist\static
-.\frontend\dist\frontend-c9c25965d3347f72.js
-.\frontend\dist\frontend-c9c25965d3347f72_bg.wasm
-.\frontend\dist\index.html
-.\frontend\dist\styles-6015e9962ac70ede.css
-.\frontend\dist\static
-.\frontend\dist\static\styles.css
-.\frontend\src
-.\frontend\src\components
-.\frontend\src\pages
-.\frontend\src\services
-.\frontend\src\confetti.rs
-.\frontend\src\lib.rs
-.\frontend\src\routes.rs
-.\frontend\src\components
-.\frontend\src\components\about.rs
-.\frontend\src\components\dashboard.rs
-.\frontend\src\components\footer.rs
-.\frontend\src\components\home.rs
-.\frontend\src\components\login.rs
-.\frontend\src\components\mod.rs
-.\frontend\src\components\nav.rs
-.\frontend\src\components\not_found.rs
-.\frontend\src\pages
-.\frontend\src\pages\about.rs
-.\frontend\src\pages\dashboard.rs
-.\frontend\src\pages\email_verified.rs
-.\frontend\src\pages\home.rs
-.\frontend\src\pages\login.rs
-.\frontend\src\pages\mod.rs
-.\frontend\src\pages\not_found.rs
-.\frontend\src\pages\register.rs
-.\frontend\src\pages\registration_complete.rs
-.\frontend\src\services
-.\frontend\src\services\auth.rs
-.\frontend\src\services\auth_context.rs
-.\frontend\src\services\confetti_context.rs
-.\frontend\src\services\mod.rs
-.\frontend\static
-.\frontend\static\styles.css
-.\migrations
-.\migrations\20240901010340_initial_schema.sql
-.\src
-.\src\api
-.\src\common
-.\src\core
-.\src\infrastructure
-.\src\lib.rs
-.\src\main.rs
-.\src\api
-.\src\api\handlers
-.\src\api\responses
-.\src\api\routes
-.\src\api\mod.rs
-.\src\api\handlers
-.\src\api\handlers\mod.rs
-.\src\api\handlers\user_handler.rs
-.\src\api\responses
-.\src\api\responses\mod.rs
-.\src\api\responses\user_response.rs
-.\src\api\routes
-.\src\api\routes\mod.rs
-.\src\api\routes\user_routes.rs
-.\src\common
-.\src\common\error
-.\src\common\utils
-.\src\common\validation
-.\src\common\mod.rs
-.\src\common\error
-.\src\common\error\api_error.rs
-.\src\common\error\auth_error.rs
-.\src\common\error\db_error.rs
-.\src\common\error\mod.rs
-.\src\common\utils
-.\src\common\utils\mod.rs
-.\src\common\utils\string.rs
-.\src\common\utils\time.rs
-.\src\common\utils\validation.rs
-.\src\common\validation
-.\src\common\validation\mod.rs
-.\src\common\validation\password.rs
-.\src\common\validation\user.rs
-.\src\core
-.\src\core\auth
-.\src\core\email
-.\src\core\user
-.\src\core\mod.rs
-.\src\core\auth
-.\src\core\auth\jwt.rs
-.\src\core\auth\mod.rs
-.\src\core\auth\service.rs
-.\src\core\email
-.\src\core\email\mod.rs
-.\src\core\email\service.rs
-.\src\core\email\templates.rs
-.\src\core\user
-.\src\core\user\mod.rs
-.\src\core\user\model.rs
-.\src\core\user\repository.rs
-.\src\core\user\service.rs
-.\src\infrastructure
-.\src\infrastructure\config
-.\src\infrastructure\database
-.\src\infrastructure\middleware
-.\src\infrastructure\mod.rs
-.\src\infrastructure\config
-.\src\infrastructure\config\app_config.rs
-.\src\infrastructure\config\mod.rs
-.\src\infrastructure\database
-.\src\infrastructure\database\connection.rs
-.\src\infrastructure\database\migrations.rs
-.\src\infrastructure\database\mod.rs
-.\src\infrastructure\middleware
-.\src\infrastructure\middleware\auth.rs
-.\src\infrastructure\middleware\cors.rs
-.\src\infrastructure\middleware\logger.rs
-.\src\infrastructure\middleware\mod.rs
-.\src\infrastructure\middleware\rate_limit.rs
-.\static
-.\static\admin_dashboard.html
-.\static\dashboard.html
-.\tests
-.\tests\user_crud_tests.rs
-.\tests\user_tests.rs
+src/
+├── api/
+│   ├── handlers/
+│   │   ├── mod.rs
+│   │   └── user_handler.rs
+│   ├── responses/
+│   │   ├── mod.rs
+│   │   └── user_response.rs
+│   ├── routes/
+│   │   ├── mod.rs
+│   │   └── user_routes.rs
+│   └── mod.rs
+│
+├── common/
+│   ├── error/
+│   │   ├── mod.rs
+│   │   ├── api_error.rs
+│   │   ├── auth_error.rs
+│   │   └── db_error.rs
+│   ├── utils/
+│   │   ├── mod.rs
+│   │   ├── string.rs
+│   │   ├── time.rs
+│   │   └── validation.rs
+│   ├── validation/
+│   │   ├── mod.rs
+│   │   ├── password.rs    # Password validation rules
+│   │   └── user.rs        # User input validation
+│   └── mod.rs
+│
+├── core/
+│   ├── auth/
+│   │   ├── mod.rs
+│   │   ├── jwt.rs         # JWT implementation
+│   │   └── service.rs     # Authentication service
+│   ├── email/
+│   │   ├── mod.rs
+│   │   ├── service.rs     # Email service implementation
+│   │   └── templates.rs   # Email templates
+│   ├── user/
+│   │   ├── mod.rs
+│   │   ├── model.rs       # User domain model
+│   │   ├── repository.rs  # User data access
+│   │   └── service.rs     # User business logic
+│   └── mod.rs
+│
+├── infrastructure/
+│   ├── config/
+│   │   ├── mod.rs
+│   │   └── app_config.rs  # Application configuration
+│   ├── database/
+│   │   ├── mod.rs
+│   │   ├── connection.rs  # Database connection setup
+│   │   └── migrations.rs  # Database migrations
+│   ├── middleware/
+│   │   ├── mod.rs
+│   │   ├── auth.rs        # Authentication middleware
+│   │   ├── cors.rs        # CORS configuration
+│   │   ├── logger.rs      # Request logging
+│   │   └── rate_limit.rs  # Rate limiting
+│   └── mod.rs
+│
+├── lib.rs                  # Library exports
+└── main.rs                # Application entry point
