@@ -1,11 +1,9 @@
 use web_sys::HtmlTextAreaElement;
 use yew::prelude::*;
-use gloo::net::http::Request;
 use gloo::storage::{LocalStorage, Storage};
 use gloo::timers::callback::Interval;
 use wasm_bindgen_futures::spawn_local;
 use serde::{Deserialize, Serialize};
-use chrono::{DateTime, Utc};
 use crate::services::auth;
 use crate::routes::Route;
 use yew_router::prelude::*;
@@ -59,6 +57,7 @@ impl Component for Dashboard {
     type Properties = ();
 
     fn create(ctx: &Context<Self>) -> Self {
+        // Start fetching user info immediately
         ctx.link().send_message(DashboardMsg::FetchUserInfo);
 
         let navigator = ctx.link().navigator().unwrap();
@@ -95,26 +94,28 @@ impl Component for Dashboard {
                         self.user_info = Some(user_info);
                     }
                     Err(error) => {
-                        self.error = Some(error);
+                        self.error = Some(error.clone());  // Clone the error if needed
+                        // If unauthorized, redirect to login
+                        if error.contains("unauthorized") {
+                            let navigator = self.navigator.clone();  // Clone the navigator
+                            navigator.push(&Route::Login);
+                        }
                     }
                 }
                 true
             }
             DashboardMsg::UpdateNotes(new_notes) => {
                 self.notes = new_notes;
-                false
+                true
             }
             DashboardMsg::SaveNotes => {
-                let result = LocalStorage::set(NOTES_STORAGE_KEY, &self.notes);
-                ctx.link().send_message(DashboardMsg::NotesSaved(result.map_err(|e| e.to_string())));
-                false
-            }
-            DashboardMsg::NotesSaved(result) => {
-                if let Err(error) = result {
-                    self.error = Some(error);
+                match LocalStorage::set(NOTES_STORAGE_KEY, &self.notes) {
+                    Ok(_) => self.error = None,
+                    Err(e) => self.error = Some(format!("Failed to save notes: {}", e)),
                 }
                 true
             }
+            DashboardMsg::NotesSaved(_) => true,
             DashboardMsg::Tick => {
                 self.timer += 1;
                 true
@@ -129,79 +130,68 @@ impl Component for Dashboard {
 
     fn view(&self, ctx: &Context<Self>) -> Html {
         html! {
-            <div class="dashboard">
-                if let Some(error) = &self.error {
-                    <div class="error-banner">
-                        { format!("Error: {}", error) }
+            <div class="dashboard-container">
+                <div class="dashboard-content">
+                    <div class="dashboard-header">
+                        <h1>{"Dashboard"}</h1>
                     </div>
-                }
-                { self.view_user_info() }
-                { self.view_notes(ctx) }
-                { self.view_session_timer() }
-                <button onclick={ctx.link().callback(|_| DashboardMsg::Logout)}
-                        class="logout-button">
-                    { "Logout" }
-                </button>
-            </div>
-        }
-    }
-}
 
-impl Dashboard {
-    fn view_user_info(&self) -> Html {
-        if let Some(user_info) = &self.user_info {
-            html! {
-                <div class="user-info">
-                    <h2>{ "User Info" }</h2>
-                    <p>{ format!("Username: {}", user_info.username) }</p>
-                    <p>{ format!("Email: {}", user_info.email.as_deref().unwrap_or("Not provided")) }</p>
-                    <p>{ format!("Email Verified: {}", user_info.is_email_verified) }</p>
-                    <p>{ format!("Account Created: {}", user_info.created_at) }</p>
+                    if let Some(error) = &self.error {
+                        <div class="error-banner">
+                            {error}
+                        </div>
+                    }
+
+                    <div class="dashboard-grid">
+                        <div class="user-info-card">
+                            <h2>{"User Info"}</h2>
+                            if let Some(user) = &self.user_info {
+                                <div class="info-row">
+                                    <span class="info-label">{"Username:"}</span>
+                                    {&user.username}
+                                </div>
+                                <div class="info-row">
+                                    <span class="info-label">{"Email:"}</span>
+                                    {user.email.as_deref().unwrap_or("Not provided")}
+                                </div>
+                                <div class="info-row">
+                                    <span class="info-label">{"Email Status:"}</span>
+                                    <span class={if user.is_email_verified { "status-verified" } else { "status-unverified" }}>
+                                        {if user.is_email_verified { "Verified" } else { "Not Verified" }}
+                                    </span>
+                                </div>
+                            } else {
+                                <div class="loading-spinner">{"Loading user info..."}</div>
+                            }
+                            <div class="info-row">
+                                <span class="info-label">{"Session Time:"}</span>
+                                {format!("{:02}:{:02}:{:02}",
+                                    self.timer / 3600,
+                                    (self.timer / 60) % 60,
+                                    self.timer % 60
+                                )}
+                            </div>
+                        </div>
+
+                        <div class="notes-card">
+                            <h2>{"Notes"}</h2>
+                            <textarea
+                                class="notes-textarea"
+                                placeholder="Write your notes here..."
+                                value={self.notes.clone()}
+                                oninput={ctx.link().callback(|e: InputEvent| {
+                                    let input: HtmlTextAreaElement = e.target_unchecked_into();
+                                    DashboardMsg::UpdateNotes(input.value())
+                                })}
+                            />
+                            <button
+                                onclick={ctx.link().callback(|_| DashboardMsg::SaveNotes)}
+                                class="save-button">
+                                {"Save Notes"}
+                            </button>
+                        </div>
+                    </div>
                 </div>
-            }
-        } else {
-            html! {
-                <div class="loading-spinner">
-                    <p>{ "Loading user info..." }</p>
-                </div>
-            }
-        }
-    }
-
-    fn view_notes(&self, ctx: &Context<Self>) -> Html {
-        let oninput = ctx.link().callback(|e: InputEvent| {
-            let input: HtmlTextAreaElement = e.target_unchecked_into();
-            DashboardMsg::UpdateNotes(input.value())
-        });
-
-        html! {
-            <div class="notes-section">
-                <h2>{ "Notes" }</h2>
-                <textarea
-                    value={self.notes.clone()}
-                    {oninput}
-                    placeholder="Write your notes here..."
-                    class="notes-textarea"
-                />
-                <button
-                    onclick={ctx.link().callback(|_| DashboardMsg::SaveNotes)}
-                    class="save-button"
-                >
-                    { "Save Notes" }
-                </button>
-            </div>
-        }
-    }
-
-    fn view_session_timer(&self) -> Html {
-        html! {
-            <div class="session-timer">
-                <h2>{ "Session Timer ⏱️" }</h2>
-                <p>{ format!("Time elapsed: {:02}:{:02}:{:02}",
-                    self.timer / 3600,
-                    (self.timer / 60) % 60,
-                    self.timer % 60)
-                }</p>
             </div>
         }
     }
@@ -212,21 +202,21 @@ async fn fetch_user_info() -> Result<User, String> {
 
     log!("Fetching user info with token");
 
-    let response = Request::get("/api/users/me")
+    let response = gloo::net::http::Request::get("/api/users/me")
         .header("Authorization", &format!("Bearer {}", token))
         .send()
         .await
         .map_err(|e| format!("Network error: {}", e.to_string()))?;
 
-    log!("Response status: {}", response.status());
+    if !response.ok() {
+        return Err("Unauthorized access".to_string());
+    }
 
-    // Get the response text first for debugging
     let response_text = response.text().await
         .map_err(|e| format!("Failed to get response text: {}", e.to_string()))?;
 
     log!("Response body: {}", &response_text);
 
-    // Try to parse the response text
     let data: DashboardResponse = serde_json::from_str(&response_text)
         .map_err(|e| format!("Failed to parse response: {} - Response was: {}", e, response_text))?;
 

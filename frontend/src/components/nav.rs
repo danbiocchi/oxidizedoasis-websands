@@ -9,20 +9,22 @@ pub fn nav() -> Html {
     let auth_context = use_context::<AuthContext>().expect("No auth context found");
     let navigator = use_navigator().unwrap();
 
-    let logout = {
-        let navigator = navigator.clone();
-        let set_auth = auth_context.set_auth.clone();
-        Callback::from(move |_| {
-            auth::remove_token();
-            set_auth.emit(false);
-            navigator.push(&Route::Home);
-        })
-    };
-
+    // General navigation helper
     let navigate = |route: Route| {
         let navigator = navigator.clone();
         Callback::from(move |_| {
             navigator.push(&route);
+        })
+    };
+
+    // Specific logout handler
+    let logout = {
+        let navigator = navigator.clone();
+        let set_auth = auth_context.set_auth.clone();
+        Callback::from(move |_| {
+            auth::logout();
+            set_auth.emit(false);
+            navigator.push(&Route::Home);
         })
     };
 
@@ -38,10 +40,20 @@ pub fn nav() -> Html {
                 </ul>
                 <div class="auth-buttons">
                     if auth_context.is_authenticated {
-                        <button class="auth-button logout-button" onclick={logout}>{ "Logout" }</button>
+                        <button onclick={logout} class="auth-button logout-button">
+                            { "Logout" }
+                        </button>
                     } else {
-                        <button onclick={navigate(Route::Login)} class="auth-button login-button">{ "Login" }</button>
-                        <button onclick={navigate(Route::Register)} class="auth-button register-button">{ "Register" }</button>
+                        <>
+                            <button onclick={navigate(Route::Login)}
+                                    class="auth-button login-button">
+                                { "Login" }
+                            </button>
+                            <button onclick={navigate(Route::Register)}
+                                    class="auth-button register-button">
+                                { "Register" }
+                            </button>
+                        </>
                     }
                 </div>
             </div>
