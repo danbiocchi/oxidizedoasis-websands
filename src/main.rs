@@ -1,35 +1,29 @@
 use std::env;
 use std::sync::Arc;
 use std::time::Duration;
+// Rate limiting protection against DOS attacks
 use actix_governor::{Governor, GovernorConfigBuilder};
 
 use actix_files as fs;
-use actix_web::{App, HttpResponse, HttpServer, web};
-use actix_web_httpauth::middleware::HttpAuthentication;
+use actix_web::{App, HttpResponse, HttpServer, web, middleware};
 use dotenv::dotenv;
 use env_logger::Env;
 use log::{debug, error, info, warn};
-use sqlx::postgres::{PgPoolOptions, Postgres};
-use sqlx::migrate::MigrateDatabase;
+use sqlx::postgres::Postgres;
 
+// Only import what we actually use
+use crate::api::routes::user_routes;
 use crate::api::handlers::user_handler::create_handler as create_user_handler;
-use crate::api::routes::{configure_routes, user_routes};
 use crate::core::email::EmailService;
-use crate::infrastructure::{
-    AppConfig,           // Configuration
-    create_pool,         // Database connection pool creator
-    run_migrations,      // Function to run database migrations
-    DatabasePool,        // Type alias for PgPool
-    jwt_auth_validator,           // JWT validator middleware
-    AuthError,           // Authentication error type
-    configure_cors,      // CORS configuration middleware
-    RequestLogger,       // Request logger middleware
-};
+use crate::infrastructure::{AppConfig, configure_cors, create_pool, RequestLogger};
+
 mod api;
 mod common;
 mod core;
 mod infrastructure;
 
+/// Sets up the database connection with migrations
+/// Includes timeout protection to prevent hanging during startup
 async fn setup_database(run_migrations: bool) -> Result<sqlx::Pool<Postgres>, Box<dyn std::error::Error>> {
     let config = AppConfig::from_env()?;
     let pool = create_pool(&config).await?;
@@ -52,12 +46,25 @@ async fn setup_database(run_migrations: bool) -> Result<sqlx::Pool<Postgres>, Bo
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
-    // Initialize environment
+    // Initialize environment and enhanced logging
+    // Timestamps in logs are crucial for security auditing
     dotenv().ok();
-    env_logger::Builder::from_env(Env::default().default_filter_or("debug")).init();
+    env_logger::Builder::from_env(Env::default().default_filter_or("debug"))
+        .format(|buf, record| {
+            use std::io::Write;
+            writeln!(
+                buf,
+                "{} [{}] - {}",
+                chrono::Local::now().format("%Y-%m-%d %H:%M:%S"),
+                record.level(),
+                record.args()
+            )
+        })
+        .init();
+
     info!("Starting OxidizedOasis-WebSands application");
 
-    // Load configuration
+    // Load configuration with proper error handling
     let config = match AppConfig::from_env() {
         Ok(config) => config,
         Err(e) => {
@@ -66,16 +73,29 @@ async fn main() -> std::io::Result<()> {
         }
     };
 
-    // Setup database
+    // Store configuration values we need after the move into HttpServer::new
+    let server_host = config.server.host.clone();
+    let server_port = config.server.port.clone();
+
+    // Database migration configuration
     let run_migrations = env::var("RUN_MIGRATIONS")
         .map(|v| v.to_lowercase() == "true")
         .unwrap_or(true);
 
-    let pool = match setup_database(run_migrations).await {
-        Ok(pool) => pool,
-        Err(e) => {
-            error!("Failed to set up database: {:?}", e);
+    // Setup database with timeout protection
+    // This prevents the application from hanging during startup
+    let pool = match tokio::time::timeout(
+        Duration::from_secs(30),
+        setup_database(run_migrations)
+    ).await {
+        Ok(Ok(pool)) => pool,
+        Ok(Err(e)) => {
+            error!("Database setup failed: {:?}", e);
             return Err(std::io::Error::new(std::io::ErrorKind::Other, e.to_string()));
+        }
+        Err(_) => {
+            error!("Database setup timed out");
+            return Err(std::io::Error::new(std::io::ErrorKind::TimedOut, "Database setup timed out"));
         }
     };
 
@@ -89,44 +109,116 @@ async fn main() -> std::io::Result<()> {
     ));
 
     // Server configuration
-    let server_addr = format!("{}:{}", config.server.host, config.server.port);
+    let server_addr = format!("{}:{}", server_host, server_port);
     debug!("Server will be listening on: {}", server_addr);
 
+    // Global rate limiting configuration
+    // Allows bursts while preventing DOS attacks
+    let governor_conf = GovernorConfigBuilder::default()
+        .seconds_per_request(1)  // Base rate: 1 request per second
+        .burst_size(5)          // Allow bursts of up to 5 requests
+        .finish()
+        .unwrap();
 
-
-    // Start HTTP server
-    // Start HTTP server
+    // Start HTTP server with security configurations
     HttpServer::new(move || {
+        // Create new config instance for each worker
+        let config = AppConfig::from_env().expect("Failed to load config");
+
         App::new()
-            // Middleware
+            // Security middleware stack - order matters!
+            // 1. Compression (should be first)
+            .wrap(middleware::Compress::default())
+            // 2. CORS protection
             .wrap(configure_cors())
+            // 3. Request logging for security auditing
             .wrap(RequestLogger::new())
-            .wrap(actix_web::middleware::Logger::default())
+            .wrap(middleware::Logger::default())
+            // 4. Rate limiting protection
+            .wrap(Governor::new(&governor_conf))
+            // 5. Security headers
             .wrap(
-                actix_web::middleware::DefaultHeaders::new()
+                middleware::DefaultHeaders::new()
+                    // Prevent XSS attacks
                     .add(("X-XSS-Protection", "1; mode=block"))
+                    // Prevent clickjacking
                     .add(("X-Frame-Options", "DENY"))
+                    // Prevent MIME type sniffing
                     .add(("X-Content-Type-Options", "nosniff"))
+                    // Control referrer information
                     .add(("Referrer-Policy", "strict-origin-when-cross-origin"))
+                    // Restrict browser features
+                    .add(("Permissions-Policy",
+                          "accelerometer=(), camera=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=()"))
+                    // Cross-Origin protections
+                    .add(("Cross-Origin-Embedder-Policy", "require-corp"))
+                    .add(("Cross-Origin-Opener-Policy", "same-origin"))
+                    .add(("Cross-Origin-Resource-Policy", "same-origin"))
+                    // Content Security Policy
+                    .add((
+                        "Content-Security-Policy",
+                        "default-src 'self'; \
+                         script-src 'self' https://cdn.jsdelivr.net 'unsafe-inline' 'unsafe-eval'; \
+                         style-src 'self' 'unsafe-inline'; \
+                         img-src 'self' data:; \
+                         connect-src 'self'; \
+                         font-src 'self'; \
+                         object-src 'none'; \
+                         base-uri 'self'; \
+                         form-action 'self'; \
+                         frame-ancestors 'none';"
+                    ))
             )
+            // Enhanced logging for security auditing
+            .wrap(middleware::Logger::new("%a %r %s %b %{Referer}i %{User-Agent}i %T"))
+
             // App Data
             .app_data(web::Data::new(pool.clone()))
             .app_data(web::Data::new(email_service.clone()))
             .app_data(user_handler.clone())
-            .app_data(web::Data::new(config.clone()))
+            .app_data(web::Data::new(config))
 
-            // Register all routes using the main configure function
+            // JSON payload protection
+            .app_data(web::JsonConfig::default()
+                .limit(4096)  // 4kb limit to prevent DOS
+                .error_handler(|err, _| {
+                    actix_web::error::InternalError::from_response(
+                        err,
+                        HttpResponse::BadRequest()
+                            .content_type("application/json")
+                            .body(r#"{"error":"Invalid JSON payload"}"#),
+                    )
+                        .into()
+                }))
+
+            // Routes configuration
             .configure(user_routes::configure)
 
-            // Static files and frontend - These should come last
-            .service(fs::Files::new("/", "./frontend/dist").index_file("index.html"))
+            // Static files and frontend with security settings
+            .service(fs::Files::new("/", "./frontend/dist")
+                .index_file("index.html")
+                .use_last_modified(true)  // Enable caching headers
+                .prefer_utf8(true)       // Ensure consistent encoding
+                .show_files_listing())   // Directory listing controlled by frontend
+            // Default service with security headers
             .default_service(web::route().to(|| async {
-                HttpResponse::Ok().content_type("text/html").body(
-                    std::fs::read_to_string("./frontend/dist/index.html").unwrap()
-                )
+                HttpResponse::Ok()
+                    .content_type("text/html; charset=utf-8")
+                    // Prevent caching of sensitive data
+                    .append_header(("Cache-Control", "no-store, must-revalidate"))
+                    .append_header(("Pragma", "no-cache"))
+                    .append_header(("Expires", "0"))
+                    .body(std::fs::read_to_string("./frontend/dist/index.html").unwrap())
             }))
     })
-        .bind(server_addr)?
+        // Server configuration for security and performance
+        .keep_alive(Duration::from_secs(75))           // Prevent connection spam
+        .client_request_timeout(Duration::from_secs(60))       // Prevent hanging connections
+        .server_hostname(server_host)                  // Explicit hostname
+        .backlog(1024)                                // Connection queue size
+        .workers(num_cpus::get() * 2)                 // Optimal worker threads
+        .shutdown_timeout(30)                         // Graceful shutdown
+        .bind(&server_addr)?
         .run()
         .await
 }

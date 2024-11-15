@@ -13,23 +13,24 @@ use gloo::console::log;
 
 const NOTES_STORAGE_KEY: &str = "dashboard_notes";
 
-#[derive(Deserialize)]
+#[derive(Debug, Deserialize)]
 struct DashboardResponse {
     success: bool,
     message: Option<String>,
     data: Option<UserData>,
+    error: Option<String>,
 }
 
-#[derive(Deserialize)]
+#[derive(Debug, Deserialize)]
 struct UserData {
     user: User,
 }
 
-#[derive(Clone, PartialEq, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Deserialize)]
 struct User {
     id: String,
     username: String,
-    email: String,
+    email: Option<String>,
     is_email_verified: bool,
     created_at: String,
 }
@@ -89,8 +90,13 @@ impl Component for Dashboard {
             }
             DashboardMsg::UserInfoFetched(result) => {
                 match result {
-                    Ok(user_info) => self.user_info = Some(user_info),
-                    Err(error) => self.error = Some(error),
+                    Ok(user_info) => {
+                        self.error = None;
+                        self.user_info = Some(user_info);
+                    }
+                    Err(error) => {
+                        self.error = Some(error);
+                    }
                 }
                 true
             }
@@ -124,11 +130,16 @@ impl Component for Dashboard {
     fn view(&self, ctx: &Context<Self>) -> Html {
         html! {
             <div class="dashboard">
+                if let Some(error) = &self.error {
+                    <div class="error-banner">
+                        { format!("Error: {}", error) }
+                    </div>
+                }
                 { self.view_user_info() }
                 { self.view_notes(ctx) }
                 { self.view_session_timer() }
-                { self.view_error() }
-                <button onclick={ctx.link().callback(|_| DashboardMsg::Logout)} class="logout-button">
+                <button onclick={ctx.link().callback(|_| DashboardMsg::Logout)}
+                        class="logout-button">
                     { "Logout" }
                 </button>
             </div>
@@ -143,14 +154,16 @@ impl Dashboard {
                 <div class="user-info">
                     <h2>{ "User Info" }</h2>
                     <p>{ format!("Username: {}", user_info.username) }</p>
-                    <p>{ format!("Email: {}", user_info.email) }</p>
+                    <p>{ format!("Email: {}", user_info.email.as_deref().unwrap_or("Not provided")) }</p>
                     <p>{ format!("Email Verified: {}", user_info.is_email_verified) }</p>
                     <p>{ format!("Account Created: {}", user_info.created_at) }</p>
                 </div>
             }
         } else {
             html! {
-                <p>{ "Loading user info..." }</p>
+                <div class="loading-spinner">
+                    <p>{ "Loading user info..." }</p>
+                </div>
             }
         }
     }
@@ -192,18 +205,6 @@ impl Dashboard {
             </div>
         }
     }
-
-    fn view_error(&self) -> Html {
-        if let Some(error) = &self.error {
-            html! {
-                <div class="error-message">
-                    { error }
-                </div>
-            }
-        } else {
-            html! {}
-        }
-    }
 }
 
 async fn fetch_user_info() -> Result<User, String> {
@@ -217,14 +218,21 @@ async fn fetch_user_info() -> Result<User, String> {
         .await
         .map_err(|e| format!("Network error: {}", e.to_string()))?;
 
-    if response.status() != 200 {
-        return Err(format!("Server error: HTTP {}", response.status()));
-    }
+    log!("Response status: {}", response.status());
 
-    let data: DashboardResponse = response
-        .json()
-        .await
-        .map_err(|e| format!("Failed to parse response: {}", e.to_string()))?;
+    // Get the response text first for debugging
+    let response_text = response.text().await
+        .map_err(|e| format!("Failed to get response text: {}", e.to_string()))?;
+
+    log!("Response body: {}", &response_text);
+
+    // Try to parse the response text
+    let data: DashboardResponse = serde_json::from_str(&response_text)
+        .map_err(|e| format!("Failed to parse response: {} - Response was: {}", e, response_text))?;
+
+    if !data.success {
+        return Err(data.error.unwrap_or_else(|| "Unknown error occurred".to_string()));
+    }
 
     match data.data {
         Some(user_data) => Ok(user_data.user),
