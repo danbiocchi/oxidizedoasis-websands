@@ -3,7 +3,7 @@ use yew::prelude::*;
 use gloo::storage::{LocalStorage, Storage};
 use gloo::timers::callback::Interval;
 use wasm_bindgen_futures::spawn_local;
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize};
 use crate::services::auth;
 use crate::routes::Route;
 use yew_router::prelude::*;
