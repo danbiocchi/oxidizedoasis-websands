@@ -1,4 +1,4 @@
-use web_sys::HtmlTextAreaElement;
+
 use yew::prelude::*;
 use gloo::storage::{LocalStorage, Storage};
 use gloo::timers::callback::Interval;
@@ -171,24 +171,6 @@ impl Component for Dashboard {
                                     self.timer % 60
                                 )}
                             </div>
-                        </div>
-
-                        <div class="notes-card">
-                            <h2>{"Notes"}</h2>
-                            <textarea
-                                class="notes-textarea"
-                                placeholder="Write your notes here..."
-                                value={self.notes.clone()}
-                                oninput={ctx.link().callback(|e: InputEvent| {
-                                    let input: HtmlTextAreaElement = e.target_unchecked_into();
-                                    DashboardMsg::UpdateNotes(input.value())
-                                })}
-                            />
-                            <button
-                                onclick={ctx.link().callback(|_| DashboardMsg::SaveNotes)}
-                                class="save-button">
-                                {"Save Notes"}
-                            </button>
                         </div>
                     </div>
                 </div>
