@@ -4,6 +4,34 @@ use uuid::Uuid;
 use chrono::{DateTime, Utc};
 
 #[derive(Debug, Serialize, Deserialize, FromRow)]
+pub struct PasswordResetToken {
+    pub id: Uuid,
+    pub user_id: Uuid,
+    pub token: String,
+    pub expires_at: DateTime<Utc>,
+    pub is_used: bool,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct PasswordResetRequest {
+    pub email: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct PasswordResetVerify {
+    pub token: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct PasswordResetSubmit {
+    pub token: String,
+    pub new_password: String,
+    pub confirm_password: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, FromRow)]
 pub struct User {
     pub id: Uuid,
     pub username: String,

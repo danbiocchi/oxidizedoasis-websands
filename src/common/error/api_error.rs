@@ -1,8 +1,9 @@
 use actix_web::{HttpResponse, ResponseError, http::StatusCode};
-use derive_more::Display;
+use derive_more::{Display, From};
 use serde::Serialize;
+use validator::ValidationError;
 
-#[derive(Debug, Display, Serialize)]
+#[derive(Debug, Display, Serialize, From)]
 #[display("{message}")]
 pub struct ApiError {
     pub message: String,
@@ -43,6 +44,17 @@ impl ApiError {
             status_code,
         }
     }
+}
+
+impl From<ValidationError> for ApiError {
+    fn from(err: ValidationError) -> Self {
+        ApiError::new(err.to_string(), ApiErrorType::Validation)
+    }
+}
+
+// Helper function to convert validation results
+pub fn from_validation<T>(result: Result<T, ValidationError>) -> Result<T, ApiError> {
+    result.map_err(ApiError::from)
 }
 
 impl ResponseError for ApiError {

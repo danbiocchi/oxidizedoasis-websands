@@ -26,12 +26,11 @@ validator = { version = "0.16", features = ["derive"] }
 regex = "1.5"
 lazy_static = "1.4"
 ammonia = "4.0.0"
-actix-governor = "0.6.0"
 actix-rt = "2.2"
 url = "2.5.2"
 derive_more = { version = "1.0.0", features = ["display", "error", "from", "debug"] }
-actix-limitation = "0.5.1"
 num_cpus = "1.16.0"
+dashmap = "5.5.3"
 
 
 [dev-dependencies]

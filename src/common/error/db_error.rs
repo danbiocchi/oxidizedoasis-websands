@@ -41,8 +41,7 @@ impl From<DbError> for ApiError {
 #[cfg(test)]
 mod tests {
     use actix_web::http::StatusCode;
-    use crate::common::AuthError;
-    use crate::common::error::auth_error::AuthErrorType;
+use crate::common::error::auth_error::{AuthError, AuthErrorType};
     use super::*;
 
     #[test]

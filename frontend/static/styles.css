@@ -202,10 +202,22 @@ button[type="submit"]:disabled {
     font-size: 0.9em;
 }
 
-/* Auth Switch Styles */
-.auth-switch {
+/* Success Message Styles */
+.success-message {
+    color: #2ecc71;
     text-align: center;
-    margin-top: 20px;
+    margin-top: 15px;
+    font-size: 0.9em;
+}
+
+/* Auth Links Styles */
+.auth-links {
+    margin-top: 1.5rem;
+    text-align: center;
+}
+
+.auth-switch {
+    margin: 0.5rem 0;
     font-size: 0.9em;
     color: #7f8c8d;
 }
@@ -218,6 +230,13 @@ button[type="submit"]:disabled {
 
 .auth-switch a:hover {
     text-decoration: underline;
+}
+
+/* Loading Message Styles */
+.loading-message {
+    text-align: center;
+    color: #7f8c8d;
+    margin: 1rem 0;
 }
 
 /* Responsive Design */
@@ -348,6 +367,7 @@ button[type="submit"]:disabled {
     border-radius: 5px;
     margin-top: 1rem;
 }
+
 .dashboard-container {
     max-width: 1200px;
     margin: 0 auto;

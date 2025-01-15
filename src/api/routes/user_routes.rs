@@ -1,29 +1,23 @@
 use actix_web::web;
-use actix_governor::{Governor, GovernorConfigBuilder};
 use crate::api::handlers::user_handler;
 use actix_web_httpauth::middleware::HttpAuthentication;
 use crate::infrastructure::middleware::auth::jwt_auth_validator;
+use crate::infrastructure::middleware::rate_limit::RateLimiter;
 
 pub fn configure(cfg: &mut web::ServiceConfig) {
-    // Rate limit configuration for auth endpoints
-    let auth_governor_config = GovernorConfigBuilder::default()
-        .seconds_per_request(1)
-        .burst_size(5)
-        .finish()
-        .unwrap();
-
     // Configure public auth routes (no /api prefix)
     cfg.service(
         web::scope("/users")
-            // Login with rate limiting
-            .service(
-                web::scope("/login")
-                    .wrap(Governor::new(&auth_governor_config))
-                    .route("", web::post().to(user_handler::login_user_handler))
-            )
-            // Register and verify without rate limiting
+            .wrap(RateLimiter::new())
+            .route("/login", web::post().to(user_handler::login_user_handler))
             .route("/register", web::post().to(user_handler::create_user_handler))
             .route("/verify", web::get().to(user_handler::verify_email_handler))
+            .service(
+                web::scope("/password-reset")
+                    .route("/verify", web::get().to(user_handler::verify_reset_token_handler))
+                    .route("/request", web::post().to(user_handler::request_password_reset_handler))
+                    .route("/reset", web::post().to(user_handler::reset_password_handler))
+            )
     );
 
     // Configure protected API routes
@@ -37,23 +31,20 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
     );
 }
 
-// Public routes configuration
+// Public routes configuration 
 pub fn configure_public_routes(cfg: &mut web::ServiceConfig) {
-    let auth_governor_config = GovernorConfigBuilder::default()
-        .per_second(2)
-        .burst_size(5)
-        .finish()
-        .unwrap();
-
     cfg.service(
         web::scope("/users")
-            .service(
-                web::scope("/login")
-                    .wrap(Governor::new(&auth_governor_config))
-                    .route("", web::post().to(user_handler::login_user_handler))
-            )
+            .wrap(RateLimiter::new())
+            .route("/login", web::post().to(user_handler::login_user_handler))
             .route("/register", web::post().to(user_handler::create_user_handler))
             .route("/verify", web::get().to(user_handler::verify_email_handler))
+            .service(
+                web::scope("/password-reset")
+                    .route("/verify", web::get().to(user_handler::verify_reset_token_handler))
+                    .route("/request", web::post().to(user_handler::request_password_reset_handler))
+                    .route("/reset", web::post().to(user_handler::reset_password_handler))
+            )
     );
 }
 

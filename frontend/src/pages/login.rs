@@ -158,10 +158,15 @@ pub fn login() -> Html {
                 if let Some(err) = &*error {
                     <p class="error-message">{err}</p>
                 }
-                <p class="auth-switch">
-                    { "Don't have an account? " }
-                    <Link<Route> to={Route::Register}>{ "Register" }</Link<Route>>
-                </p>
+                <div class="auth-links">
+                    <p class="auth-switch">
+                        { "Don't have an account? " }
+                        <Link<Route> to={Route::Register}>{ "Register" }</Link<Route>>
+                    </p>
+                    <p class="auth-switch">
+                        <Link<Route> to={Route::PasswordResetRequest}>{ "Forgot Password?" }</Link<Route>>
+                    </p>
+                </div>
             </div>
         </main>
     }

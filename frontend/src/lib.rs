@@ -10,10 +10,12 @@ mod confetti;
 
 use components::nav::Nav;
 use routes::{Route, switch};
-use services::auth_context::AuthContext;
-
+use services::{
+    auth_context::AuthContext,
+    confetti_context::ConfettiContext,
+    ResetTokenContext,
+};
 use components::footer::Footer;
-use services::confetti_context::ConfettiContext;
 
 
 #[wasm_bindgen(start)]
@@ -40,17 +42,28 @@ fn app() -> Html {
         })
     };
 
+    let reset_token = use_state(String::default);
+    let set_reset_token = {
+        let reset_token = reset_token.clone();
+        Callback::from(move |token: String| {
+            reset_token.set(token);
+        })
+    };
+
     let auth_context = AuthContext::new(*is_authenticated, set_auth);
     let confetti_context = ConfettiContext::new(*is_confetti_active, set_confetti_active);
+    let reset_token_context = ResetTokenContext::new((*reset_token).clone(), set_reset_token);
 
     html! {
         <ContextProvider<AuthContext> context={auth_context}>
         <ContextProvider<ConfettiContext> context={confetti_context}>
+        <ContextProvider<ResetTokenContext> context={reset_token_context}>
             <BrowserRouter>
                 <Nav />
                 <Switch<Route> render={switch} />
                 <Footer />
             </BrowserRouter>
+        </ContextProvider<ResetTokenContext>>
         </ContextProvider<ConfettiContext>>
         </ContextProvider<AuthContext>>
     }

@@ -7,7 +7,7 @@ use log::{debug, error, info};
 use crate::common::{
     error::{ApiError, ApiErrorType, DbError},
     utils::generate_secure_token,
-    validation::{UserInput, validate_and_sanitize_user_input},
+    validation::{UserInput, validate_and_sanitize_user_input, validate_password},
 };
 use crate::core::email::EmailServiceTrait;
 use super::{User, UserRepository};
@@ -162,6 +162,106 @@ impl UserService {
             })
     }
 
+    pub async fn request_password_reset(&self, email: &str) -> Result<(), ApiError> {
+        debug!("Processing password reset request for email: {}", email);
+
+        // Find user by email
+        let user = match self.repository.find_user_by_email(email).await {
+            Ok(Some(user)) => user,
+            Ok(None) => {
+                debug!("No user found with email: {}", email);
+                // Return success to prevent email enumeration
+                return Ok(());
+            },
+            Err(e) => return Err(ApiError::from(DbError::from(e))),
+        };
+
+        // Verify email is verified
+        if !user.is_email_verified {
+            debug!("Attempted password reset for unverified email: {}", email);
+            return Err(ApiError::new("Email not verified", ApiErrorType::Validation));
+        }
+
+        // Create password reset token
+        let reset_token = self.repository.create_password_reset_token(user.id)
+            .await
+            .map_err(|e| {
+                error!("Failed to create password reset token: {}", e);
+                ApiError::from(DbError::from(e))
+            })?;
+
+        // Send password reset email
+        self.email_service.send_password_reset_email(email, &reset_token.token)
+            .await
+            .map_err(|e| {
+                error!("Failed to send password reset email: {}", e);
+                ApiError::new("Failed to send password reset email", ApiErrorType::Internal)
+            })?;
+
+        info!("Password reset email sent to: {}", email);
+        Ok(())
+    }
+
+    pub async fn verify_reset_token(&self, token: &str) -> Result<(), ApiError> {
+        debug!("Verifying password reset token");
+
+        self.repository.verify_reset_token(token)
+            .await
+            .map_err(|e| ApiError::from(DbError::from(e)))?
+            .ok_or_else(|| {
+                debug!("Invalid or expired reset token");
+                ApiError::new("Invalid or expired reset token", ApiErrorType::Validation)
+            })?;
+
+        Ok(())
+    }
+
+    pub async fn reset_password(&self, token: &str, new_password: &str) -> Result<(), ApiError> {
+        debug!("Processing password reset");
+
+        // Validate new password
+        validate_password(new_password)
+            .map_err(|e| {
+                debug!("Invalid new password: {}", e);
+                ApiError::new(e.to_string(), ApiErrorType::Validation)
+            })?;
+
+        // Verify and get reset token
+        let reset_token = self.repository.verify_reset_token(token)
+            .await
+            .map_err(|e| ApiError::from(DbError::from(e)))?
+            .ok_or_else(|| {
+                debug!("Invalid or expired reset token");
+                ApiError::new("Invalid or expired reset token", ApiErrorType::Validation)
+            })?;
+
+        // Hash new password
+        let password_hash = hash(new_password.as_bytes(), DEFAULT_COST)
+            .map_err(|e| {
+                error!("Failed to hash new password: {}", e);
+                ApiError::new("Failed to process password", ApiErrorType::Internal)
+            })?;
+
+        // Update password
+        self.repository.update_password(reset_token.user_id, &password_hash)
+            .await
+            .map_err(|e| {
+                error!("Failed to update password: {}", e);
+                ApiError::from(DbError::from(e))
+            })?;
+
+        // Mark token as used
+        self.repository.mark_reset_token_used(token)
+            .await
+            .map_err(|e| {
+                error!("Failed to mark reset token as used: {}", e);
+                ApiError::from(DbError::from(e))
+            })?;
+
+        info!("Successfully reset password for user: {}", reset_token.user_id);
+        Ok(())
+    }
+
     pub async fn resend_verification_email(&self, user_id: Uuid) -> Result<(), ApiError> {
         debug!("Resending verification email for user: {}", user_id);
 
@@ -201,6 +301,7 @@ impl UserService {
 mod tests {
     use super::*;
     use crate::core::email::mock::MockEmailService;
+    use std::time::Duration as StdDuration;
 
     async fn setup_test_service() -> (UserService, Arc<MockEmailService>) {
         let database_url = std::env::var("TEST_DATABASE_URL")
@@ -272,6 +373,82 @@ mod tests {
         let updated_user = service.update_user(user.id, update_input).await.unwrap();
         assert_eq!(updated_user.username, "updated_user");
         assert_eq!(updated_user.email, Some("updated@example.com".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_password_reset_flow() {
+        let (service, email_service) = setup_test_service().await;
+
+        // Create test user
+        let input = UserInput {
+            username: "resetuser".to_string(),
+            email: Some("reset@example.com".to_string()),
+            password: Some("TestPass123!".to_string()),
+        };
+
+        let (user, verification_token) = service.create_user(input).await.unwrap();
+        
+        // Verify email first
+        service.verify_email(&verification_token).await.unwrap();
+
+        // Request password reset
+        service.request_password_reset("reset@example.com").await.unwrap();
+
+        // Verify email was sent
+        let sent_emails = email_service.get_sent_emails();
+        assert_eq!(sent_emails.len(), 2); // Verification + reset emails
+
+        // Get reset token from repository directly
+        let reset_token = service.repository.find_user_by_email("reset@example.com")
+            .await.unwrap().unwrap();
+
+        // Verify token is valid
+        service.verify_reset_token(&reset_token.verification_token.unwrap()).await.unwrap();
+
+        // Reset password
+        service.reset_password(
+            &reset_token.verification_token.unwrap(),
+            "NewPass123!"
+        ).await.unwrap();
+
+        // Try to reuse token (should fail)
+        let reuse_result = service.reset_password(
+            &reset_token.verification_token.unwrap(),
+            "AnotherPass123!"
+        ).await;
+        assert!(reuse_result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_password_reset_validation() {
+        let (service, _) = setup_test_service().await;
+
+        // Create and verify user
+        let input = UserInput {
+            username: "validateuser".to_string(),
+            email: Some("validate@example.com".to_string()),
+            password: Some("TestPass123!".to_string()),
+        };
+
+        let (_, verification_token) = service.create_user(input).await.unwrap();
+        service.verify_email(&verification_token).await.unwrap();
+
+        // Test invalid email
+        let invalid_email_result = service.request_password_reset("nonexistent@example.com").await;
+        assert!(invalid_email_result.is_ok()); // Should succeed to prevent email enumeration
+
+        // Test invalid token
+        let invalid_token_result = service.verify_reset_token("invalid_token").await;
+        assert!(invalid_token_result.is_err());
+
+        // Test weak password
+        let reset_token = service.repository.find_user_by_email("validate@example.com")
+            .await.unwrap().unwrap();
+        let weak_password_result = service.reset_password(
+            &reset_token.verification_token.unwrap(),
+            "weak"
+        ).await;
+        assert!(weak_password_result.is_err());
     }
 
     #[tokio::test]

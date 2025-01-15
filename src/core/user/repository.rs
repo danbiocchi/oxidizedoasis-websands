@@ -1,8 +1,8 @@
 // src/core/user/repository.rs
 use sqlx::PgPool;
 use uuid::Uuid;
-use chrono::{DateTime, Utc, Duration};
-use super::model::{User, UserResponse};
+use chrono::{Utc, Duration};
+use super::model::{User, PasswordResetToken};
 use crate::common::validation::UserInput;
 use log::{error, info, debug};
 
@@ -59,7 +59,7 @@ impl UserRepository {
             .await;
 
         match &user {
-            Ok(u) => info!("Successfully created user with id: {}", u.id),
+            Ok(u) => info!("Successfully created user with id: {}", &u.id),
             Err(e) => error!("Failed to create user: {}", e),
         }
 
@@ -87,7 +87,7 @@ impl UserRepository {
             .await?;
 
         if let Some(ref r) = result {
-            info!("Successfully verified email for user: {}", r.id);
+            info!("Successfully verified email for user: {}", &r.id);
         } else {
             debug!("No user found with the provided verification token or token expired");
         }
@@ -111,7 +111,7 @@ impl UserRepository {
             .await;
 
         if let Ok(Some(ref u)) = user {
-            debug!("Found user: {}", u.username);
+            debug!("Found user: {}", &u.username);
         }
 
         user
@@ -133,7 +133,7 @@ impl UserRepository {
             .await;
 
         if let Ok(Some(ref u)) = user {
-            debug!("Found user: {}", u.id);
+            debug!("Found user: {}", &u.id);
         }
 
         user
@@ -177,7 +177,7 @@ impl UserRepository {
             .await;
 
         if let Ok(ref u) = user {
-            info!("Successfully updated user: {}", u.id);
+            info!("Successfully updated user: {}", &u.id);
         } else if let Err(ref e) = user {
             error!("Failed to update user {}: {}", id, e);
         }
@@ -255,11 +255,140 @@ impl UserRepository {
         Ok(())
     }
 
+    pub async fn create_password_reset_token(&self, user_id: Uuid) -> Result<PasswordResetToken, sqlx::Error> {
+        debug!("Creating password reset token for user: {}", user_id);
+
+        let token = Uuid::new_v4().to_string();
+        let expires_at = Utc::now() + Duration::hours(1); // 1 hour expiration
+        let now = Utc::now();
+
+        let reset_token = sqlx::query_as!(
+            PasswordResetToken,
+            r#"
+            INSERT INTO password_reset_tokens (
+                id, user_id, token, expires_at, is_used, created_at, updated_at
+            )
+            VALUES ($1, $2, $3, $4, $5, $6, $7)
+            RETURNING *
+            "#,
+            Uuid::new_v4(),
+            user_id,
+            token,
+            expires_at,
+            false,
+            now,
+            now
+        )
+        .fetch_one(&self.pool)
+        .await;
+
+        match &reset_token {
+            Ok(_t) => info!("Created password reset token for user: {}", user_id),
+            Err(e) => error!("Failed to create password reset token: {}", e),
+        }
+
+        reset_token
+    }
+
+    pub async fn find_user_by_email(&self, email: &str) -> Result<Option<User>, sqlx::Error> {
+        debug!("Looking up user by email: {}", email);
+
+        let user = sqlx::query_as!(
+            User,
+            r#"
+            SELECT *
+            FROM users
+            WHERE email = $1
+            "#,
+            Some(email)
+        )
+        .fetch_optional(&self.pool)
+        .await;
+
+        if let Ok(Some(ref u)) = user {
+            debug!("Found user: {}", &u.id);
+        }
+
+        user
+    }
+
+    pub async fn verify_reset_token(&self, token: &str) -> Result<Option<PasswordResetToken>, sqlx::Error> {
+        debug!("Verifying password reset token");
+
+        let reset_token = sqlx::query_as!(
+            PasswordResetToken,
+            r#"
+            SELECT *
+            FROM password_reset_tokens
+            WHERE token = $1
+              AND expires_at > CURRENT_TIMESTAMP
+              AND is_used = false
+            "#,
+            token
+        )
+        .fetch_optional(&self.pool)
+        .await;
+
+        if let Ok(Some(ref t)) = reset_token {
+            debug!("Found valid reset token for user: {}", t.user_id);
+        }
+
+        reset_token
+    }
+
+    pub async fn mark_reset_token_used(&self, token: &str) -> Result<bool, sqlx::Error> {
+        debug!("Marking reset token as used");
+
+        let result = sqlx::query!(
+            r#"
+            UPDATE password_reset_tokens
+            SET is_used = true,
+                updated_at = $1
+            WHERE token = $2
+              AND expires_at > CURRENT_TIMESTAMP
+              AND is_used = false
+            "#,
+            Utc::now(),
+            token
+        )
+        .execute(&self.pool)
+        .await?;
+
+        let updated = result.rows_affected() > 0;
+        if updated {
+            info!("Successfully marked reset token as used");
+        } else {
+            debug!("No valid reset token found to mark as used");
+        }
+
+        Ok(updated)
+    }
+
+    pub async fn update_password(&self, user_id: Uuid, password_hash: &str) -> Result<(), sqlx::Error> {
+        debug!("Updating password for user: {}", user_id);
+
+        sqlx::query!(
+            r#"
+            UPDATE users
+            SET password_hash = $1,
+                updated_at = $2
+            WHERE id = $3
+            "#,
+            password_hash,
+            Utc::now(),
+            user_id
+        )
+        .execute(&self.pool)
+        .await?;
+
+        info!("Successfully updated password for user: {}", user_id);
+        Ok(())
+    }
+
     #[cfg(test)]
     pub async fn clear_all(&self) -> Result<(), sqlx::Error> {
-        sqlx::query!("DELETE FROM users")
-            .execute(&self.pool)
-            .await?;
+        sqlx::query!("DELETE FROM password_reset_tokens").execute(&self.pool).await?;
+        sqlx::query!("DELETE FROM users").execute(&self.pool).await?;
         Ok(())
     }
 }
@@ -268,6 +397,7 @@ impl UserRepository {
 mod tests {
     use super::*;
     use crate::common::validation::UserInput;
+    use std::time::Duration as StdDuration;
 
     async fn setup_test_db() -> PgPool {
         let database_url = std::env::var("TEST_DATABASE_URL")
@@ -321,6 +451,77 @@ mod tests {
 
         let verified_user = repo.find_by_id(created_user.id).await.unwrap().unwrap();
         assert!(verified_user.is_email_verified);
+    }
+
+    #[tokio::test]
+    async fn test_password_reset_flow() {
+        let pool = setup_test_db().await;
+        let repo = UserRepository::new(pool);
+
+        // Create test user
+        let user_input = UserInput {
+            username: "resetuser".to_string(),
+            email: Some("reset@example.com".to_string()),
+            password: Some("TestPass123!".to_string()),
+        };
+
+        let created_user = repo.create(
+            &user_input,
+            "hashed_password".to_string(),
+            "verification_token".to_string(),
+        ).await.unwrap();
+
+        // Create reset token
+        let reset_token = repo.create_password_reset_token(created_user.id).await.unwrap();
+        assert!(!reset_token.is_used);
+        
+        // Verify token
+        let verified_token = repo.verify_reset_token(&reset_token.token).await.unwrap().unwrap();
+        assert_eq!(verified_token.id, reset_token.id);
+
+        // Mark token as used
+        let marked_used = repo.mark_reset_token_used(&reset_token.token).await.unwrap();
+        assert!(marked_used);
+
+        // Verify token can't be used again
+        let reused_token = repo.verify_reset_token(&reset_token.token).await.unwrap();
+        assert!(reused_token.is_none());
+
+        // Update password
+        repo.update_password(created_user.id, "new_hashed_password").await.unwrap();
+        
+        // Verify password was updated
+        let updated_user = repo.find_by_id(created_user.id).await.unwrap().unwrap();
+        assert_eq!(updated_user.password_hash, "new_hashed_password");
+    }
+
+    #[tokio::test]
+    async fn test_expired_reset_token() {
+        let pool = setup_test_db().await;
+        let repo = UserRepository::new(pool);
+
+        // Create test user
+        let user_input = UserInput {
+            username: "expireduser".to_string(),
+            email: Some("expired@example.com".to_string()),
+            password: Some("TestPass123!".to_string()),
+        };
+
+        let created_user = repo.create(
+            &user_input,
+            "hashed_password".to_string(),
+            "verification_token".to_string(),
+        ).await.unwrap();
+
+        // Create reset token
+        let reset_token = repo.create_password_reset_token(created_user.id).await.unwrap();
+        
+        // Wait for token to expire (we'll use a short duration for testing)
+        tokio::time::sleep(StdDuration::from_secs(1)).await;
+        
+        // Try to verify expired token
+        let expired_token = repo.verify_reset_token(&reset_token.token).await.unwrap();
+        assert!(expired_token.is_none());
     }
 
     #[tokio::test]

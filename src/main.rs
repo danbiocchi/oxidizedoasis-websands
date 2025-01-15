@@ -1,9 +1,6 @@
 use std::env;
 use std::sync::Arc;
 use std::time::Duration;
-// Rate limiting protection against DOS attacks
-use actix_governor::{Governor, GovernorConfigBuilder};
-
 use actix_files as fs;
 use actix_web::{App, HttpResponse, HttpServer, web, middleware};
 use dotenv::dotenv;
@@ -15,7 +12,7 @@ use sqlx::postgres::Postgres;
 use crate::api::routes::user_routes;
 use crate::api::handlers::user_handler::create_handler as create_user_handler;
 use crate::core::email::EmailService;
-use crate::infrastructure::{AppConfig, configure_cors, create_pool, RequestLogger};
+use crate::infrastructure::{AppConfig, configure_cors, create_pool, RequestLogger, RateLimiter};
 
 mod api;
 mod common;
@@ -114,11 +111,7 @@ async fn main() -> std::io::Result<()> {
 
     // Global rate limiting configuration
     // Allows bursts while preventing DOS attacks
-    let governor_conf = GovernorConfigBuilder::default()
-        .seconds_per_request(1)  // Base rate: 1 request per second
-        .burst_size(5)          // Allow bursts of up to 5 requests
-        .finish()
-        .unwrap();
+
 
     // Start HTTP server with security configurations
     HttpServer::new(move || {
@@ -134,9 +127,11 @@ async fn main() -> std::io::Result<()> {
             // 3. Request logging for security auditing
             .wrap(RequestLogger::new())
             .wrap(middleware::Logger::default())
-            // 4. Rate limiting protection
-            .wrap(Governor::new(&governor_conf))
-            // 5. Security headers
+            // 4. Global rate limiting protection
+            // Removed acrix governer
+            // 5. Password reset specific rate limiting
+            .wrap(RateLimiter::new())
+            // 6. Security headers
             .wrap(
                 middleware::DefaultHeaders::new()
                     // Prevent XSS attacks
@@ -194,21 +189,24 @@ async fn main() -> std::io::Result<()> {
             // Routes configuration
             .configure(user_routes::configure)
 
-            // Static files and frontend with security settings
-            .service(fs::Files::new("/", "./frontend/dist")
-                .index_file("index.html")
-                .use_last_modified(true)  // Enable caching headers
-                .prefer_utf8(true)       // Ensure consistent encoding
-                .show_files_listing())   // Directory listing controlled by frontend
-            // Default service with security headers
+            // Serve static assets from the dist directory
+            .service(fs::Files::new("/", "./frontend/dist").index_file("index.html"))
+            // Handle all other routes by serving index.html for client-side routing
             .default_service(web::route().to(|| async {
-                HttpResponse::Ok()
-                    .content_type("text/html; charset=utf-8")
-                    // Prevent caching of sensitive data
-                    .append_header(("Cache-Control", "no-store, must-revalidate"))
-                    .append_header(("Pragma", "no-cache"))
-                    .append_header(("Expires", "0"))
-                    .body(std::fs::read_to_string("./frontend/dist/index.html").unwrap())
+                match std::fs::read_to_string("./frontend/dist/index.html") {
+                    Ok(contents) => HttpResponse::Ok()
+                        .content_type("text/html; charset=utf-8")
+                        .append_header(("Cache-Control", "no-store, must-revalidate"))
+                        .append_header(("Pragma", "no-cache"))
+                        .append_header(("Expires", "0"))
+                        .body(contents),
+                    Err(e) => {
+                        error!("Failed to read index.html: {}", e);
+                        HttpResponse::InternalServerError()
+                            .content_type("text/plain")
+                            .body("Internal Server Error")
+                    }
+                }
             }))
     })
         // Server configuration for security and performance

@@ -9,7 +9,7 @@ use crate::core::user::{UserRepository, UserService};
 use crate::core::auth::AuthService;
 use crate::core::email::EmailServiceTrait;
 use crate::common::validation::{UserInput, LoginInput, TokenQuery};
-use crate::api::responses::user_response::ApiResponse;
+use crate::core::user::model::{PasswordResetRequest, PasswordResetSubmit};
 
 pub struct UserHandler {
     user_service: Arc<UserService>,
@@ -269,6 +269,89 @@ impl UserHandler {
         }
     }
 
+    pub async fn request_password_reset(
+        &self,
+        request: web::Json<PasswordResetRequest>,
+    ) -> impl Responder {
+        debug!("Received password reset request");
+
+        match self.user_service.request_password_reset(&request.email).await {
+            Ok(()) => {
+                info!("Password reset email sent successfully");
+                HttpResponse::Ok().json(json!({
+                    "success": true,
+                    "message": "If an account exists with that email, you will receive password reset instructions."
+                }))
+            },
+            Err(e) => {
+                error!("Password reset request failed: {:?}", e);
+                // Return success even on error to prevent email enumeration
+                HttpResponse::Ok().json(json!({
+                    "success": true,
+                    "message": "If an account exists with that email, you will receive password reset instructions."
+                }))
+            }
+        }
+    }
+
+    pub async fn verify_reset_token(
+        &self,
+        token_query: web::Query<TokenQuery>,
+    ) -> Result<impl Responder, actix_web::Error> {
+        let token = TokenQuery::try_from(token_query)?;
+        debug!("Verifying password reset token");
+
+        match self.user_service.verify_reset_token(token.token()).await {
+            Ok(()) => {
+                info!("Password reset token verified successfully");
+                Ok(HttpResponse::Found()
+                    .append_header((header::LOCATION, format!("/password-reset/new?token={}", token.token())))
+                    .finish())
+            },
+            Err(e) => {
+                error!("Password reset token verification failed: {:?}", e);
+                Ok(HttpResponse::BadRequest().json(json!({
+                    "success": false,
+                    "message": "The password reset link is invalid or has expired",
+                    "error": "Invalid reset token"
+                })))
+            }
+        }
+    }
+
+    pub async fn reset_password(
+        &self,
+        reset_data: web::Json<PasswordResetSubmit>,
+    ) -> impl Responder {
+        debug!("Processing password reset");
+
+        if reset_data.new_password != reset_data.confirm_password {
+            return HttpResponse::BadRequest().json(json!({
+                "success": false,
+                "message": "Passwords do not match",
+                "error": "Password mismatch"
+            }));
+        }
+
+        match self.user_service.reset_password(&reset_data.token, &reset_data.new_password).await {
+            Ok(()) => {
+                info!("Password reset successful");
+                HttpResponse::Ok().json(json!({
+                    "success": true,
+                    "message": "Password has been reset successfully. You can now log in with your new password."
+                }))
+            },
+            Err(e) => {
+                error!("Password reset failed: {:?}", e);
+                HttpResponse::BadRequest().json(json!({
+                    "success": false,
+                    "message": e.to_string(),
+                    "error": "Password reset failed"
+                }))
+            }
+        }
+    }
+
     pub async fn delete_user(
         &self,
         user_id: web::Path<Uuid>,
@@ -357,6 +440,27 @@ pub async fn update_user_handler(
     auth: BearerAuth,
 ) -> impl Responder {
     handler.update_user(user_id, user_input, auth).await
+}
+
+pub async fn request_password_reset_handler(
+    handler: web::Data<UserHandler>,
+    request: web::Json<PasswordResetRequest>,
+) -> impl Responder {
+    handler.request_password_reset(request).await
+}
+
+pub async fn verify_reset_token_handler(
+    handler: web::Data<UserHandler>,
+    token_query: web::Query<TokenQuery>,
+) -> Result<impl Responder, actix_web::Error> {
+    handler.verify_reset_token(token_query).await
+}
+
+pub async fn reset_password_handler(
+    handler: web::Data<UserHandler>,
+    reset_data: web::Json<PasswordResetSubmit>,
+) -> impl Responder {
+    handler.reset_password(reset_data).await
 }
 
 pub async fn delete_user_handler(
