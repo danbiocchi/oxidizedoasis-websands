@@ -36,6 +36,7 @@ Comprehensive documentation for OxidizedOasis-WebSands is available to help deve
 
 - 🔒 Robust user authentication system with JWT (JSON Web Tokens)
 - ✉️ Secure user registration with email verification
+- 🔑 Secure password reset with time-limited tokens and email verification
 - 🔐 Password hashing using bcrypt for enhanced security
 - 🚀 High-performance database operations with SQLx and PostgreSQL
 - 🛡️ Cross-Site Scripting (XSS) protection with input sanitization

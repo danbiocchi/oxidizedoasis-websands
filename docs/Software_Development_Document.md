@@ -702,7 +702,7 @@ Key features:
 
 ### 3.1.2 User Authentication
 
-The authentication system uses JWT tokens and is implemented in the `AuthService`:
+The authentication system uses JWT tokens and includes password reset functionality:
 
 ```rust
 pub async fn login(&self, input: LoginInput) -> Result<(String, User), AuthError> {
@@ -724,6 +724,46 @@ pub async fn login(&self, input: LoginInput) -> Result<(String, User), AuthError
 
     Ok((token, user))
 }
+
+pub async fn request_password_reset(&self, email: &str) -> Result<(), ApiError> {
+    // Find user by email
+    let user = match self.repository.find_user_by_email(email).await {
+        Ok(Some(user)) => user,
+        Ok(None) => return Ok(()), // Return success to prevent email enumeration
+        Err(e) => return Err(ApiError::from(DbError::from(e))),
+    };
+
+    // Verify email is verified
+    if !user.is_email_verified {
+        return Err(ApiError::new("Email not verified", ApiErrorType::Validation));
+    }
+
+    // Create password reset token
+    let reset_token = self.repository.create_password_reset_token(user.id).await?;
+
+    // Send password reset email
+    self.email_service.send_password_reset_email(email, &reset_token.token).await?;
+
+    Ok(())
+}
+
+pub async fn reset_password(&self, token: &str, new_password: &str) -> Result<(), ApiError> {
+    // Validate new password
+    validate_password(new_password)?;
+
+    // Verify and get reset token
+    let reset_token = self.repository.verify_reset_token(token).await?
+        .ok_or_else(|| ApiError::new("Invalid or expired reset token", ApiErrorType::Validation))?;
+
+    // Hash new password
+    let password_hash = hash(new_password.as_bytes(), DEFAULT_COST)?;
+
+    // Update password and mark token as used
+    self.repository.update_password(reset_token.user_id, &password_hash).await?;
+    self.repository.mark_reset_token_used(token).await?;
+
+    Ok(())
+}
 ```
 
 Features:
@@ -732,7 +772,45 @@ Features:
 3. JWT token generation
 4. Session management
 
-### 3.1.3 Profile Management
+### 3.1.3 Password Reset
+
+The password reset flow consists of three main steps:
+
+1. **Request Reset**
+   - User requests password reset by providing email
+   - System verifies email and sends reset token
+   - Token expires after 1 hour for security
+
+2. **Token Verification**
+   - User clicks reset link in email
+   - System verifies token validity and expiration
+   - Token is single-use to prevent reuse
+
+3. **Password Update**
+   - User provides new password
+   - System validates password requirements
+   - Password is updated and token is marked as used
+
+Database schema for password reset:
+```sql
+CREATE TABLE password_reset_tokens (
+    id uuid PRIMARY KEY,
+    user_id uuid NOT NULL,
+    token VARCHAR(255) UNIQUE NOT NULL,
+    expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    is_used BOOLEAN NOT NULL DEFAULT false,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT password_reset_tokens_user_id_fkey FOREIGN KEY (user_id)
+        REFERENCES users (id) ON DELETE CASCADE
+);
+
+CREATE INDEX idx_password_reset_tokens_token ON password_reset_tokens(token);
+CREATE INDEX idx_password_reset_tokens_user_id ON password_reset_tokens(user_id);
+CREATE INDEX idx_password_reset_tokens_expires_at ON password_reset_tokens(expires_at);
+```
+
+### 3.1.4 Profile Management
 
 Profile management functionality allows users to update their information:
 
