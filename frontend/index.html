@@ -4,14 +4,14 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>OxidizedOasis-WebSands</title>
+    <link data-trunk rel="icon" type="image/svg+xml" href="static/favicon.svg">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <link data-trunk rel="css" href="static/styles.css">
     <link data-trunk rel="copy-dir" href="static">
+    <link data-trunk rel="rust" data-wasm-opt="z" />
 </head>
     <body>
     <div id="app"></div>
-    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.5.1/dist/confetti.browser.min.js"></script>
-    <script type="module">
-        import init from '/frontend.js';
-        init('/frontend_bg.wasm');
-    </script>    </body>
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.5.1/dist/confetti.browser.min.js" defer></script>
+    </body>
 </html>

@@ -1,9 +1,16 @@
 [build]
 target = "index.html"
-release = false
 dist = "dist"
 public_url = "/"
 
 [serve]
 no_autoreload = true
 
+[[hooks]]
+stage = "post_build"
+command = "cmd"
+command_arguments = ["/C", "xcopy /E /I /Y static dist\\static"]
+
+[clean]
+dist = "dist"
+cargo = false

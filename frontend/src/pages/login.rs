@@ -121,10 +121,10 @@ pub fn login() -> Html {
     };
 
     html! {
-        <main class="login-content">
-            <div class="auth-form-container">
+        <div class="auth-container">
+            <div class="auth-card">
                 <h1>{"Login to OxidizedOasis"}</h1>
-                <form {onsubmit} class="login-form">
+                <form {onsubmit} class="auth-form">
                     <div class="form-group">
                         <label for="username">{"Username"}</label>
                         <input
@@ -147,7 +147,7 @@ pub fn login() -> Html {
                             required=true
                         />
                     </div>
-                    <button type="submit" class="login-button" disabled={*is_loading}>
+                    <button type="submit" class="auth-button" disabled={*is_loading}>
                         if *is_loading {
                             {"Logging in..."}
                         } else {
@@ -156,18 +156,13 @@ pub fn login() -> Html {
                     </button>
                 </form>
                 if let Some(err) = &*error {
-                    <p class="error-message">{err}</p>
+                    <div class="error-banner">{err}</div>
                 }
                 <div class="auth-links">
-                    <p class="auth-switch">
-                        { "Don't have an account? " }
-                        <Link<Route> to={Route::Register}>{ "Register" }</Link<Route>>
-                    </p>
-                    <p class="auth-switch">
-                        <Link<Route> to={Route::PasswordResetRequest}>{ "Forgot Password?" }</Link<Route>>
-                    </p>
+                    <Link<Route> to={Route::Register}>{ "Don't have an account?" }</Link<Route>>
+                    <Link<Route> to={Route::PasswordResetRequest}>{ "Forgot Password?" }</Link<Route>>
                 </div>
             </div>
-        </main>
+        </div>
     }
 }

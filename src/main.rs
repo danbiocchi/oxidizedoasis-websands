@@ -153,16 +153,18 @@ async fn main() -> std::io::Result<()> {
                     .add((
                         "Content-Security-Policy",
                         "default-src 'self'; \
-                         script-src 'self' https://cdn.jsdelivr.net 'unsafe-inline' 'unsafe-eval'; \
-                         style-src 'self' 'unsafe-inline'; \
-                         img-src 'self' data:; \
-                         connect-src 'self'; \
-                         font-src 'self'; \
+                         script-src 'self' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com 'unsafe-inline' 'unsafe-eval'; \
+                         style-src 'self' https://cdnjs.cloudflare.com 'unsafe-inline'; \
+                         img-src 'self' data: https:; \
+                         connect-src 'self' ws: wss:; \
+                         font-src 'self' https://cdnjs.cloudflare.com; \
                          object-src 'none'; \
                          base-uri 'self'; \
                          form-action 'self'; \
-                         frame-ancestors 'none';"
+                         frame-ancestors 'none'; \
+                         worker-src 'self' blob:;"
                     ))
+                    .add(("X-Content-Type-Options", "nosniff"))
             )
             // Enhanced logging for security auditing
             .wrap(middleware::Logger::new("%a %r %s %b %{Referer}i %{User-Agent}i %T"))
@@ -189,8 +191,13 @@ async fn main() -> std::io::Result<()> {
             // Routes configuration
             .configure(user_routes::configure)
 
-            // Serve static assets from the dist directory
-            .service(fs::Files::new("/", "./frontend/dist").index_file("index.html"))
+            // Serve static files with proper MIME types
+            .service(
+                fs::Files::new("/", "./frontend/dist")
+                    .index_file("index.html")
+                    .prefer_utf8(true)
+                    .use_last_modified(true)
+            )
             // Handle all other routes by serving index.html for client-side routing
             .default_service(web::route().to(|| async {
                 match std::fs::read_to_string("./frontend/dist/index.html") {

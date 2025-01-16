@@ -142,9 +142,10 @@ pub fn register() -> Html {
         && password_requirements.iter().all(|&x| x);
 
     html! {
-        <div class="auth-form-container">
-            <h2>{ "Sign Up to OxidizedOasis" }</h2>
-            <form {onsubmit}>
+        <div class="auth-container">
+            <div class="auth-card">
+                <h1>{ "Sign Up to OxidizedOasis" }</h1>
+                <form class="auth-form" {onsubmit}>
                 <div class="form-group">
                     <label for="username">{ "Username" }</label>
                     <input
@@ -195,17 +196,17 @@ pub fn register() -> Html {
                         { "Special character" }
                     </div>
                 </div>
-                <button type="submit" disabled={*is_loading || !form_is_valid}>
-                    { if *is_loading { "Signing Up..." } else { "Sign Up" } }
-                </button>
-            </form>
-            if let Some(err) = &*error {
-                <p class="error-message">{ err }</p>
-            }
-            <p class="auth-switch">
-                { "Already have an account? " }
-                <Link<Route> to={Route::Login}>{ "Log in" }</Link<Route>>
-            </p>
+                    <button type="submit" class="auth-button" disabled={*is_loading || !form_is_valid}>
+                        { if *is_loading { "Signing Up..." } else { "Sign Up" } }
+                    </button>
+                </form>
+                if let Some(err) = &*error {
+                    <div class="error-banner">{ err }</div>
+                }
+                <div class="auth-links">
+                    <Link<Route> to={Route::Login}>{ "Already have an account? Log in" }</Link<Route>>
+                </div>
+            </div>
         </div>
     }
 }

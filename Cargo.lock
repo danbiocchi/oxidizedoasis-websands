@@ -2334,6 +2334,7 @@ dependencies = [
  "lazy_static",
  "lettre",
  "log",
+ "mime",
  "num_cpus",
  "rand",
  "regex",
