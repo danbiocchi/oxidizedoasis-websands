@@ -97,28 +97,25 @@ pub fn password_reset_verify() -> Html {
     }
 
     html! {
-        <main class="auth-content">
-            <div class="auth-form-container">
-                <h1>{"Verifying Reset Link"}</h1>
-                if *is_loading {
-                    <div class="loading-message">
-                        <p>{"Verifying your password reset link..."}</p>
-                    </div>
-                } else if let Some(err) = &*error {
-                    <div class="error-container">
-                        <p class="error-message">{err}</p>
-                        <div class="auth-links">
-                            <Link<Route> to={Route::PasswordResetRequest}>
-                                {"Request a new reset link"}
-                            </Link<Route>>
-                            {" or "}
-                            <Link<Route> to={Route::Login}>
-                                {"return to login"}
-                            </Link<Route>>
-                        </div>
-                    </div>
-                }
-            </div>
-        </main>
+        <div class="form-container">
+            <h1>{"Verifying Reset Link"}</h1>
+            if *is_loading {
+                <div class="loading-container">
+                    <div class="loading-spinner"></div>
+                    <p>{"Verifying your password reset link..."}</p>
+                </div>
+            } else if let Some(err) = &*error {
+                <div class="error-message">{err}</div>
+                <div class="form-links">
+                    <Link<Route> to={Route::PasswordResetRequest} classes="form-link">
+                        {"Request a new reset link"}
+                    </Link<Route>>
+                    <span class="form-link-separator">{"or"}</span>
+                    <Link<Route> to={Route::Login} classes="form-link">
+                        {"return to login"}
+                    </Link<Route>>
+                </div>
+            }
+        </div>
     }
 }

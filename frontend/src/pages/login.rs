@@ -121,48 +121,44 @@ pub fn login() -> Html {
     };
 
     html! {
-        <div class="auth-container">
-            <div class="auth-card">
-                <h1>{"Login to OxidizedOasis"}</h1>
-                <form {onsubmit} class="auth-form">
-                    <div class="form-group">
-                        <label for="username">{"Username"}</label>
-                        <input
-                            type="text"
-                            id="username"
-                            name="username"
-                            value={form.username.clone()}
-                            oninput={oninput.clone()}
-                            required=true
-                        />
-                    </div>
-                    <div class="form-group">
-                        <label for="password">{"Password"}</label>
-                        <input
-                            type="password"
-                            id="password"
-                            name="password"
-                            value={form.password.clone()}
-                            oninput={oninput.clone()}
-                            required=true
-                        />
-                    </div>
-                    <button type="submit" class="auth-button" disabled={*is_loading}>
+        <div class="form-container">
+            <h1>{"Login to Cipher Horizon"}</h1>
+            <form {onsubmit}>
+                <div class="form-group">
+                    <label for="username">{"Username"}</label>
+                    <input
+                        type="text"
+                        id="username"
+                        name="username"
+                        value={form.username.clone()}
+                        oninput={oninput.clone()}
+                        required=true
+                    />
+                </div>
+                <div class="form-group">
+                    <label for="password">{"Password"}</label>
+                    <input
+                        type="password"
+                        id="password"
+                        name="password"
+                        value={form.password.clone()}
+                        oninput={oninput.clone()}
+                        required=true
+                    />
+                </div>
+                <button type="submit" class="form-button" disabled={*is_loading}>
                         if *is_loading {
                             {"Logging in..."}
                         } else {
                             {"Login"}
                         }
                     </button>
-                </form>
-                if let Some(err) = &*error {
-                    <div class="error-banner">{err}</div>
-                }
-                <div class="auth-links">
-                    <Link<Route> to={Route::Register}>{ "Don't have an account?" }</Link<Route>>
-                    <Link<Route> to={Route::PasswordResetRequest}>{ "Forgot Password?" }</Link<Route>>
-                </div>
-            </div>
+            </form>
+            if let Some(err) = &*error {
+                <div class="error-message">{err}</div>
+            }
+            <Link<Route> to={Route::Register} classes="form-link">{ "Don't have an account?" }</Link<Route>>
+            <Link<Route> to={Route::PasswordResetRequest} classes="form-link">{ "Forgot Password?" }</Link<Route>>
         </div>
     }
 }

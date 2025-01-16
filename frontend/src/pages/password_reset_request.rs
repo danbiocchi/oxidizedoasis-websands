@@ -89,13 +89,12 @@ pub fn password_reset_request() -> Html {
     };
 
     html! {
-        <main class="auth-content">
-            <div class="auth-form-container">
-                <h1>{"Reset Password"}</h1>
-                <p class="form-description">
-                    {"Enter your email address and we'll send you instructions to reset your password."}
-                </p>
-                <form {onsubmit} class="auth-form">
+        <div class="form-container">
+            <h1>{"Reset Password"}</h1>
+            <p class="form-description">
+                {"Enter your email address and we'll send you instructions to reset your password."}
+            </p>
+            <form {onsubmit}>
                     <div class="form-group">
                         <label for="email">{"Email"}</label>
                         <input
@@ -107,7 +106,7 @@ pub fn password_reset_request() -> Html {
                             required=true
                         />
                     </div>
-                    <button type="submit" class="submit-button" disabled={*is_loading}>
+                    <button type="submit" class="form-button" disabled={*is_loading}>
                         if *is_loading {
                             {"Sending..."}
                         } else {
@@ -116,15 +115,12 @@ pub fn password_reset_request() -> Html {
                     </button>
                 </form>
                 if let Some(err) = &*error {
-                    <p class="error-message">{err}</p>
+                    <div class="error-message">{err}</div>
                 }
                 if let Some(msg) = &*success {
-                    <p class="success-message">{msg}</p>
+                    <div class="success-message">{msg}</div>
                 }
-                <p class="auth-switch">
-                    <Link<Route> to={Route::Login}>{ "Back to Login" }</Link<Route>>
-                </p>
-            </div>
-        </main>
+                <Link<Route> to={Route::Login} classes="form-link">{ "Back to Login" }</Link<Route>>
+        </div>
     }
 }

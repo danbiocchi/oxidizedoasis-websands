@@ -136,10 +136,9 @@ pub fn password_reset_new() -> Html {
         form.new_password == form.confirm_password;
 
     html! {
-        <main class="auth-content">
-            <div class="auth-form-container">
-                <h1>{"Set New Password"}</h1>
-                <form {onsubmit} class="auth-form">
+        <div class="form-container">
+            <h1>{"Set New Password"}</h1>
+            <form {onsubmit}>
                     <div class="form-group">
                         <label for="new_password">{"New Password"}</label>
                         <input
@@ -166,22 +165,27 @@ pub fn password_reset_new() -> Html {
                     </div>
                     <div class="password-requirements">
                         <div class={classes!("requirement", password_requirements[0].then(|| "met"))}>
-                            { "At least 8 characters" }
+                            <i class="fas fa-check"></i>
+                            <span>{ "At least 8 characters" }</span>
                         </div>
                         <div class={classes!("requirement", password_requirements[1].then(|| "met"))}>
-                            { "Uppercase letter" }
+                            <i class="fas fa-check"></i>
+                            <span>{ "Uppercase letter" }</span>
                         </div>
                         <div class={classes!("requirement", password_requirements[2].then(|| "met"))}>
-                            { "Lowercase letter" }
+                            <i class="fas fa-check"></i>
+                            <span>{ "Lowercase letter" }</span>
                         </div>
                         <div class={classes!("requirement", password_requirements[3].then(|| "met"))}>
-                            { "Number" }
+                            <i class="fas fa-check"></i>
+                            <span>{ "Number" }</span>
                         </div>
                         <div class={classes!("requirement", password_requirements[4].then(|| "met"))}>
-                            { "Special character" }
+                            <i class="fas fa-check"></i>
+                            <span>{ "Special character" }</span>
                         </div>
                     </div>
-                    <button type="submit" class="submit-button" disabled={*is_loading || !form_is_valid}>
+                    <button type="submit" class="form-button" disabled={*is_loading || !form_is_valid}>
                         if *is_loading {
                             {"Updating Password..."}
                         } else {
@@ -190,12 +194,11 @@ pub fn password_reset_new() -> Html {
                     </button>
                 </form>
                 if let Some(err) = &*error {
-                    <p class="error-message">{err}</p>
+                    <div class="error-message">{err}</div>
                 }
                 if let Some(msg) = &*success {
-                    <p class="success-message">{msg}</p>
+                    <div class="success-message">{msg}</div>
                 }
-            </div>
-        </main>
+        </div>
     }
 }
