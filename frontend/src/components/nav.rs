@@ -24,7 +24,7 @@ pub fn nav() -> Html {
         Callback::from(move |_| {
             auth::logout();
             set_auth.emit(false);
-            navigator.push(&Route::Home);
+            navigator.push(&Route::Login);
         })
     };
 

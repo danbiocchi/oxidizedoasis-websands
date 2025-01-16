@@ -7,7 +7,7 @@ use crate::services::auth;
 use crate::routes::Route;
 use yew_router::prelude::*;
 use gloo::console::log;
-use crate::components::icons::{DashboardIcon, ProfileIcon, SettingsIcon, LogoutIcon};
+use crate::components::icons::{DashboardIcon, ProfileIcon, SettingsIcon};
 
 const NOTES_STORAGE_KEY: &str = "dashboard_notes";
 
@@ -47,7 +47,6 @@ pub enum DashboardMsg {
     SaveNotes,
     NotesSaved(Result<(), String>),
     Tick,
-    Logout,
     ToggleSidebar,
     ChangeView(DashboardView),
 }
@@ -145,11 +144,6 @@ impl Component for Dashboard {
                 self.timer += 1;
                 true
             }
-            DashboardMsg::Logout => {
-                auth::logout();
-                self.navigator.push(&Route::Login);
-                false
-            }
             DashboardMsg::ToggleSidebar => {
                 self.sidebar_expanded = !self.sidebar_expanded;
                 true
@@ -209,12 +203,6 @@ impl Component for Dashboard {
                             }
                         </div>
                         
-                        <div class="nav-item logout" onclick={ctx.link().callback(|_| DashboardMsg::Logout)}>
-                            <LogoutIcon />
-                            if self.sidebar_expanded {
-                                <span>{"Logout"}</span>
-                            }
-                        </div>
                     </div>
                 </div>
 
