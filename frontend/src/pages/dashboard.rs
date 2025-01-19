@@ -178,9 +178,7 @@ impl Component for Dashboard {
                             onclick={ctx.link().callback(|_| DashboardMsg::ChangeView(DashboardView::Overview))}
                         >
                             <DashboardIcon />
-                            if self.sidebar_expanded {
-                                <span>{"Overview"}</span>
-                            }
+                            <span class={if !self.sidebar_expanded { "hidden" } else { "" }}>{"Overview"}</span>
                         </div>
                         
                         <div 
@@ -188,9 +186,7 @@ impl Component for Dashboard {
                             onclick={ctx.link().callback(|_| DashboardMsg::ChangeView(DashboardView::Profile))}
                         >
                             <ProfileIcon />
-                            if self.sidebar_expanded {
-                                <span>{"Profile"}</span>
-                            }
+                            <span class={if !self.sidebar_expanded { "hidden" } else { "" }}>{"Profile"}</span>
                         </div>
                         
                         <div 
@@ -198,9 +194,7 @@ impl Component for Dashboard {
                             onclick={ctx.link().callback(|_| DashboardMsg::ChangeView(DashboardView::Settings))}
                         >
                             <SettingsIcon />
-                            if self.sidebar_expanded {
-                                <span>{"Settings"}</span>
-                            }
+                            <span class={if !self.sidebar_expanded { "hidden" } else { "" }}>{"Settings"}</span>
                         </div>
                         
                     </div>

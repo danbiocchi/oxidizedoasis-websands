@@ -642,7 +642,7 @@ main {
 }
 
 .dashboard-sidebar.collapsed {
-    width: 60px;
+    width: 70px;
 }
 
 .sidebar-toggle {
@@ -706,8 +706,13 @@ main {
 }
 
 .nav-item svg {
-    width: 24px;
-    height: 24px;
+    width: 18px;
+    height: 18px;
+}
+
+.dashboard-sidebar.collapsed .nav-item svg {
+    width: 22px;
+    height: 22px;
 }
 
 .nav-item span {
@@ -716,12 +721,17 @@ main {
     transition: opacity 0.3s ease;
 }
 
+.hidden {
+    display: none;
+}
+
 .dashboard-sidebar.collapsed .nav-item span {
     display: none;
 }
 
 .dashboard-sidebar.collapsed .nav-item {
     justify-content: center;
+    padding: 12px 0;
 }
 
 
@@ -734,7 +744,7 @@ main {
 }
 
 .dashboard-content.expanded {
-    margin-left: 60px;
+    margin-left: 70px;
 }
 
 /* Cards and Grids */
