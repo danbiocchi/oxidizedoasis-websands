@@ -60,7 +60,7 @@ pub fn nav() -> Html {
                 </div>
                 <div class="c-navbar__actions">
                     if auth_context.is_authenticated {
-                        <button onclick={logout} class="c-button c-button--outline">
+                        <button onclick={logout} class="c-button c-button--error">
                             { "Logout" }
                         </button>
                     } else {
