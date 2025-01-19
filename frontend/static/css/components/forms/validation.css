@@ -1,0 +1,180 @@
+/**
+ * Form Validation Styles
+ * Styles for form validation states and messages
+ */
+
+/* Form Group */
+.c-form-group {
+  margin-bottom: var(--spacing-base);
+}
+
+/* Form Label */
+.c-form-label {
+  display: block;
+  margin-bottom: var(--spacing-xs);
+  font-weight: 500;
+  color: var(--color-text);
+}
+
+.c-form-label.is-required::after {
+  content: '*';
+  margin-left: var(--spacing-xs);
+  color: var(--color-error);
+}
+
+/* Validation States */
+.c-form-group.is-valid .c-input {
+  border-color: var(--color-success);
+  padding-right: calc(1.5em + var(--spacing-lg));
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16'%3E%3Cpath fill='%2328a745' d='M10.97 4.97a.75.75 0 0 1 1.07 1.05l-3.99 4.99a.75.75 0 0 1-1.08.02L4.324 8.384a.75.75 0 1 1 1.06-1.06l2.094 2.093 3.473-4.425z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right calc(0.375em + var(--spacing-xs)) center;
+  background-size: calc(0.75em + var(--spacing-xs)) calc(0.75em + var(--spacing-xs));
+}
+
+.c-form-group.is-invalid .c-input {
+  border-color: var(--color-error);
+  padding-right: calc(1.5em + var(--spacing-lg));
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16'%3E%3Cpath fill='%23dc3545' d='M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0M5.354 4.646a.5.5 0 1 0-.708.708L7.293 8l-2.647 2.646a.5.5 0 0 0 .708.708L8 8.707l2.646 2.647a.5.5 0 0 0 .708-.708L8.707 8l2.647-2.646a.5.5 0 0 0-.708-.708L8 7.293z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right calc(0.375em + var(--spacing-xs)) center;
+  background-size: calc(0.75em + var(--spacing-xs)) calc(0.75em + var(--spacing-xs));
+}
+
+/* Validation Messages */
+.c-form-feedback {
+  display: none;
+  width: 100%;
+  margin-top: var(--spacing-xs);
+  font-size: var(--font-size-sm);
+}
+
+.c-form-feedback--valid {
+  color: var(--color-success);
+}
+
+.c-form-feedback--invalid {
+  color: var(--color-error);
+}
+
+.c-form-group.is-valid .c-form-feedback--valid,
+.c-form-group.is-invalid .c-form-feedback--invalid {
+  display: block;
+}
+
+/* Validation Icons */
+.c-form-icon {
+  position: absolute;
+  top: 50%;
+  right: var(--spacing-base);
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+/* Password Strength Indicator */
+.c-password-strength {
+  margin-top: var(--spacing-xs);
+}
+
+.c-password-strength__bar {
+  height: 4px;
+  border-radius: var(--border-radius-full);
+  background-color: var(--color-text-light);
+  overflow: hidden;
+}
+
+.c-password-strength__progress {
+  height: 100%;
+  width: 0;
+  transition: width var(--transition-base);
+}
+
+.c-password-strength__progress.is-weak {
+  width: 25%;
+  background-color: var(--color-error);
+}
+
+.c-password-strength__progress.is-fair {
+  width: 50%;
+  background-color: var(--color-warning);
+}
+
+.c-password-strength__progress.is-good {
+  width: 75%;
+  background-color: var(--color-info);
+}
+
+.c-password-strength__progress.is-strong {
+  width: 100%;
+  background-color: var(--color-success);
+}
+
+.c-password-strength__text {
+  margin-top: var(--spacing-xs);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-light);
+}
+
+/* Character Counter */
+.c-char-counter {
+  margin-top: var(--spacing-xs);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-light);
+  text-align: right;
+}
+
+.c-char-counter.is-limit {
+  color: var(--color-warning);
+}
+
+.c-char-counter.is-exceeded {
+  color: var(--color-error);
+}
+
+/* Dark Mode */
+@media (prefers-color-scheme: dark) {
+  .c-form-label {
+    color: var(--color-text-dark-mode);
+  }
+
+  .c-form-group.is-valid .c-input,
+  .c-form-group.is-invalid .c-input {
+    background-color: var(--color-surface-dark);
+  }
+
+  .c-password-strength__bar {
+    background-color: rgba(255, 255, 255, 0.1);
+  }
+}
+
+/* High Contrast Mode */
+@media (prefers-contrast: high) {
+  .c-form-label.is-required::after {
+    color: currentColor;
+  }
+
+  .c-form-group.is-valid .c-input,
+  .c-form-group.is-invalid .c-input {
+    border-width: 2px;
+  }
+
+  .c-password-strength__progress {
+    border: 1px solid currentColor;
+  }
+}
+
+/* Reduced Motion */
+@media (prefers-reduced-motion: reduce) {
+  .c-password-strength__progress {
+    transition: none;
+  }
+}
+
+/* Print Styles */
+@media print {
+  .c-form-feedback,
+  .c-password-strength,
+  .c-char-counter {
+    display: none;
+  }
+}

@@ -157,10 +157,10 @@ impl Component for Dashboard {
 
     fn view(&self, ctx: &Context<Self>) -> Html {
         html! {
-            <div class="dashboard-container">
+            <div class="l-container--dashboard critical-dashboard">
                 // Sidebar
-                <div class={classes!("dashboard-sidebar", if !self.sidebar_expanded { "collapsed" } else { "" })}>
-                    <div class="sidebar-toggle" onclick={ctx.link().callback(|_| DashboardMsg::ToggleSidebar)}>
+                <div class={classes!("c-sidebar", if !self.sidebar_expanded { "is-collapsed" } else { "" })}>
+                    <div class="c-sidebar__toggle" onclick={ctx.link().callback(|_| DashboardMsg::ToggleSidebar)}>
                         if self.sidebar_expanded {
                             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                 <polyline points="15 18 9 12 15 6"></polyline>
@@ -172,38 +172,38 @@ impl Component for Dashboard {
                         }
                     </div>
                     
-                    <div class="sidebar-nav">
+                    <div class="c-sidebar__nav">
                         <div 
-                            class={classes!("nav-item", if self.current_view == DashboardView::Overview { "active" } else { "" })}
+                            class={classes!("c-sidebar__item", if self.current_view == DashboardView::Overview { "is-active" } else { "" })}
                             onclick={ctx.link().callback(|_| DashboardMsg::ChangeView(DashboardView::Overview))}
                         >
                             <DashboardIcon />
-                            <span class={if !self.sidebar_expanded { "hidden" } else { "" }}>{"Overview"}</span>
+                            <span class={classes!("c-sidebar__label", if !self.sidebar_expanded { "u-hidden" } else { "" })}>{"Overview"}</span>
                         </div>
                         
                         <div 
-                            class={classes!("nav-item", if self.current_view == DashboardView::Profile { "active" } else { "" })}
+                            class={classes!("c-sidebar__item", if self.current_view == DashboardView::Profile { "is-active" } else { "" })}
                             onclick={ctx.link().callback(|_| DashboardMsg::ChangeView(DashboardView::Profile))}
                         >
                             <ProfileIcon />
-                            <span class={if !self.sidebar_expanded { "hidden" } else { "" }}>{"Profile"}</span>
+                            <span class={classes!("c-sidebar__label", if !self.sidebar_expanded { "u-hidden" } else { "" })}>{"Profile"}</span>
                         </div>
                         
                         <div 
-                            class={classes!("nav-item", if self.current_view == DashboardView::Settings { "active" } else { "" })}
+                            class={classes!("c-sidebar__item", if self.current_view == DashboardView::Settings { "is-active" } else { "" })}
                             onclick={ctx.link().callback(|_| DashboardMsg::ChangeView(DashboardView::Settings))}
                         >
                             <SettingsIcon />
-                            <span class={if !self.sidebar_expanded { "hidden" } else { "" }}>{"Settings"}</span>
+                            <span class={classes!("c-sidebar__label", if !self.sidebar_expanded { "u-hidden" } else { "" })}>{"Settings"}</span>
                         </div>
                         
                     </div>
                 </div>
 
                 // Main content area
-                <div class={classes!("dashboard-content", if !self.sidebar_expanded { "expanded" } else { "" })}>
+                <div class={classes!("l-container--dashboard__content", if !self.sidebar_expanded { "is-expanded" } else { "" })}>
                     if let Some(error) = &self.error {
-                        <div class="error-banner">
+                        <div class="c-validation__error">
                             {error}
                         </div>
                     }
@@ -226,26 +226,26 @@ impl Dashboard {
 
     fn render_overview(&self) -> Html {
         html! {
-            <div class="dashboard-grid">
-                <div class="overview-card">
-                    <h2>{"Dashboard Overview"}</h2>
-                    <div class="stats-grid">
-                        <div class="stat-card">
+            <div class="l-grid l-grid--dashboard">
+                <div class="c-card c-card--dashboard">
+                    <h2 class="c-card__title">{"Dashboard Overview"}</h2>
+                    <div class="l-grid l-grid--stats">
+                        <div class="c-card c-card--stat">
                             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                 <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
                                 <circle cx="8.5" cy="7" r="4"></circle>
                                 <polyline points="17 11 19 13 23 9"></polyline>
                             </svg>
-                            <span class="stat-label">{"Account Status"}</span>
-                            <span class="stat-value">{"Active"}</span>
+                            <span class="c-card__label">{"Account Status"}</span>
+                            <span class="c-card__value">{"Active"}</span>
                         </div>
-                        <div class="stat-card">
+                        <div class="c-card c-card--stat">
                             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                 <circle cx="12" cy="12" r="10"></circle>
                                 <polyline points="12 6 12 12 16 14"></polyline>
                             </svg>
-                            <span class="stat-label">{"Session Time"}</span>
-                            <span class="stat-value">
+                            <span class="c-card__label">{"Session Time"}</span>
+                            <span class="c-card__value">
                                 {format!("{:02}:{:02}:{:02}",
                                     self.timer / 3600,
                                     (self.timer / 60) % 60,
@@ -261,31 +261,35 @@ impl Dashboard {
 
     fn render_profile(&self) -> Html {
         html! {
-            <div class="profile-container">
-                <h2>{"Profile Information"}</h2>
+            <div class="l-container l-container--md">
+                <h2 class="u-text-2xl u-mb-lg">{"Profile Information"}</h2>
                 if let Some(user) = &self.user_info {
-                    <div class="profile-card">
-                        <div class="info-row">
-                            <span class="info-label">{"Username:"}</span>
-                            <span class="info-value">{&user.username}</span>
+                    <>
+                        <div class="c-card">
+                            <div class="c-card__content">
+                                <div class="c-card__row">
+                                    <span class="c-card__label">{"Username:"}</span>
+                                    <span class="c-card__value">{&user.username}</span>
+                                </div>
+                                <div class="c-card__row">
+                                    <span class="c-card__label">{"Email:"}</span>
+                                    <span class="c-card__value">{user.email.as_deref().unwrap_or("Not provided")}</span>
+                                </div>
+                                <div class="c-card__row">
+                                    <span class="c-card__label">{"Email Status:"}</span>
+                                    <span class={classes!("c-card__value", if user.is_email_verified { "is-verified" } else { "is-unverified" })}>
+                                        {if user.is_email_verified { "Verified" } else { "Not Verified" }}
+                                    </span>
+                                </div>
+                                <div class="c-card__row">
+                                    <span class="c-card__label">{"Account Created:"}</span>
+                                    <span class="c-card__value">{&user.created_at}</span>
+                                </div>
+                            </div>
                         </div>
-                        <div class="info-row">
-                            <span class="info-label">{"Email:"}</span>
-                            <span class="info-value">{user.email.as_deref().unwrap_or("Not provided")}</span>
-                        </div>
-                        <div class="info-row">
-                            <span class="info-label">{"Email Status:"}</span>
-                            <span class={classes!("info-value", if user.is_email_verified { "verified" } else { "unverified" })}>
-                                {if user.is_email_verified { "Verified" } else { "Not Verified" }}
-                            </span>
-                        </div>
-                        <div class="info-row">
-                            <span class="info-label">{"Account Created:"}</span>
-                            <span class="info-value">{&user.created_at}</span>
-                        </div>
-                    </div>
+                    </>
                 } else {
-                    <div class="loading-spinner">{"Loading profile information..."}</div>
+                    <div class="c-loader c-loader--circular">{"Loading profile information..."}</div>
                 }
             </div>
         }
@@ -293,26 +297,24 @@ impl Dashboard {
 
     fn render_settings(&self) -> Html {
         html! {
-            <div class="settings-container">
-                <h2>{"Settings"}</h2>
-                <div class="settings-grid">
-                    <div class="settings-card">
-                        <h3>{"Account Settings"}</h3>
-                        <div class="settings-option">
-                            <label class="switch">
-                                <input type="checkbox" checked=true />
-                                <span class="slider"></span>
-                            </label>
-                            <span>{"Email Notifications"}</span>
+            <div class="l-container l-container--md">
+                <h2 class="u-text-2xl u-mb-lg">{"Settings"}</h2>
+                <div class="l-grid l-grid--settings">
+                    <>
+                        <div class="c-card">
+                            <h3 class="c-card__title">{"Account Settings"}</h3>
+                            <div class="c-card__content">
+                                <div class="c-form-check">
+                                    <input type="checkbox" class="c-form-check-input" checked=true />
+                                    <span class="c-form-check-label">{"Email Notifications"}</span>
+                                </div>
+                                <div class="c-form-check">
+                                    <input type="checkbox" class="c-form-check-input" />
+                                    <span class="c-form-check-label">{"Two-Factor Authentication"}</span>
+                                </div>
+                            </div>
                         </div>
-                        <div class="settings-option">
-                            <label class="switch">
-                                <input type="checkbox" />
-                                <span class="slider"></span>
-                            </label>
-                            <span>{"Two-Factor Authentication"}</span>
-                        </div>
-                    </div>
+                    </>
                 </div>
             </div>
         }

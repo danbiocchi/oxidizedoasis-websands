@@ -1,0 +1,26 @@
+/**
+ * Home Page Bundle
+ * Imports all styles needed for the home page
+ */
+
+/* Core Styles */
+@import '/static/css/core/variables.css';
+@import '/static/css/core/reset.css';
+@import '/static/css/core/base.css';
+
+/* Utilities */
+@import '/static/css/utils/animations.css';
+@import '/static/css/utils/helpers.css';
+@import '/static/css/utils/breakpoints.css';
+
+/* Layouts */
+@import '/static/css/layouts/grid.css';
+@import '/static/css/layouts/containers.css';
+
+/* Components */
+@import '/static/css/components/buttons.css';
+@import '/static/css/components/cards.css';
+@import '/static/css/components/nav/navbar.css';
+
+/* Page-specific styles */
+@import './home.css';

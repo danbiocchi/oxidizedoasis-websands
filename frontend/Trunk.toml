@@ -4,13 +4,31 @@ dist = "dist"
 public_url = "/"
 
 [serve]
+port = 8081
 no_autoreload = true
+
+[[hooks]]
+stage = "pre_build"
+command = "cmd"
+command_arguments = ["/C", "if not exist dist\\static\\css\\core mkdir dist\\static\\css\\core && if not exist dist\\static\\css\\components\\nav mkdir dist\\static\\css\\components\\nav && if not exist dist\\static\\css\\components\\forms mkdir dist\\static\\css\\components\\forms && if not exist dist\\static\\css\\layouts mkdir dist\\static\\css\\layouts && if not exist dist\\static\\css\\utils mkdir dist\\static\\css\\utils && if not exist dist\\static\\css\\pages\\home mkdir dist\\static\\css\\pages\\home && if not exist dist\\static\\css\\pages\\about mkdir dist\\static\\css\\pages\\about && if not exist dist\\static\\css\\pages\\auth mkdir dist\\static\\css\\pages\\auth && if not exist dist\\static\\css\\pages\\dashboard mkdir dist\\static\\css\\pages\\dashboard"]
 
 [[hooks]]
 stage = "post_build"
 command = "cmd"
-command_arguments = ["/C", "xcopy /E /I /Y static dist\\static"]
+command_arguments = ["/C", "xcopy /E /I /Y static\\* dist\\static\\"]
+
+[watch]
+watch = ["src", "static"]
 
 [clean]
 dist = "dist"
 cargo = false
+
+[build.css]
+minify = true
+source_maps = true
+
+[[hooks]]
+stage = "build"
+command = "cmd"
+command_arguments = ["/C", "xcopy /E /I /Y static\\css\\core\\*.css dist\\static\\css\\core\\ && xcopy /E /I /Y static\\css\\components\\nav\\*.css dist\\static\\css\\components\\nav\\ && xcopy /E /I /Y static\\css\\components\\forms\\*.css dist\\static\\css\\components\\forms\\ && xcopy /E /I /Y static\\css\\components\\*.css dist\\static\\css\\components\\ && xcopy /E /I /Y static\\css\\layouts\\*.css dist\\static\\css\\layouts\\ && xcopy /E /I /Y static\\css\\utils\\*.css dist\\static\\css\\utils\\ && xcopy /E /I /Y static\\css\\pages\\home\\*.css dist\\static\\css\\pages\\home\\ && xcopy /E /I /Y static\\css\\pages\\about\\*.css dist\\static\\css\\pages\\about\\ && xcopy /E /I /Y static\\css\\pages\\auth\\*.css dist\\static\\css\\pages\\auth\\ && xcopy /E /I /Y static\\css\\pages\\dashboard\\*.css dist\\static\\css\\pages\\dashboard\\ && xcopy /E /I /Y static\\css\\*.css dist\\static\\css\\"]

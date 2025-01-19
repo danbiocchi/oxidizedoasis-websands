@@ -1,0 +1,14 @@
+/**
+ * Auth Pages Bundle
+ * Imports all styles needed for authentication pages
+ */
+
+/* Import shared components needed for auth pages */
+@import '/static/css/components/forms/inputs.css';
+@import '/static/css/components/forms/validation.css';
+@import '/static/css/components/buttons.css';
+@import '/static/css/components/loaders.css';
+@import '/static/css/components/cards.css';
+
+/* Import auth-specific styles */
+@import './auth.css';

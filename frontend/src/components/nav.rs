@@ -8,6 +8,15 @@ use crate::services::auth;
 pub fn nav() -> Html {
     let auth_context = use_context::<AuthContext>().expect("No auth context found");
     let navigator = use_navigator().unwrap();
+    let is_menu_open = use_state(|| false);
+
+    // Mobile menu toggle handler
+    let toggle_menu = {
+        let is_menu_open = is_menu_open.clone();
+        Callback::from(move |_| {
+            is_menu_open.set(!*is_menu_open);
+        })
+    };
 
     // General navigation helper
     let navigate = |route: Route| {
@@ -29,28 +38,39 @@ pub fn nav() -> Html {
     };
 
     html! {
-        <nav class="navbar">
-            <div class="navbar-container">
-                <ul class="nav-links">
-                    <li><Link<Route> to={Route::Home}>{ "Home" }</Link<Route>></li>
-                    <li><Link<Route> to={Route::About}>{ "About" }</Link<Route>></li>
+        <nav class="c-navbar">
+            <div class="c-navbar__content">
+                <div class="c-navbar__brand-group">
+                    <Link<Route> classes="c-navbar__brand" to={Route::Home}>
+                        { "WebSands" }
+                    </Link<Route>>
+                    <Link<Route> classes="c-navbar__link" to={Route::About}>{ "About" }</Link<Route>>
                     if auth_context.is_authenticated {
-                        <li><Link<Route> to={Route::Dashboard}>{ "Dashboard" }</Link<Route>></li>
+                        <Link<Route> classes="c-navbar__link" to={Route::Dashboard}>{ "Dashboard" }</Link<Route>>
                     }
-                </ul>
-                <div class="auth-buttons">
+                </div>
+                <button onclick={toggle_menu.clone()} class="c-navbar__menu-button">
+                    if *is_menu_open {
+                        { "✕" }
+                    } else {
+                        { "☰" }
+                    }
+                </button>
+                <div class={classes!("c-navbar__nav", (*is_menu_open).then_some("is-open"))}>
+                </div>
+                <div class="c-navbar__actions">
                     if auth_context.is_authenticated {
-                        <button onclick={logout} class="auth-button logout-button">
+                        <button onclick={logout} class="c-button c-button--outline">
                             { "Logout" }
                         </button>
                     } else {
                         <>
                             <button onclick={navigate(Route::Login)}
-                                    class="auth-button login-button">
+                                    class="c-button c-button--outline">
                                 { "Login" }
                             </button>
                             <button onclick={navigate(Route::Register)}
-                                    class="auth-button register-button">
+                                    class="c-button c-button--primary">
                                 { "Register" }
                             </button>
                         </>

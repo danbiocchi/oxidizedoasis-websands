@@ -7,9 +7,9 @@ pub fn footer() -> Html {
     let app_name = "Web Sands"; // Use the APP_NAME from environment variables
 
     html! {
-        <footer class="footer">
-            <div class="footer-container">
-                <p>{ format!("© {} {}. All rights reserved.", year, app_name) }</p>
+        <footer class="c-footer">
+            <div class="c-footer__container">
+                <p class="c-footer__copyright">{ format!("© {} {}. All rights reserved.", year, app_name) }</p>
             </div>
         </footer>
     }

@@ -1,0 +1,36 @@
+/**
+ * Footer Component Styles
+ */
+
+.c-footer {
+  padding: var(--spacing-lg) 0;
+  background-color: var(--color-surface);
+  border-top: 1px solid var(--color-border);
+}
+
+.c-footer__container {
+  max-width: var(--container-width);
+  margin: 0 auto;
+  padding: 0 var(--spacing-base);
+  text-align: center;
+}
+
+.c-footer__copyright {
+  color: var(--color-text-light);
+  font-size: var(--font-size-sm);
+}
+
+/* Dark Mode */
+@media (prefers-color-scheme: dark) {
+  .c-footer {
+    background-color: var(--color-surface-dark);
+    border-color: var(--color-border-dark);
+  }
+}
+
+/* Print Styles */
+@media print {
+  .c-footer {
+    display: none;
+  }
+}

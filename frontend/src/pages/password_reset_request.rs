@@ -89,15 +89,19 @@ pub fn password_reset_request() -> Html {
     };
 
     html! {
-        <div class="form-container">
-            <h1>{"Reset Password"}</h1>
-            <p class="form-description">
-                {"Enter your email address and we'll send you instructions to reset your password."}
-            </p>
-            <form {onsubmit}>
-                    <div class="form-group">
-                        <label for="email">{"Email"}</label>
+        <div class="auth">
+            <div class="auth__card">
+                <div class="auth__header">
+                    <h1 class="auth__title">{"Reset Password"}</h1>
+                    <p class="auth__subtitle">
+                        {"Enter your email address and we'll send you instructions to reset your password."}
+                    </p>
+                </div>
+                <form {onsubmit} class="auth__form">
+                    <div class="auth__form-group">
+                        <label class="auth__label" for="email">{"Email"}</label>
                         <input
+                            class="auth__input"
                             type="email"
                             id="email"
                             name="email"
@@ -106,7 +110,7 @@ pub fn password_reset_request() -> Html {
                             required=true
                         />
                     </div>
-                    <button type="submit" class="form-button" disabled={*is_loading}>
+                    <button type="submit" class="auth__button" disabled={*is_loading}>
                         if *is_loading {
                             {"Sending..."}
                         } else {
@@ -115,12 +119,15 @@ pub fn password_reset_request() -> Html {
                     </button>
                 </form>
                 if let Some(err) = &*error {
-                    <div class="error-message">{err}</div>
+                    <div class="auth__error">{err}</div>
                 }
                 if let Some(msg) = &*success {
-                    <div class="success-message">{msg}</div>
+                    <div class="auth__success">{msg}</div>
                 }
-                <Link<Route> to={Route::Login} classes="form-link">{ "Back to Login" }</Link<Route>>
+                <div class="auth__links">
+                    <Link<Route> to={Route::Login} classes="auth__link">{ "Back to Login" }</Link<Route>>
+                </div>
+            </div>
         </div>
     }
 }

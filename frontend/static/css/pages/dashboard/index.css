@@ -1,0 +1,13 @@
+/**
+ * Dashboard Page Bundle
+ * Imports all styles needed for the dashboard pages
+ */
+
+/* Import shared components needed for dashboard */
+@import '/static/css/components/nav/sidebar.css';
+@import '/static/css/components/cards.css';
+@import '/static/css/components/loaders.css';
+@import '/static/css/components/buttons.css';
+
+/* Import dashboard-specific styles */
+@import './dashboard.css';

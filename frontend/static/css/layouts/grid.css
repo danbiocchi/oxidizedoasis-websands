@@ -1,0 +1,133 @@
+/**
+ * Grid System
+ * Flexible grid layout system with responsive support
+ */
+
+/* Base Grid Container */
+.l-grid {
+  display: grid;
+  gap: var(--spacing-base);
+}
+
+/* Grid Columns */
+.l-grid--1 { grid-template-columns: repeat(1, 1fr); }
+.l-grid--2 { grid-template-columns: repeat(2, 1fr); }
+.l-grid--3 { grid-template-columns: repeat(3, 1fr); }
+.l-grid--4 { grid-template-columns: repeat(4, 1fr); }
+.l-grid--5 { grid-template-columns: repeat(5, 1fr); }
+.l-grid--6 { grid-template-columns: repeat(6, 1fr); }
+
+/* Auto-fit Grids */
+.l-grid--auto-sm { grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
+.l-grid--auto-md { grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); }
+.l-grid--auto-lg { grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); }
+
+/* Grid Gaps */
+.l-grid--gap-xs { gap: var(--spacing-xs); }
+.l-grid--gap-sm { gap: var(--spacing-sm); }
+.l-grid--gap-base { gap: var(--spacing-base); }
+.l-grid--gap-lg { gap: var(--spacing-lg); }
+.l-grid--gap-xl { gap: var(--spacing-xl); }
+
+/* Grid Areas */
+.l-grid--areas {
+  grid-template-areas: 
+    "header header header"
+    "sidebar main main"
+    "footer footer footer";
+}
+
+.l-grid__header { grid-area: header; }
+.l-grid__sidebar { grid-area: sidebar; }
+.l-grid__main { grid-area: main; }
+.l-grid__footer { grid-area: footer; }
+
+/* Grid Item Spans */
+.l-grid__item--span-2 { grid-column: span 2; }
+.l-grid__item--span-3 { grid-column: span 3; }
+.l-grid__item--span-4 { grid-column: span 4; }
+.l-grid__item--span-full { grid-column: 1 / -1; }
+
+/* Grid Item Alignment */
+.l-grid--items-start { align-items: start; }
+.l-grid--items-center { align-items: center; }
+.l-grid--items-end { align-items: end; }
+
+.l-grid--justify-start { justify-items: start; }
+.l-grid--justify-center { justify-items: center; }
+.l-grid--justify-end { justify-items: end; }
+
+/* Responsive Grid Layouts */
+@media (max-width: 575.98px) {
+  .l-grid--responsive {
+    grid-template-columns: 1fr;
+  }
+  
+  .l-grid__item--span-2,
+  .l-grid__item--span-3,
+  .l-grid__item--span-4 {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (min-width: 576px) and (max-width: 767.98px) {
+  .l-grid--4,
+  .l-grid--5,
+  .l-grid--6 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (min-width: 768px) and (max-width: 991.98px) {
+  .l-grid--5,
+  .l-grid--6 {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+/* Special Grid Layouts */
+.l-grid--dashboard {
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: var(--spacing-lg);
+}
+
+.l-grid--gallery {
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: var(--spacing-sm);
+}
+
+.l-grid--features {
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: var(--spacing-xl);
+}
+
+/* Grid with Sidebar */
+.l-grid--with-sidebar {
+  display: grid;
+  gap: var(--spacing-lg);
+}
+
+@media (min-width: 992px) {
+  .l-grid--with-sidebar {
+    grid-template-columns: var(--sidebar-width) 1fr;
+  }
+  
+  .l-grid--with-sidebar.is-collapsed {
+    grid-template-columns: var(--sidebar-width-collapsed) 1fr;
+  }
+}
+
+/* Print Styles */
+@media print {
+  .l-grid {
+    display: block;
+  }
+  
+  .l-grid > * {
+    margin-bottom: var(--spacing-lg);
+  }
+  
+  .l-grid > *:last-child {
+    margin-bottom: 0;
+  }
+}

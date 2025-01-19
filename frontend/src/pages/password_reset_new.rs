@@ -136,69 +136,75 @@ pub fn password_reset_new() -> Html {
         form.new_password == form.confirm_password;
 
     html! {
-        <div class="form-container">
-            <h1>{"Set New Password"}</h1>
-            <form {onsubmit}>
-                    <div class="form-group">
-                        <label for="new_password">{"New Password"}</label>
-                        <input
-                            type="password"
-                            id="new_password"
-                            name="new_password"
-                            value={form.new_password.clone()}
-                            oninput={oninput.clone()}
-                            required=true
-                            minlength="8"
-                        />
+        <div class="auth">
+            <div class="auth__card">
+                <div class="auth__header">
+                    <h1 class="auth__title">{"Set New Password"}</h1>
+                </div>
+                <form {onsubmit} class="auth__form">
+                <div class="auth__form-group">
+                    <label class="auth__label" for="new_password">{"New Password"}</label>
+                    <input
+                        class="auth__input"
+                        type="password"
+                        id="new_password"
+                        name="new_password"
+                        value={form.new_password.clone()}
+                        oninput={oninput.clone()}
+                        required=true
+                        minlength="8"
+                    />
+                </div>
+                <div class="auth__form-group">
+                    <label class="auth__label" for="confirm_password">{"Confirm Password"}</label>
+                    <input
+                        class="auth__input"
+                        type="password"
+                        id="confirm_password"
+                        name="confirm_password"
+                        value={form.confirm_password.clone()}
+                        oninput={oninput.clone()}
+                        required=true
+                        minlength="8"
+                    />
+                </div>
+                <div class="auth__requirements">
+                    <div class={classes!("auth__requirement", password_requirements[0].then(|| "auth__requirement--met"))}>
+                        <i class="fas fa-check"></i>
+                        <span>{ "At least 8 characters" }</span>
                     </div>
-                    <div class="form-group">
-                        <label for="confirm_password">{"Confirm Password"}</label>
-                        <input
-                            type="password"
-                            id="confirm_password"
-                            name="confirm_password"
-                            value={form.confirm_password.clone()}
-                            oninput={oninput.clone()}
-                            required=true
-                            minlength="8"
-                        />
+                    <div class={classes!("auth__requirement", password_requirements[1].then(|| "auth__requirement--met"))}>
+                        <i class="fas fa-check"></i>
+                        <span>{ "Uppercase letter" }</span>
                     </div>
-                    <div class="password-requirements">
-                        <div class={classes!("requirement", password_requirements[0].then(|| "met"))}>
-                            <i class="fas fa-check"></i>
-                            <span>{ "At least 8 characters" }</span>
-                        </div>
-                        <div class={classes!("requirement", password_requirements[1].then(|| "met"))}>
-                            <i class="fas fa-check"></i>
-                            <span>{ "Uppercase letter" }</span>
-                        </div>
-                        <div class={classes!("requirement", password_requirements[2].then(|| "met"))}>
-                            <i class="fas fa-check"></i>
-                            <span>{ "Lowercase letter" }</span>
-                        </div>
-                        <div class={classes!("requirement", password_requirements[3].then(|| "met"))}>
-                            <i class="fas fa-check"></i>
-                            <span>{ "Number" }</span>
-                        </div>
-                        <div class={classes!("requirement", password_requirements[4].then(|| "met"))}>
-                            <i class="fas fa-check"></i>
-                            <span>{ "Special character" }</span>
-                        </div>
+                    <div class={classes!("auth__requirement", password_requirements[2].then(|| "auth__requirement--met"))}>
+                        <i class="fas fa-check"></i>
+                        <span>{ "Lowercase letter" }</span>
                     </div>
-                    <button type="submit" class="form-button" disabled={*is_loading || !form_is_valid}>
-                        if *is_loading {
-                            {"Updating Password..."}
-                        } else {
-                            {"Update Password"}
-                        }
-                    </button>
+                    <div class={classes!("auth__requirement", password_requirements[3].then(|| "auth__requirement--met"))}>
+                        <i class="fas fa-check"></i>
+                        <span>{ "Number" }</span>
+                    </div>
+                    <div class={classes!("auth__requirement", password_requirements[4].then(|| "auth__requirement--met"))}>
+                        <i class="fas fa-check"></i>
+                        <span>{ "Special character" }</span>
+                    </div>
+                </div>
+                <button type="submit" class="auth__button" disabled={*is_loading || !form_is_valid}>
+                    if *is_loading {
+                        {"Updating Password..."}
+                    } else {
+                        {"Update Password"}
+                    }
+                </button>
                 </form>
                 if let Some(err) = &*error {
-                    <div class="error-message">{err}</div>
+                    <div class="auth__error">{err}</div>
                 }
                 if let Some(msg) = &*success {
-                    <div class="success-message">{msg}</div>
+                    <div class="auth__success">{msg}</div>
                 }
+            </div>
         </div>
     }
 }

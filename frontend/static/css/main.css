@@ -1,0 +1,134 @@
+/**
+ * Main CSS Entry Point
+ * Core styles and shared components that should be available across all pages
+ */
+
+/* Core Styles - Essential Design System */
+@import './core/variables.css';  /* Design tokens and theme variables */
+@import './core/reset.css';      /* Modern CSS reset */
+@import './core/base.css';       /* Base element styles */
+
+/* Layout Components - Structural Elements */
+@import './layouts/grid.css';      /* Grid system */
+@import './layouts/containers.css'; /* Container layouts */
+
+/* Components - Reusable UI Elements */
+@import './components/nav/navbar.css';    /* Main navigation */
+@import './components/nav/sidebar.css';   /* Sidebar navigation */
+@import './components/footer.css';        /* Footer component */
+@import './components/buttons.css';       /* Button styles */
+@import './components/cards.css';         /* Card containers */
+@import './components/loaders.css';       /* Loading indicators */
+
+/* Form Components */
+@import './components/forms/inputs.css';     /* Form inputs */
+@import './components/forms/validation.css'; /* Form validation */
+
+/* Page Styles */
+@import './pages/auth/index.css';         /* Authentication pages */
+
+/* Utility Classes */
+@import './utils/animations.css';   /* Animation utilities */
+@import './utils/helpers.css';      /* Helper classes */
+@import './utils/breakpoints.css';  /* Responsive utilities */
+
+/**
+ * Critical CSS
+ */
+.critical {
+  display: block;
+  visibility: visible;
+  opacity: 1;
+}
+
+/**
+ * Performance Optimizations
+ */
+* {
+  /* Optimize GPU acceleration */
+  transform: translateZ(0);
+  backface-visibility: hidden;
+  perspective: 1000px;
+}
+
+/* Content-visibility optimization */
+.optimize-visibility {
+  content-visibility: auto;
+  contain-intrinsic-size: 0 500px;
+}
+
+/* Reduce layout shifts */
+.prevent-shift {
+  contain: layout style;
+}
+
+/* Layer promotion for animations */
+.promote-layer {
+  will-change: transform;
+}
+
+/**
+ * Media Queries
+ */
+
+/* Dark Mode */
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+  }
+}
+
+/* High Contrast Mode */
+@media (prefers-contrast: high) {
+  :root {
+    --color-primary: #006600;
+    --color-error: #cc0000;
+    --color-success: #006600;
+    text-underline-offset: 3px;
+    text-decoration-thickness: 2px;
+  }
+}
+
+/* Reduced Motion */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Print Styles */
+@media print {
+  @page {
+    margin: 2cm;
+  }
+
+  body {
+    font: 13pt Georgia, "Times New Roman", Times, serif;
+    line-height: 1.3;
+    background: #fff !important;
+    color: #000;
+    min-height: 0;
+  }
+
+  h1 { font-size: 24pt; }
+  h2, h3, h4 { font-size: 14pt; margin-top: 25px; }
+
+  a, blockquote, h1, h2, h3, h4, h5, h6, img, table, pre {
+    page-break-inside: avoid;
+  }
+
+  h1, h2, h3, h4, h5, h6, img {
+    page-break-after: avoid;
+  }
+
+  ul, ol, dl {
+    page-break-before: avoid;
+  }
+
+  .no-print {
+    display: none !important;
+  }
+}

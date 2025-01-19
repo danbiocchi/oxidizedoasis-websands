@@ -1,0 +1,159 @@
+/**
+ * Breakpoint Utilities
+ * Responsive design breakpoints and utilities
+ */
+
+/* Base Breakpoint Variables */
+:root {
+  --breakpoint-xs: 320px;  /* Small phones */
+  --breakpoint-sm: 576px;  /* Large phones */
+  --breakpoint-md: 768px;  /* Tablets */
+  --breakpoint-lg: 992px;  /* Laptops/Desktops */
+  --breakpoint-xl: 1200px; /* Large Desktops */
+  --breakpoint-2xl: 1400px; /* Extra Large Desktops */
+}
+
+/* Responsive Container Classes */
+.u-container {
+  width: 100%;
+  margin-right: auto;
+  margin-left: auto;
+  padding-right: var(--spacing-base);
+  padding-left: var(--spacing-base);
+}
+
+@media (min-width: 576px) {
+  .u-container {
+    max-width: 540px;
+  }
+}
+
+@media (min-width: 768px) {
+  .u-container {
+    max-width: 720px;
+  }
+}
+
+@media (min-width: 992px) {
+  .u-container {
+    max-width: 960px;
+  }
+}
+
+@media (min-width: 1200px) {
+  .u-container {
+    max-width: 1140px;
+  }
+}
+
+@media (min-width: 1400px) {
+  .u-container {
+    max-width: 1320px;
+  }
+}
+
+/* Responsive Display Utilities */
+@media (max-width: 575.98px) {
+  .u-hidden-xs {
+    display: none !important;
+  }
+}
+
+@media (min-width: 576px) and (max-width: 767.98px) {
+  .u-hidden-sm {
+    display: none !important;
+  }
+}
+
+@media (min-width: 768px) and (max-width: 991.98px) {
+  .u-hidden-md {
+    display: none !important;
+  }
+}
+
+@media (min-width: 992px) and (max-width: 1199.98px) {
+  .u-hidden-lg {
+    display: none !important;
+  }
+}
+
+@media (min-width: 1200px) and (max-width: 1399.98px) {
+  .u-hidden-xl {
+    display: none !important;
+  }
+}
+
+@media (min-width: 1400px) {
+  .u-hidden-2xl {
+    display: none !important;
+  }
+}
+
+/* Show utilities */
+@media (min-width: 576px) {
+  .u-show-sm-up {
+    display: block !important;
+  }
+}
+
+@media (min-width: 768px) {
+  .u-show-md-up {
+    display: block !important;
+  }
+}
+
+@media (min-width: 992px) {
+  .u-show-lg-up {
+    display: block !important;
+  }
+}
+
+@media (min-width: 1200px) {
+  .u-show-xl-up {
+    display: block !important;
+  }
+}
+
+/* Responsive Text Alignment */
+@media (max-width: 575.98px) {
+  .u-text-left-xs { text-align: left !important; }
+  .u-text-center-xs { text-align: center !important; }
+  .u-text-right-xs { text-align: right !important; }
+}
+
+@media (min-width: 576px) and (max-width: 767.98px) {
+  .u-text-left-sm { text-align: left !important; }
+  .u-text-center-sm { text-align: center !important; }
+  .u-text-right-sm { text-align: right !important; }
+}
+
+@media (min-width: 768px) and (max-width: 991.98px) {
+  .u-text-left-md { text-align: left !important; }
+  .u-text-center-md { text-align: center !important; }
+  .u-text-right-md { text-align: right !important; }
+}
+
+/* Responsive Spacing */
+@media (max-width: 575.98px) {
+  .u-m-xs-0 { margin: 0 !important; }
+  .u-p-xs-0 { padding: 0 !important; }
+}
+
+@media (min-width: 576px) and (max-width: 767.98px) {
+  .u-m-sm-0 { margin: 0 !important; }
+  .u-p-sm-0 { padding: 0 !important; }
+}
+
+@media (min-width: 768px) and (max-width: 991.98px) {
+  .u-m-md-0 { margin: 0 !important; }
+  .u-p-md-0 { padding: 0 !important; }
+}
+
+/* Print Breakpoint */
+@media print {
+  .u-container {
+    max-width: none;
+    padding: 0;
+    margin: 0;
+  }
+}

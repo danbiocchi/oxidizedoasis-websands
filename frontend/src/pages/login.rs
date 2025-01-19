@@ -121,12 +121,16 @@ pub fn login() -> Html {
     };
 
     html! {
-        <div class="form-container">
-            <h1>{"Login to Cipher Horizon"}</h1>
-            <form {onsubmit}>
-                <div class="form-group">
-                    <label for="username">{"Username"}</label>
+        <div class="auth auth--login">
+            <div class="auth__card">
+                <div class="auth__header">
+                    <h1 class="auth__title">{"Login to Cipher Horizon"}</h1>
+                </div>
+                <form {onsubmit} class="auth__form">
+                <div class="auth__form-group">
+                    <label class="auth__label" for="username">{"Username"}</label>
                     <input
+                        class="auth__input"
                         type="text"
                         id="username"
                         name="username"
@@ -135,9 +139,10 @@ pub fn login() -> Html {
                         required=true
                     />
                 </div>
-                <div class="form-group">
-                    <label for="password">{"Password"}</label>
+                <div class="auth__form-group">
+                    <label class="auth__label" for="password">{"Password"}</label>
                     <input
+                        class="auth__input"
                         type="password"
                         id="password"
                         name="password"
@@ -146,19 +151,22 @@ pub fn login() -> Html {
                         required=true
                     />
                 </div>
-                <button type="submit" class="form-button" disabled={*is_loading}>
-                        if *is_loading {
-                            {"Logging in..."}
-                        } else {
-                            {"Login"}
-                        }
-                    </button>
-            </form>
-            if let Some(err) = &*error {
-                <div class="error-message">{err}</div>
-            }
-            <Link<Route> to={Route::Register} classes="form-link">{ "Don't have an account?" }</Link<Route>>
-            <Link<Route> to={Route::PasswordResetRequest} classes="form-link">{ "Forgot Password?" }</Link<Route>>
+                <button type="submit" class="auth__button" disabled={*is_loading}>
+                    if *is_loading {
+                        {"Logging in..."}
+                    } else {
+                        {"Login"}
+                    }
+                </button>
+                </form>
+                if let Some(err) = &*error {
+                    <div class="auth__error">{err}</div>
+                }
+                <div class="auth__links">
+                    <Link<Route> to={Route::Register} classes="auth__link">{ "Don't have an account?" }</Link<Route>>
+                    <Link<Route> to={Route::PasswordResetRequest} classes="auth__link">{ "Forgot Password?" }</Link<Route>>
+                </div>
+            </div>
         </div>
     }
 }

@@ -142,12 +142,16 @@ pub fn register() -> Html {
         && password_requirements.iter().all(|&x| x);
 
     html! {
-        <div class="form-container">
-            <h1>{ "Sign Up to Cipher Horizon" }</h1>
-            <form {onsubmit}>
-                <div class="form-group">
-                    <label for="username">{ "Username" }</label>
+        <div class="auth auth--register">
+            <div class="auth__card">
+                <div class="auth__header">
+                    <h1 class="auth__title">{ "Sign Up to Cipher Horizon" }</h1>
+                </div>
+                <form {onsubmit} class="auth__form">
+                <div class="auth__form-group">
+                    <label class="auth__label" for="username">{ "Username" }</label>
                     <input
+                        class="auth__input"
                         type="text"
                         id="username"
                         name="username"
@@ -156,9 +160,10 @@ pub fn register() -> Html {
                         required=true
                     />
                 </div>
-                <div class="form-group">
-                    <label for="email">{ "Email" }</label>
+                <div class="auth__form-group">
+                    <label class="auth__label" for="email">{ "Email" }</label>
                     <input
+                        class="auth__input"
                         type="email"
                         id="email"
                         name="email"
@@ -167,9 +172,10 @@ pub fn register() -> Html {
                         required=true
                     />
                 </div>
-                <div class="form-group">
-                    <label for="password">{ "Password" }</label>
+                <div class="auth__form-group">
+                    <label class="auth__label" for="password">{ "Password" }</label>
                     <input
+                        class="auth__input"
                         type="password"
                         id="password"
                         name="password"
@@ -178,36 +184,39 @@ pub fn register() -> Html {
                         required=true
                     />
                 </div>
-                <div class="password-requirements">
-                    <div class={classes!("requirement", password_requirements[0].then(|| "met"))}>
+                <div class="auth__requirements">
+                    <div class={classes!("auth__requirement", password_requirements[0].then(|| "auth__requirement--met"))}>
                         <i class="fas fa-check"></i>
                         <span>{ "At least 8 characters" }</span>
                     </div>
-                    <div class={classes!("requirement", password_requirements[1].then(|| "met"))}>
+                    <div class={classes!("auth__requirement", password_requirements[1].then(|| "auth__requirement--met"))}>
                         <i class="fas fa-check"></i>
                         <span>{ "Uppercase letter" }</span>
                     </div>
-                    <div class={classes!("requirement", password_requirements[2].then(|| "met"))}>
+                    <div class={classes!("auth__requirement", password_requirements[2].then(|| "auth__requirement--met"))}>
                         <i class="fas fa-check"></i>
                         <span>{ "Lowercase letter" }</span>
                     </div>
-                    <div class={classes!("requirement", password_requirements[3].then(|| "met"))}>
+                    <div class={classes!("auth__requirement", password_requirements[3].then(|| "auth__requirement--met"))}>
                         <i class="fas fa-check"></i>
                         <span>{ "Number" }</span>
                     </div>
-                    <div class={classes!("requirement", password_requirements[4].then(|| "met"))}>
+                    <div class={classes!("auth__requirement", password_requirements[4].then(|| "auth__requirement--met"))}>
                         <i class="fas fa-check"></i>
                         <span>{ "Special character" }</span>
                     </div>
                 </div>
-                    <button type="submit" class="form-button" disabled={*is_loading || !form_is_valid}>
-                        { if *is_loading { "Signing Up..." } else { "Sign Up" } }
-                    </button>
+                <button type="submit" class="auth__button" disabled={*is_loading || !form_is_valid}>
+                    { if *is_loading { "Signing Up..." } else { "Sign Up" } }
+                </button>
                 </form>
                 if let Some(err) = &*error {
-                    <div class="error-message">{ err }</div>
+                    <div class="auth__error">{ err }</div>
                 }
-                <Link<Route> to={Route::Login} classes="form-link">{ "Already have an account? Log in" }</Link<Route>>
+                <div class="auth__links">
+                    <Link<Route> to={Route::Login} classes="auth__link">{ "Already have an account? Log in" }</Link<Route>>
+                </div>
+            </div>
         </div>
     }
 }

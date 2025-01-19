@@ -193,6 +193,12 @@ async fn main() -> std::io::Result<()> {
 
             // Serve static files with proper MIME types
             .service(
+                fs::Files::new("/static/css", "./frontend/static/css")
+                    .prefer_utf8(true)
+                    .use_last_modified(true)
+                    .show_files_listing()
+            )
+            .service(
                 fs::Files::new("/", "./frontend/dist")
                     .index_file("index.html")
                     .prefer_utf8(true)

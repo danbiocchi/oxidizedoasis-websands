@@ -1,0 +1,12 @@
+/**
+ * About Page Bundle
+ * Imports all styles needed for the about page
+ */
+
+/* Import shared components needed for about page */
+@import '/static/css/components/nav/navbar.css';
+@import '/static/css/components/cards.css';
+@import '/static/css/components/buttons.css';
+
+/* Import about-specific styles */
+@import './about.css';

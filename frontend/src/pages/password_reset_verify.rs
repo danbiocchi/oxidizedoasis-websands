@@ -97,25 +97,29 @@ pub fn password_reset_verify() -> Html {
     }
 
     html! {
-        <div class="form-container">
-            <h1>{"Verifying Reset Link"}</h1>
-            if *is_loading {
-                <div class="loading-container">
-                    <div class="loading-spinner"></div>
-                    <p>{"Verifying your password reset link..."}</p>
+        <div class="auth">
+            <div class="auth__card">
+                <div class="auth__header">
+                    <h1 class="auth__title">{"Verifying Reset Link"}</h1>
                 </div>
-            } else if let Some(err) = &*error {
-                <div class="error-message">{err}</div>
-                <div class="form-links">
-                    <Link<Route> to={Route::PasswordResetRequest} classes="form-link">
-                        {"Request a new reset link"}
-                    </Link<Route>>
-                    <span class="form-link-separator">{"or"}</span>
-                    <Link<Route> to={Route::Login} classes="form-link">
-                        {"return to login"}
-                    </Link<Route>>
-                </div>
-            }
+                if *is_loading {
+                    <div class="auth__loading">
+                        <div class="auth__spinner"></div>
+                        <p class="auth__subtitle">{"Verifying your password reset link..."}</p>
+                    </div>
+                } else if let Some(err) = &*error {
+                    <div class="auth__error">{err}</div>
+                    <div class="auth__links">
+                        <Link<Route> to={Route::PasswordResetRequest} classes="auth__link">
+                            {"Request a new reset link"}
+                        </Link<Route>>
+                        <span class="auth__separator">{"or"}</span>
+                        <Link<Route> to={Route::Login} classes="auth__link">
+                            {"return to login"}
+                        </Link<Route>>
+                    </div>
+                }
+            </div>
         </div>
     }
 }

@@ -1,0 +1,171 @@
+/**
+ * Helper Utilities
+ * Common utility classes for spacing, typography, and layout
+ */
+
+/* Display */
+.u-block { display: block !important; }
+.u-inline { display: inline !important; }
+.u-inline-block { display: inline-block !important; }
+.u-flex { display: flex !important; }
+.u-inline-flex { display: inline-flex !important; }
+.u-grid { display: grid !important; }
+.u-hidden { display: none !important; }
+
+/* Flex Utilities */
+.u-flex-row { flex-direction: row !important; }
+.u-flex-column { flex-direction: column !important; }
+.u-flex-wrap { flex-wrap: wrap !important; }
+.u-flex-nowrap { flex-wrap: nowrap !important; }
+.u-flex-1 { flex: 1 1 0% !important; }
+.u-flex-auto { flex: 1 1 auto !important; }
+.u-flex-initial { flex: 0 1 auto !important; }
+.u-flex-none { flex: none !important; }
+
+/* Flex Alignment */
+.u-items-start { align-items: flex-start !important; }
+.u-items-end { align-items: flex-end !important; }
+.u-items-center { align-items: center !important; }
+.u-items-baseline { align-items: baseline !important; }
+.u-items-stretch { align-items: stretch !important; }
+
+.u-justify-start { justify-content: flex-start !important; }
+.u-justify-end { justify-content: flex-end !important; }
+.u-justify-center { justify-content: center !important; }
+.u-justify-between { justify-content: space-between !important; }
+.u-justify-around { justify-content: space-around !important; }
+
+/* Spacing Utilities */
+.u-m-0 { margin: 0 !important; }
+.u-m-xs { margin: var(--spacing-xs) !important; }
+.u-m-sm { margin: var(--spacing-sm) !important; }
+.u-m-base { margin: var(--spacing-base) !important; }
+.u-m-lg { margin: var(--spacing-lg) !important; }
+.u-m-xl { margin: var(--spacing-xl) !important; }
+.u-m-2xl { margin: var(--spacing-2xl) !important; }
+.u-m-3xl { margin: var(--spacing-3xl) !important; }
+
+.u-mt-0 { margin-top: 0 !important; }
+.u-mr-0 { margin-right: 0 !important; }
+.u-mb-0 { margin-bottom: 0 !important; }
+.u-ml-0 { margin-left: 0 !important; }
+
+.u-mt-xs { margin-top: var(--spacing-xs) !important; }
+.u-mr-xs { margin-right: var(--spacing-xs) !important; }
+.u-mb-xs { margin-bottom: var(--spacing-xs) !important; }
+.u-ml-xs { margin-left: var(--spacing-xs) !important; }
+
+.u-mt-sm { margin-top: var(--spacing-sm) !important; }
+.u-mr-sm { margin-right: var(--spacing-sm) !important; }
+.u-mb-sm { margin-bottom: var(--spacing-sm) !important; }
+.u-ml-sm { margin-left: var(--spacing-sm) !important; }
+
+.u-mt-base { margin-top: var(--spacing-base) !important; }
+.u-mr-base { margin-right: var(--spacing-base) !important; }
+.u-mb-base { margin-bottom: var(--spacing-base) !important; }
+.u-ml-base { margin-left: var(--spacing-base) !important; }
+
+.u-mt-lg { margin-top: var(--spacing-lg) !important; }
+.u-mr-lg { margin-right: var(--spacing-lg) !important; }
+.u-mb-lg { margin-bottom: var(--spacing-lg) !important; }
+.u-ml-lg { margin-left: var(--spacing-lg) !important; }
+
+.u-mt-xl { margin-top: var(--spacing-xl) !important; }
+.u-mr-xl { margin-right: var(--spacing-xl) !important; }
+.u-mb-xl { margin-bottom: var(--spacing-xl) !important; }
+.u-ml-xl { margin-left: var(--spacing-xl) !important; }
+
+/* Padding Utilities */
+.u-p-0 { padding: 0 !important; }
+.u-p-xs { padding: var(--spacing-xs) !important; }
+.u-p-sm { padding: var(--spacing-sm) !important; }
+.u-p-base { padding: var(--spacing-base) !important; }
+.u-p-lg { padding: var(--spacing-lg) !important; }
+.u-p-xl { padding: var(--spacing-xl) !important; }
+.u-p-2xl { padding: var(--spacing-2xl) !important; }
+.u-p-3xl { padding: var(--spacing-3xl) !important; }
+
+/* Typography */
+.u-text-xs { font-size: var(--font-size-xs) !important; }
+.u-text-sm { font-size: var(--font-size-sm) !important; }
+.u-text-base { font-size: var(--font-size-base) !important; }
+.u-text-lg { font-size: var(--font-size-lg) !important; }
+.u-text-xl { font-size: var(--font-size-xl) !important; }
+.u-text-2xl { font-size: var(--font-size-2xl) !important; }
+.u-text-3xl { font-size: var(--font-size-3xl) !important; }
+.u-text-4xl { font-size: var(--font-size-4xl) !important; }
+
+.u-font-thin { font-weight: 100 !important; }
+.u-font-light { font-weight: 300 !important; }
+.u-font-normal { font-weight: 400 !important; }
+.u-font-medium { font-weight: 500 !important; }
+.u-font-semibold { font-weight: 600 !important; }
+.u-font-bold { font-weight: 700 !important; }
+
+.u-text-left { text-align: left !important; }
+.u-text-center { text-align: center !important; }
+.u-text-right { text-align: right !important; }
+
+.u-text-primary { color: var(--color-primary) !important; }
+.u-text-error { color: var(--color-error) !important; }
+.u-text-success { color: var(--color-success) !important; }
+.u-text-warning { color: var(--color-warning) !important; }
+.u-text-info { color: var(--color-info) !important; }
+
+/* Position */
+.u-relative { position: relative !important; }
+.u-absolute { position: absolute !important; }
+.u-fixed { position: fixed !important; }
+.u-sticky { position: sticky !important; }
+
+/* Width & Height */
+.u-w-full { width: 100% !important; }
+.u-h-full { height: 100% !important; }
+.u-w-screen { width: 100vw !important; }
+.u-h-screen { height: 100vh !important; }
+
+/* Overflow */
+.u-overflow-hidden { overflow: hidden !important; }
+.u-overflow-auto { overflow: auto !important; }
+.u-overflow-scroll { overflow: scroll !important; }
+
+/* Visibility */
+.u-visible { visibility: visible !important; }
+.u-invisible { visibility: hidden !important; }
+
+/* Z-index */
+.u-z-0 { z-index: 0 !important; }
+.u-z-10 { z-index: 10 !important; }
+.u-z-20 { z-index: 20 !important; }
+.u-z-30 { z-index: 30 !important; }
+.u-z-40 { z-index: 40 !important; }
+.u-z-50 { z-index: 50 !important; }
+
+/* Print */
+@media print {
+  .u-print-hidden {
+    display: none !important;
+  }
+}
+
+/* Screen Readers */
+.u-sr-only {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  margin: -1px !important;
+  overflow: hidden !important;
+  clip: rect(0, 0, 0, 0) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
+}
+
+.u-sr-only-focusable:focus {
+  position: static !important;
+  width: auto !important;
+  height: auto !important;
+  overflow: visible !important;
+  clip: auto !important;
+  white-space: normal !important;
+}

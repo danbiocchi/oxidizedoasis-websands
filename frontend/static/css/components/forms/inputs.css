@@ -1,0 +1,240 @@
+/**
+ * Form Input Components
+ * Styles for form controls and input elements
+ */
+
+/* Base Input */
+.c-input {
+  display: block;
+  width: 100%;
+  padding: var(--input-padding);
+  font-size: var(--font-size-base);
+  line-height: 1.5;
+  color: var(--color-text);
+  background-color: var(--color-surface);
+  border: var(--input-border-width) solid var(--input-border-color);
+  border-radius: var(--input-border-radius);
+  transition: var(--transition-base);
+}
+
+.c-input:focus {
+  outline: none;
+  border-color: var(--input-focus-border-color);
+  box-shadow: 0 0 0 var(--input-focus-ring-width) var(--input-focus-ring-color);
+}
+
+/* Input Sizes */
+.c-input--sm {
+  padding: var(--spacing-xs) var(--spacing-sm);
+  font-size: var(--font-size-sm);
+}
+
+.c-input--lg {
+  padding: var(--spacing-base) var(--spacing-lg);
+  font-size: var(--font-size-lg);
+}
+
+/* Input States */
+.c-input:disabled,
+.c-input.is-disabled {
+  background-color: var(--color-background);
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.c-input.is-error {
+  border-color: var(--color-error);
+}
+
+.c-input.is-error:focus {
+  box-shadow: 0 0 0 var(--input-focus-ring-width) rgba(220, 53, 69, 0.25);
+}
+
+.c-input.is-success {
+  border-color: var(--color-success);
+}
+
+.c-input.is-success:focus {
+  box-shadow: 0 0 0 var(--input-focus-ring-width) rgba(40, 167, 69, 0.25);
+}
+
+/* Input Group */
+.c-input-group {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  width: 100%;
+}
+
+.c-input-group .c-input {
+  position: relative;
+  flex: 1 1 auto;
+  width: 1%;
+  min-width: 0;
+}
+
+.c-input-group .c-input:not(:first-child) {
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+}
+
+.c-input-group .c-input:not(:last-child) {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+/* Input Addons */
+.c-input-group__addon {
+  display: flex;
+  align-items: center;
+  padding: var(--spacing-sm) var(--spacing-base);
+  font-size: var(--font-size-base);
+  font-weight: 400;
+  line-height: 1.5;
+  color: var(--color-text);
+  text-align: center;
+  background-color: var(--color-background);
+  border: var(--input-border-width) solid var(--input-border-color);
+}
+
+.c-input-group__addon:first-child {
+  border-right: 0;
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.c-input-group__addon:last-child {
+  border-left: 0;
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+}
+
+/* Textarea */
+.c-textarea {
+  min-height: 100px;
+  resize: vertical;
+}
+
+/* Select */
+.c-select {
+  padding-right: var(--spacing-xl);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='4' viewBox='0 0 8 4'%3E%3Cpath fill='%236C757D' d='M0 0l4 4 4-4z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right var(--spacing-base) center;
+  background-size: 8px 4px;
+  appearance: none;
+}
+
+/* Checkbox and Radio */
+.c-checkbox,
+.c-radio {
+  position: relative;
+  display: inline-block;
+  min-height: 1.5rem;
+  padding-left: 1.75rem;
+}
+
+.c-checkbox__input,
+.c-radio__input {
+  position: absolute;
+  left: 0;
+  width: 1.25rem;
+  height: 1.25rem;
+  opacity: 0;
+  z-index: -1;
+}
+
+.c-checkbox__label,
+.c-radio__label {
+  position: relative;
+  margin-bottom: 0;
+  vertical-align: top;
+}
+
+.c-checkbox__label::before,
+.c-radio__label::before {
+  content: '';
+  position: absolute;
+  left: -1.75rem;
+  display: block;
+  width: 1.25rem;
+  height: 1.25rem;
+  background-color: var(--color-surface);
+  border: var(--input-border-width) solid var(--input-border-color);
+}
+
+.c-checkbox__label::before {
+  border-radius: var(--border-radius-sm);
+}
+
+.c-radio__label::before {
+  border-radius: 50%;
+}
+
+.c-checkbox__input:checked ~ .c-checkbox__label::before {
+  background-color: var(--color-primary);
+  border-color: var(--color-primary);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='10' viewBox='0 0 12 10'%3E%3Cpath fill='none' stroke='%23FFFFFF' stroke-width='2' d='M1 5l3 3 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: center;
+}
+
+.c-radio__input:checked ~ .c-radio__label::before {
+  border-color: var(--color-primary);
+  background-color: var(--color-primary);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='8' viewBox='0 0 8 8'%3E%3Ccircle fill='%23FFFFFF' cx='4' cy='4' r='4'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 8px;
+}
+
+/* Dark Mode */
+@media (prefers-color-scheme: dark) {
+  .c-input,
+  .c-select {
+    background-color: var(--color-surface-dark);
+    border-color: rgba(255, 255, 255, 0.1);
+    color: var(--color-text-dark-mode);
+  }
+
+  .c-input:disabled,
+  .c-select:disabled {
+    background-color: rgba(255, 255, 255, 0.05);
+  }
+
+  .c-input-group__addon {
+    background-color: rgba(255, 255, 255, 0.05);
+    border-color: rgba(255, 255, 255, 0.1);
+    color: var(--color-text-dark-mode);
+  }
+
+  .c-checkbox__label::before,
+  .c-radio__label::before {
+    background-color: var(--color-surface-dark);
+    border-color: rgba(255, 255, 255, 0.1);
+  }
+}
+
+/* High Contrast Mode */
+@media (prefers-contrast: high) {
+  .c-input,
+  .c-select,
+  .c-checkbox__label::before,
+  .c-radio__label::before {
+    border-width: 2px;
+  }
+}
+
+/* Print Styles */
+@media print {
+  .c-input,
+  .c-select {
+    border: 1px solid #000;
+  }
+
+  .c-input:disabled,
+  .c-select:disabled {
+    background-color: #fff;
+  }
+}

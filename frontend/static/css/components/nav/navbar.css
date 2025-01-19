@@ -1,0 +1,183 @@
+/**
+ * Navbar Component
+ * Main navigation bar styles
+ */
+
+/* Navbar Container */
+.c-navbar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: var(--header-height);
+  background-color: var(--color-surface);
+  box-shadow: var(--shadow-sm);
+  z-index: var(--z-index-fixed);
+  transition: var(--transition-base);
+}
+
+/* Navbar Content */
+.c-navbar__content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 100%;
+  padding: 0 var(--spacing-base);
+  max-width: var(--container-max-width);
+  margin: 0 auto;
+}
+
+/* Navbar Brand Group */
+.c-navbar__brand-group {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+/* Navbar Brand */
+.c-navbar__brand {
+  display: flex;
+  align-items: center;
+  font-size: var(--font-size-lg);
+  font-weight: 600;
+  color: var(--color-text);
+  text-decoration: none;
+}
+
+.c-navbar__logo {
+  height: 32px;
+  width: auto;
+}
+
+/* Navbar Navigation */
+.c-navbar__nav {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm); /* Reduced gap to bring About closer to WebSands */
+}
+
+/* Navbar Links */
+.c-navbar__link {
+  position: relative;
+  color: var(--color-text);
+  text-decoration: none;
+  padding: var(--spacing-xs) var(--spacing-sm);
+  font-weight: 500;
+  transition: all var(--transition-base);
+  border-radius: var(--border-radius-sm);
+}
+
+.c-navbar__link:hover {
+  color: var(--color-primary);
+  background-color: var(--color-primary-transparent);
+}
+
+.c-navbar__link.is-active {
+  color: var(--color-primary);
+  background-color: var(--color-primary-transparent);
+}
+
+/* Navbar Actions */
+.c-navbar__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-base);
+}
+
+/* Mobile Menu Button */
+.c-navbar__menu-button {
+  display: none;
+  padding: var(--spacing-xs);
+  color: var(--color-text);
+  cursor: pointer;
+}
+
+/* Mobile Navigation */
+@media (max-width: 767.98px) {
+  .c-navbar__menu-button {
+    display: block;
+  }
+
+  .c-navbar__brand-group {
+    gap: var(--spacing-xs);
+  }
+
+  .c-navbar__nav {
+    position: fixed;
+    top: var(--header-height);
+    left: 0;
+    right: 0;
+    bottom: 0;
+    flex-direction: column;
+    background-color: var(--color-surface);
+    padding: var(--spacing-lg);
+    transform: translateX(-100%);
+    transition: transform var(--transition-base);
+  }
+
+  .c-navbar__nav.is-open {
+    transform: translateX(0);
+  }
+
+  .c-navbar__link {
+    width: 100%;
+    padding: var(--spacing-base);
+    text-align: center;
+  }
+
+  .c-navbar__link.is-active::after {
+    display: none;
+  }
+
+  .c-navbar__actions {
+    margin-top: var(--spacing-xl);
+    flex-direction: column;
+    width: 100%;
+  }
+}
+
+/* Scrolled State */
+.c-navbar.is-scrolled {
+  background-color: var(--color-surface);
+  box-shadow: var(--shadow-lg);
+}
+
+/* Dark Mode */
+@media (prefers-color-scheme: dark) {
+  .c-navbar {
+    background-color: var(--color-surface-dark);
+  }
+
+  .c-navbar.is-scrolled {
+    background-color: var(--color-surface-dark);
+  }
+
+  .c-navbar__link:hover {
+    color: var(--color-primary-light);
+  }
+}
+
+/* High Contrast Mode */
+@media (prefers-contrast: high) {
+  .c-navbar {
+    border-bottom: 2px solid currentColor;
+    box-shadow: none;
+  }
+
+  .c-navbar__link.is-active::after {
+    height: 3px;
+  }
+}
+
+/* Print Styles */
+@media print {
+  .c-navbar {
+    position: static;
+    box-shadow: none;
+    border-bottom: 1px solid #000;
+  }
+
+  .c-navbar__actions {
+    display: none;
+  }
+}

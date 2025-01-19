@@ -1,0 +1,197 @@
+/**
+ * Sidebar Component
+ * Side navigation styles for dashboard and admin areas
+ */
+
+/* Sidebar Container */
+.c-sidebar {
+  position: fixed;
+  top: var(--header-height);
+  left: 0;
+  bottom: 0;
+  width: var(--sidebar-width);
+  background-color: var(--color-surface);
+  border-right: 1px solid rgba(0, 0, 0, 0.1);
+  transition: width var(--transition-smooth);
+  z-index: var(--z-index-fixed);
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+/* Collapsed State */
+.c-sidebar.is-collapsed {
+  width: var(--sidebar-width-collapsed);
+}
+
+/* Sidebar Toggle */
+.c-sidebar__toggle {
+  position: absolute;
+  top: var(--spacing-base);
+  right: var(--spacing-sm);
+  padding: var(--spacing-sm);
+  color: var(--color-text-light);
+  cursor: pointer;
+  transition: var(--transition-base);
+  border-radius: var(--border-radius-full);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: rgba(0, 0, 0, 0.03);
+  width: 32px;
+  height: 32px;
+  z-index: var(--z-index-fixed);
+}
+
+.c-sidebar__toggle:hover {
+  color: var(--color-text);
+  background-color: rgba(0, 0, 0, 0.08);
+}
+
+.c-sidebar__toggle:active {
+  background-color: rgba(0, 0, 0, 0.12);
+}
+
+/* Sidebar Navigation */
+.c-sidebar__nav {
+  padding: var(--spacing-lg) var(--spacing-sm);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+
+/* Sidebar Items */
+.c-sidebar__item {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-base);
+  padding: var(--spacing-sm) var(--spacing-base);
+  color: var(--color-text-light);
+  text-decoration: none;
+  border-radius: var(--border-radius-base);
+  transition: var(--transition-base);
+  cursor: pointer;
+}
+
+.c-sidebar__item:hover {
+  color: var(--color-text);
+  background-color: rgba(0, 0, 0, 0.05);
+}
+
+.c-sidebar__item.is-active {
+  color: var(--color-primary);
+  background-color: rgba(76, 175, 80, 0.1);
+}
+
+/* Sidebar Icons */
+.c-sidebar__item svg {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+}
+
+/* Sidebar Labels */
+.c-sidebar__label {
+  white-space: nowrap;
+  opacity: 1;
+  transition: opacity var(--transition-base);
+}
+
+.c-sidebar.is-collapsed .c-sidebar__label {
+  opacity: 0;
+}
+
+/* Sidebar Groups */
+.c-sidebar__group {
+  margin-bottom: var(--spacing-lg);
+}
+
+.c-sidebar__group-title {
+  padding: var(--spacing-sm) var(--spacing-base);
+  color: var(--color-text-light);
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* Sidebar Footer */
+.c-sidebar__footer {
+  padding: var(--spacing-base);
+  border-top: 1px solid rgba(0, 0, 0, 0.1);
+  margin-top: auto;
+}
+
+/* Dark Mode */
+@media (prefers-color-scheme: dark) {
+  .c-sidebar {
+    background-color: var(--color-surface-dark);
+    border-right-color: rgba(255, 255, 255, 0.1);
+  }
+
+  .c-sidebar__item:hover {
+    background-color: rgba(255, 255, 255, 0.05);
+  }
+
+  .c-sidebar__item.is-active {
+    background-color: rgba(76, 175, 80, 0.2);
+  }
+
+  .c-sidebar__toggle {
+    background-color: rgba(255, 255, 255, 0.05);
+  }
+
+  .c-sidebar__toggle:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+  }
+
+  .c-sidebar__toggle:active {
+    background-color: rgba(255, 255, 255, 0.15);
+  }
+
+  .c-sidebar__footer {
+    border-top-color: rgba(255, 255, 255, 0.1);
+  }
+}
+
+/* High Contrast Mode */
+@media (prefers-contrast: high) {
+  .c-sidebar {
+    border-right-width: 2px;
+  }
+
+  .c-sidebar__item.is-active {
+    border: 2px solid currentColor;
+    background: none;
+  }
+}
+
+/* Reduced Motion */
+@media (prefers-reduced-motion: reduce) {
+  .c-sidebar,
+  .c-sidebar__label {
+    transition: none;
+  }
+}
+
+/* Print Styles */
+@media print {
+  .c-sidebar {
+    display: none;
+  }
+}
+
+/* Mobile Styles */
+@media (max-width: 991.98px) {
+  .c-sidebar {
+    transform: translateX(-100%);
+    transition: transform var(--transition-smooth);
+  }
+
+  .c-sidebar.is-open {
+    transform: translateX(0);
+  }
+
+  .c-sidebar.is-collapsed {
+    transform: translateX(-100%);
+  }
+}

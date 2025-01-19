@@ -1,0 +1,152 @@
+/**
+ * Container System
+ * Layout containers for consistent content width and padding
+ */
+
+/* Base Container */
+.l-container {
+  width: 100%;
+  margin-right: auto;
+  margin-left: auto;
+  padding-right: var(--spacing-base);
+  padding-left: var(--spacing-base);
+  max-width: var(--container-max-width);
+}
+
+/* Container Sizes */
+.l-container--sm {
+  max-width: 640px;
+}
+
+.l-container--md {
+  max-width: 768px;
+}
+
+.l-container--lg {
+  max-width: 1024px;
+}
+
+.l-container--xl {
+  max-width: 1280px;
+}
+
+.l-container--2xl {
+  max-width: 1536px;
+}
+
+/* Container Modifiers */
+.l-container--fluid {
+  max-width: none;
+}
+
+.l-container--narrow {
+  max-width: 65ch;
+}
+
+/* Container Padding Variations */
+.l-container--px-0 {
+  padding-left: 0;
+  padding-right: 0;
+}
+
+.l-container--px-sm {
+  padding-left: var(--spacing-sm);
+  padding-right: var(--spacing-sm);
+}
+
+.l-container--px-lg {
+  padding-left: var(--spacing-lg);
+  padding-right: var(--spacing-lg);
+}
+
+/* Page-specific Containers */
+.l-container--dashboard {
+  display: flex;
+  min-height: calc(100vh - var(--header-height));
+  padding: 0;
+}
+
+.l-container--auth {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: calc(100vh - var(--header-height));
+  padding: var(--spacing-xl) var(--spacing-base);
+}
+
+.l-container--content {
+  padding-top: var(--spacing-2xl);
+  padding-bottom: var(--spacing-2xl);
+}
+
+/* Responsive Container Padding */
+@media (max-width: 575.98px) {
+  .l-container {
+    padding-right: var(--spacing-sm);
+    padding-left: var(--spacing-sm);
+  }
+}
+
+@media (min-width: 992px) {
+  .l-container--dashboard {
+    padding-left: var(--sidebar-width);
+  }
+
+  .l-container--dashboard.is-collapsed {
+    padding-left: var(--sidebar-width-collapsed);
+  }
+}
+
+/* Container with Sidebar */
+.l-container--with-sidebar {
+  display: flex;
+  gap: var(--spacing-xl);
+}
+
+.l-container--with-sidebar__main {
+  flex: 1;
+  min-width: 0; /* Prevent flex item from overflowing */
+}
+
+.l-container--with-sidebar__sidebar {
+  flex-shrink: 0;
+  width: 300px;
+}
+
+@media (max-width: 991.98px) {
+  .l-container--with-sidebar {
+    flex-direction: column;
+  }
+
+  .l-container--with-sidebar__sidebar {
+    width: 100%;
+  }
+}
+
+/* Container with Header */
+.l-container--with-header {
+  padding-top: var(--header-height);
+}
+
+/* Print Styles */
+@media print {
+  .l-container {
+    max-width: none;
+    padding: 0;
+    margin: 0;
+  }
+}
+
+/* High Contrast Mode */
+@media (prefers-contrast: high) {
+  .l-container {
+    border: 1px solid currentColor;
+  }
+}
+
+/* Dark Mode Adjustments */
+@media (prefers-color-scheme: dark) {
+  .l-container--with-header {
+    background-color: var(--color-background-dark);
+  }
+}
