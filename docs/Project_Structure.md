@@ -6,8 +6,7 @@ frontend/
 │   │   ├── mod.rs          # Components module declarations
 │   │   ├── nav.rs          # Navigation bar component
 │   │   ├── footer.rs       # Footer component
-│   │   ├── dashboard.rs    # Dashboard component
-│   │   ├── login.rs        # Login form component
+│   │   ├── icons.rs        # Icon components
 │   │   └── not_found.rs    # 404 page component
 │   │
 │   ├── pages/              # Page-level components
@@ -18,22 +17,58 @@ frontend/
 │   │   ├── login.rs        # Login page
 │   │   ├── register.rs     # Registration page
 │   │   ├── email_verified.rs  # Email verification confirmation
-│   │   └── registration_complete.rs  # Registration success
+│   │   ├── registration_complete.rs  # Registration success
+│   │   ├── password_reset_request.rs # Password reset request page
+│   │   ├── password_reset_verify.rs  # Password reset verification
+│   │   ├── password_reset_new.rs     # New password entry page
+│   │   └── not_found.rs    # 404 page
 │   │
 │   ├── services/           # Business logic and state management
-│   │   ├── lib.rs          # Library entry point
+│   │   ├── mod.rs          # Services module declarations
+│   │   ├── auth.rs         # Authentication service
+│   │   ├── auth_context.rs # Authentication context provider
 │   │   ├── confetti.rs     # Confetti animation service
-│   │   └── auth.rs         # Authentication service
+│   │   ├── confetti_context.rs # Confetti context provider
+│   │   └── reset_token_context.rs # Password reset token context
 │   │
 │   ├── routes.rs           # Route definitions
 │   └── lib.rs              # Main application entry
 │
 ├── static/
-│   └── styles.css          # Global styles
+│   ├── favicon.svg         # Site favicon
+│   └── css/                # Organized CSS structure
+│       ├── main.css        # Main CSS entry point
+│       ├── core/           # Core styles
+│       │   ├── base.css    # Base styles
+│       │   ├── reset.css   # CSS reset
+│       │   └── variables.css # CSS variables
+│       ├── components/     # Component styles
+│       │   ├── buttons.css
+│       │   ├── cards.css
+│       │   ├── footer.css
+│       │   ├── loaders.css
+│       │   ├── forms/
+│       │   │   ├── inputs.css
+│       │   │   └── validation.css
+│       │   └── nav/
+│       │       ├── navbar.css
+│       │       └── sidebar.css
+│       ├── layouts/        # Layout styles
+│       │   ├── containers.css
+│       │   └── grid.css
+│       ├── pages/          # Page-specific styles
+│       │   ├── about/
+│       │   ├── auth/
+│       │   ├── dashboard/
+│       │   └── home/
+│       └── utils/          # Utility styles
+│           ├── animations.css
+│           ├── breakpoints.css
+│           └── helpers.css
 │
 ├── Cargo.toml              # Dependencies and build configuration
-├── index.html             # HTML template
-└── Trunk.toml             # Trunk bundler configuration
+├── index.html              # HTML template
+└── Trunk.toml              # Trunk bundler configuration
 
 src/
 ├── api/
@@ -98,4 +133,8 @@ src/
 │   └── mod.rs
 │
 ├── lib.rs                  # Library exports
-└── main.rs                # Application entry point
+└── main.rs                 # Application entry point
+
+tests/                      # Integration tests
+├── user_crud_tests.rs      # User CRUD operation tests
+└── user_tests.rs           # General user functionality tests
