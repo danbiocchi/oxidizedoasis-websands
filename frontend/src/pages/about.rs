@@ -4,12 +4,15 @@ use yew::prelude::*;
 pub fn about() -> Html {
     html! {
         <main class="p-about">
-            <div class="p-about__container">
-                <div class="p-about__header">
-                    <h1 class="p-about__title">{"About OxidizedOasis"}</h1>
-                    <h2 class="p-about__subtitle">{"Modern Full-Stack Rust Development"}</h2>
-                    <p class="p-about__mission-text">{"OxidizedOasis represents the cutting edge of web development, leveraging Rust's powerful ecosystem for both frontend and backend development. Our platform demonstrates the capabilities of Rust in building secure, performant, and maintainable web applications."}</p>
+            <div class="p-about__hero">
+                <div class="p-about__hero-content">
+                    <h1 class="p-about__hero-title">{"About OxidizedOasis"}</h1>
+                    <h2 class="p-about__hero-subtitle">{"Modern Full-Stack Rust Development"}</h2>
+                    <p class="p-about__hero-text">{"OxidizedOasis represents the cutting edge of web development, leveraging Rust's powerful ecosystem for both frontend and backend development. Our platform demonstrates the capabilities of Rust in building secure, performant, and maintainable web applications."}</p>
                 </div>
+            </div>
+
+            <div class="p-about__content">
 
                 <div class="p-about__values">
                     <h2 class="p-about__section-title">{"Technology Stack"}</h2>
@@ -54,19 +57,39 @@ pub fn about() -> Html {
                     </div>
                 </div>
 
-                <div class="p-about__stats">
+                <div class="p-about__features">
                     <h2 class="p-about__section-title">{"Key Features"}</h2>
-                    <div class="p-about__stats-grid">
-                        <li><i class="fas fa-shield-alt"></i>{"Robust JWT authentication with bcrypt password hashing"}</li>
-                        <li><i class="fas fa-envelope"></i>{"Secure email verification and password reset flows"}</li>
-                        <li><i class="fas fa-tachometer-alt"></i>{"WebAssembly compilation for near-native performance"}</li>
-                        <li><i class="fas fa-database"></i>{"Type-safe database operations with SQLx"}</li>
-                        <li><i class="fas fa-lock"></i>{"XSS protection and CORS security configuration"}</li>
-                        <li><i class="fas fa-code-branch"></i>{"Clean architecture with domain-driven design"}</li>
-                        <li><i class="fas fa-mobile-alt"></i>{"Responsive design for all devices"}</li>
-                        <li><i class="fas fa-sync"></i>{"Automated database migrations"}</li>
-                        <li><i class="fas fa-vial"></i>{"Test-driven development approach"}</li>
-                        <li><i class="fas fa-box"></i>{"Docker containerization support"}</li>
+                    <div class="p-about__features-grid">
+                        <div class="p-about__feature-card">
+                            <i class="fas fa-shield-alt p-about__feature-icon"></i>
+                            <h3 class="p-about__feature-title">{"Robust Security"}</h3>
+                            <p class="p-about__feature-description">{"Industry-standard JWT authentication with bcrypt password hashing and secure email verification flows"}</p>
+                        </div>
+                        <div class="p-about__feature-card">
+                            <i class="fas fa-tachometer-alt p-about__feature-icon"></i>
+                            <h3 class="p-about__feature-title">{"High Performance"}</h3>
+                            <p class="p-about__feature-description">{"WebAssembly compilation delivers near-native performance in the browser"}</p>
+                        </div>
+                        <div class="p-about__feature-card">
+                            <i class="fas fa-database p-about__feature-icon"></i>
+                            <h3 class="p-about__feature-title">{"Type-Safe Data"}</h3>
+                            <p class="p-about__feature-description">{"Compile-time validated database operations with SQLx for guaranteed data integrity"}</p>
+                        </div>
+                        <div class="p-about__feature-card">
+                            <i class="fas fa-lock p-about__feature-icon"></i>
+                            <h3 class="p-about__feature-title">{"Advanced Security"}</h3>
+                            <p class="p-about__feature-description">{"Comprehensive XSS protection and CORS security configuration"}</p>
+                        </div>
+                        <div class="p-about__feature-card">
+                            <i class="fas fa-code-branch p-about__feature-icon"></i>
+                            <h3 class="p-about__feature-title">{"Clean Architecture"}</h3>
+                            <p class="p-about__feature-description">{"Domain-driven design principles ensure maintainable and extensible codebase"}</p>
+                        </div>
+                        <div class="p-about__feature-card">
+                            <i class="fas fa-cogs p-about__feature-icon"></i>
+                            <h3 class="p-about__feature-title">{"DevOps Ready"}</h3>
+                            <p class="p-about__feature-description">{"Docker containerization with automated testing and comprehensive CI/CD integration"}</p>
+                        </div>
                     </div>
                 </div>
             </div>

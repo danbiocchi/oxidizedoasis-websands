@@ -87,15 +87,6 @@
   }
 }
 
-@media (min-width: 992px) {
-  .l-container--dashboard {
-    padding-left: var(--sidebar-width);
-  }
-
-  .l-container--dashboard.is-collapsed {
-    padding-left: var(--sidebar-width-collapsed);
-  }
-}
 
 /* Container with Sidebar */
 .l-container--with-sidebar {

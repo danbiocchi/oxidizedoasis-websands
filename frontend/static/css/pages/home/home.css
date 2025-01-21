@@ -117,8 +117,7 @@
 }
 
 .p-home__feature-icon {
-  width: 48px;
-  height: 48px;
+  font-size: 2.5rem;
   margin-bottom: var(--spacing-base);
   color: var(--color-primary);
 }
@@ -136,7 +135,7 @@
 
 /* Highlights Section */
 .p-home__highlights {
-  padding: var(--spacing-3xl) 0;
+  padding: var(--spacing-xl) 0;
   background-color: var(--color-background);
 }
 
@@ -161,8 +160,7 @@
 }
 
 .p-home__highlight-icon {
-  width: 48px;
-  height: 48px;
+  font-size: 2.5rem;
   margin-bottom: var(--spacing-base);
   color: var(--color-primary);
 }

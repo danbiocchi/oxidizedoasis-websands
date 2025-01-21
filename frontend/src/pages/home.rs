@@ -42,6 +42,16 @@ pub fn home() -> Html {
                             <h3 class="p-home__feature-title">{"Robust Authentication"}</h3>
                             <p class="p-home__feature-description">{"Industry-standard JWT authentication with secure password handling and rate limiting"}</p>
                         </div>
+                        <div class="p-home__feature-card">
+                            <i class="fas fa-database p-home__feature-icon"></i>
+                            <h3 class="p-home__feature-title">{"Type-Safe Database"}</h3>
+                            <p class="p-home__feature-description">{"Compile-time SQL query validation with SQLx for reliable data operations"}</p>
+                        </div>
+                        <div class="p-home__feature-card">
+                            <i class="fas fa-sync p-home__feature-icon"></i>
+                            <h3 class="p-home__feature-title">{"Async Runtime"}</h3>
+                            <p class="p-home__feature-description">{"Efficient concurrent operations with Rust's async/await and Tokio runtime"}</p>
+                        </div>
                     </div>
                 </section>
 
