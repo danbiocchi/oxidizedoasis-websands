@@ -142,10 +142,10 @@ pub fn register() -> Html {
         && password_requirements.iter().all(|&x| x);
 
     html! {
-        <div class="auth auth--register">
+        <div class={classes!("auth", "auth--register")}>
             <div class="auth__card">
                 <div class="auth__header">
-                    <h1 class="auth__title">{ "Sign Up to Cipher Horizon" }</h1>
+                    <h1 class="auth__title" id="register-title">{ "Sign Up to Cipher Horizon" }</h1>
                 </div>
                 <form {onsubmit} class="auth__form">
                 <div class="auth__form-group">
@@ -206,7 +206,11 @@ pub fn register() -> Html {
                         <span>{ "Special character" }</span>
                     </div>
                 </div>
-                <button type="submit" class="auth__button" disabled={*is_loading || !form_is_valid}>
+                <button 
+                    type="submit" 
+                    class="auth__button" 
+                    disabled={*is_loading || !form_is_valid}
+                >
                     { if *is_loading { "Signing Up..." } else { "Sign Up" } }
                 </button>
                 </form>
@@ -214,7 +218,9 @@ pub fn register() -> Html {
                     <div class="auth__error">{ err }</div>
                 }
                 <div class="auth__links">
-                    <Link<Route> to={Route::Login} classes="auth__link">{ "Already have an account? Log in" }</Link<Route>>
+                    <Link<Route> to={Route::Login} classes="auth__link">
+                        { "Already have an account? Log in" }
+                    </Link<Route>>
                 </div>
             </div>
         </div>
