@@ -14,8 +14,11 @@ pub fn remove_token() {
     LocalStorage::delete(TOKEN_KEY);
 }
 
+pub fn is_authenticated() -> bool {
+    get_token().is_some()
+}
+
 pub fn logout() {
     remove_token();
     // You might want to redirect to the login page or update app state here
 }
-

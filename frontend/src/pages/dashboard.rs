@@ -260,61 +260,88 @@ impl Dashboard {
     }
 
     fn render_profile(&self) -> Html {
+        let content = if let Some(user) = &self.user_info {
+            html! {
+                <div class="l-grid l-grid--stats">
+                    <div class="c-card c-card--stat">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                            <circle cx="12" cy="7" r="4"></circle>
+                        </svg>
+                        <span class="c-card__label">{"Username"}</span>
+                        <span class="c-card__value">{&user.username}</span>
+                    </div>
+                    <div class="c-card c-card--stat">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
+                            <polyline points="22,6 12,13 2,6"></polyline>
+                        </svg>
+                        <span class="c-card__label">{"Email"}</span>
+                        <span class="c-card__value">{user.email.as_deref().unwrap_or("Not provided")}</span>
+                    </div>
+                    <div class="c-card c-card--stat">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                            <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                        </svg>
+                        <span class="c-card__label">{"Email Status"}</span>
+                        <span class={classes!("c-card__value", if user.is_email_verified { "is-verified" } else { "is-unverified" })}>
+                            {if user.is_email_verified { "Verified" } else { "Not Verified" }}
+                        </span>
+                    </div>
+                    <div class="c-card c-card--stat">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                            <line x1="16" y1="2" x2="16" y2="6"></line>
+                            <line x1="8" y1="2" x2="8" y2="6"></line>
+                            <line x1="3" y1="10" x2="21" y2="10"></line>
+                        </svg>
+                        <span class="c-card__label">{"Account Created"}</span>
+                        <span class="c-card__value">{&user.created_at}</span>
+                    </div>
+                </div>
+            }
+        } else {
+            html! {
+                <div class="c-loader c-loader--circular">{"Loading profile information..."}</div>
+            }
+        };
+
         html! {
-            <div class="l-container l-container--md">
-                <h2 class="u-text-2xl u-mb-lg">{"Profile Information"}</h2>
-                if let Some(user) = &self.user_info {
-                    <>
-                        <div class="c-card">
-                            <div class="c-card__content">
-                                <div class="c-card__row">
-                                    <span class="c-card__label">{"Username:"}</span>
-                                    <span class="c-card__value">{&user.username}</span>
-                                </div>
-                                <div class="c-card__row">
-                                    <span class="c-card__label">{"Email:"}</span>
-                                    <span class="c-card__value">{user.email.as_deref().unwrap_or("Not provided")}</span>
-                                </div>
-                                <div class="c-card__row">
-                                    <span class="c-card__label">{"Email Status:"}</span>
-                                    <span class={classes!("c-card__value", if user.is_email_verified { "is-verified" } else { "is-unverified" })}>
-                                        {if user.is_email_verified { "Verified" } else { "Not Verified" }}
-                                    </span>
-                                </div>
-                                <div class="c-card__row">
-                                    <span class="c-card__label">{"Account Created:"}</span>
-                                    <span class="c-card__value">{&user.created_at}</span>
-                                </div>
-                            </div>
-                        </div>
-                    </>
-                } else {
-                    <div class="c-loader c-loader--circular">{"Loading profile information..."}</div>
-                }
+            <div class="l-grid l-grid--dashboard">
+                <div class="c-card c-card--dashboard">
+                    <h2 class="c-card__title">{"Profile Information"}</h2>
+                    {content}
+                </div>
             </div>
         }
     }
 
     fn render_settings(&self) -> Html {
         html! {
-            <div class="l-container l-container--md">
-                <h2 class="u-text-2xl u-mb-lg">{"Settings"}</h2>
-                <div class="l-grid l-grid--settings">
-                    <>
-                        <div class="c-card">
-                            <h3 class="c-card__title">{"Account Settings"}</h3>
-                            <div class="c-card__content">
-                                <div class="c-form-check">
-                                    <input type="checkbox" class="c-form-check-input" checked=true />
-                                    <span class="c-form-check-label">{"Email Notifications"}</span>
-                                </div>
-                                <div class="c-form-check">
-                                    <input type="checkbox" class="c-form-check-input" />
-                                    <span class="c-form-check-label">{"Two-Factor Authentication"}</span>
-                                </div>
+            <div class="l-grid l-grid--dashboard">
+                <div class="c-card c-card--dashboard">
+                    <h2 class="c-card__title">{"Settings"}</h2>
+                    <div class="l-grid l-grid--stats">
+                        <div class="c-card c-card--stat">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M22 17H2a3 3 0 0 0 3-3V9a7 7 0 0 1 14 0v5a3 3 0 0 0 3 3zm-8.27 4a2 2 0 0 1-3.46 0"></path>
+                            </svg>
+                            <span class="c-card__label">{"Email Notifications"}</span>
+                            <div class="c-form-check">
+                                <input type="checkbox" class="c-form-check-input" checked=true />
                             </div>
                         </div>
-                    </>
+                        <div class="c-card c-card--stat">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+                            </svg>
+                            <span class="c-card__label">{"Two-Factor Authentication"}</span>
+                            <div class="c-form-check">
+                                <input type="checkbox" class="c-form-check-input" />
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         }
