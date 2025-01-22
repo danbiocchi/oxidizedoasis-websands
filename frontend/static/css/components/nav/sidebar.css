@@ -9,54 +9,12 @@
   top: var(--header-height);
   left: 0;
   bottom: 0;
-  width: var(--sidebar-width);
+  width: 250px;
   background-color: var(--color-surface);
   border-right: 1px solid rgba(0, 0, 0, 0.1);
-  transition: width var(--transition-smooth), transform var(--transition-smooth);
   z-index: var(--z-index-fixed);
   overflow-x: hidden;
   overflow-y: auto;
-  transform: translateX(0);
-  will-change: width, transform;
-}
-
-/* Collapsed State */
-.c-sidebar.is-collapsed {
-  width: var(--sidebar-width-collapsed);
-  transform: translateX(0);
-}
-
-/* Sidebar Toggle */
-.c-sidebar__toggle {
-  position: absolute;
-  top: var(--spacing-xs);
-  right: var(--spacing-xs);
-  padding: calc(var(--spacing-xs) / 2);
-  color: var(--color-text-light);
-  cursor: pointer;
-  transition: var(--transition-smooth);
-  border-radius: var(--border-radius-full);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background-color: rgba(0, 0, 0, 0.03);
-  width: 20px;
-  height: 20px;
-  z-index: calc(var(--z-index-fixed) + 1);
-  will-change: transform;
-}
-
-.c-sidebar.is-collapsed .c-sidebar__toggle {
-  transform: translateX(calc(var(--sidebar-width-collapsed) - var(--sidebar-width) + var(--spacing-xs)));
-}
-
-.c-sidebar__toggle:hover {
-  color: var(--color-text);
-  background-color: rgba(0, 0, 0, 0.08);
-}
-
-.c-sidebar__toggle:active {
-  background-color: rgba(0, 0, 0, 0.12);
 }
 
 /* Sidebar Navigation */
@@ -100,12 +58,6 @@
 /* Sidebar Labels */
 .c-sidebar__label {
   white-space: nowrap;
-  opacity: 1;
-  transition: opacity var(--transition-base);
-}
-
-.c-sidebar.is-collapsed .c-sidebar__label {
-  opacity: 0;
 }
 
 /* Sidebar Groups */
@@ -192,15 +144,9 @@
 @media (max-width: 991.98px) {
   .c-sidebar {
     transform: translateX(-100%);
-    transition: transform var(--transition-smooth), width var(--transition-smooth);
   }
 
   .c-sidebar.is-open {
     transform: translateX(0);
-  }
-
-  .c-sidebar.is-collapsed {
-    width: var(--sidebar-width-collapsed);
-    transform: translateX(-100%);
   }
 }

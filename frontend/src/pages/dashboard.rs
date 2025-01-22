@@ -47,7 +47,6 @@ pub enum DashboardMsg {
     SaveNotes,
     NotesSaved(Result<(), String>),
     Tick,
-    ToggleSidebar,
     ChangeView(DashboardView),
 }
 
@@ -58,7 +57,6 @@ pub struct Dashboard {
     timer: u32,
     _interval: Option<Interval>,
     navigator: Navigator,
-    sidebar_expanded: bool,
     current_view: DashboardView,
 }
 
@@ -79,7 +77,6 @@ impl Component for Dashboard {
                 timer: 0,
                 _interval: None,
                 navigator,
-                sidebar_expanded: true,
                 current_view: DashboardView::Overview,
             };
         }
@@ -98,7 +95,6 @@ impl Component for Dashboard {
             timer: 0,
             _interval: interval,
             navigator,
-            sidebar_expanded: true,
             current_view: DashboardView::Overview,
         }
     }
@@ -144,10 +140,6 @@ impl Component for Dashboard {
                 self.timer += 1;
                 true
             }
-            DashboardMsg::ToggleSidebar => {
-                self.sidebar_expanded = !self.sidebar_expanded;
-                true
-            }
             DashboardMsg::ChangeView(view) => {
                 self.current_view = view;
                 true
@@ -159,18 +151,7 @@ impl Component for Dashboard {
         html! {
             <div class="l-container--dashboard critical-dashboard">
                 // Sidebar
-                <div class={classes!("c-sidebar", if !self.sidebar_expanded { "is-collapsed" } else { "" })}>
-                    <div class="c-sidebar__toggle" onclick={ctx.link().callback(|_| DashboardMsg::ToggleSidebar)}>
-                        if self.sidebar_expanded {
-                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <polyline points="15 18 9 12 15 6"></polyline>
-                            </svg>
-                        } else {
-                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <polyline points="9 18 15 12 9 6"></polyline>
-                            </svg>
-                        }
-                    </div>
+                <div class="c-sidebar">
                     
                     <div class="c-sidebar__nav">
                         <div 
@@ -178,7 +159,7 @@ impl Component for Dashboard {
                             onclick={ctx.link().callback(|_| DashboardMsg::ChangeView(DashboardView::Overview))}
                         >
                             <DashboardIcon />
-                            <span class={classes!("c-sidebar__label", if !self.sidebar_expanded { "u-hidden" } else { "" })}>{"Overview"}</span>
+                            <span class="c-sidebar__label">{"Overview"}</span>
                         </div>
                         
                         <div 
@@ -186,7 +167,7 @@ impl Component for Dashboard {
                             onclick={ctx.link().callback(|_| DashboardMsg::ChangeView(DashboardView::Profile))}
                         >
                             <ProfileIcon />
-                            <span class={classes!("c-sidebar__label", if !self.sidebar_expanded { "u-hidden" } else { "" })}>{"Profile"}</span>
+                            <span class="c-sidebar__label">{"Profile"}</span>
                         </div>
                         
                         <div 
@@ -194,14 +175,14 @@ impl Component for Dashboard {
                             onclick={ctx.link().callback(|_| DashboardMsg::ChangeView(DashboardView::Settings))}
                         >
                             <SettingsIcon />
-                            <span class={classes!("c-sidebar__label", if !self.sidebar_expanded { "u-hidden" } else { "" })}>{"Settings"}</span>
+                            <span class="c-sidebar__label">{"Settings"}</span>
                         </div>
                         
                     </div>
                 </div>
 
                 // Main content area
-                <div class={classes!("l-container--dashboard__content", if !self.sidebar_expanded { "is-expanded" } else { "" })}>
+                <div class="l-container--dashboard__content">
                     if let Some(error) = &self.error {
                         <div class="c-validation__error">
                             {error}
@@ -236,22 +217,26 @@ impl Dashboard {
                                 <circle cx="8.5" cy="7" r="4"></circle>
                                 <polyline points="17 11 19 13 23 9"></polyline>
                             </svg>
-                            <span class="c-card__label">{"Account Status"}</span>
-                            <span class="c-card__value">{"Active"}</span>
+                            <div class="stat-content">
+                                <span class="c-card__label">{"Account Status"}</span>
+                                <span class="c-card__value">{"Active"}</span>
+                            </div>
                         </div>
                         <div class="c-card c-card--stat">
                             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                 <circle cx="12" cy="12" r="10"></circle>
                                 <polyline points="12 6 12 12 16 14"></polyline>
                             </svg>
-                            <span class="c-card__label">{"Session Time"}</span>
-                            <span class="c-card__value">
-                                {format!("{:02}:{:02}:{:02}",
-                                    self.timer / 3600,
-                                    (self.timer / 60) % 60,
-                                    self.timer % 60
-                                )}
-                            </span>
+                            <div class="stat-content">
+                                <span class="c-card__label">{"Session Time"}</span>
+                                <span class="c-card__value">
+                                    {format!("{:02}:{:02}:{:02}",
+                                        self.timer / 3600,
+                                        (self.timer / 60) % 60,
+                                        self.timer % 60
+                                    )}
+                                </span>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -268,26 +253,32 @@ impl Dashboard {
                             <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
                             <circle cx="12" cy="7" r="4"></circle>
                         </svg>
-                        <span class="c-card__label">{"Username"}</span>
-                        <span class="c-card__value">{&user.username}</span>
+                        <div class="stat-content">
+                            <span class="c-card__label">{"Username"}</span>
+                            <span class="c-card__value">{&user.username}</span>
+                        </div>
                     </div>
                     <div class="c-card c-card--stat">
                         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
                             <polyline points="22,6 12,13 2,6"></polyline>
                         </svg>
-                        <span class="c-card__label">{"Email"}</span>
-                        <span class="c-card__value">{user.email.as_deref().unwrap_or("Not provided")}</span>
+                        <div class="stat-content">
+                            <span class="c-card__label">{"Email"}</span>
+                            <span class="c-card__value">{user.email.as_deref().unwrap_or("Not provided")}</span>
+                        </div>
                     </div>
                     <div class="c-card c-card--stat">
                         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
                             <polyline points="22 4 12 14.01 9 11.01"></polyline>
                         </svg>
-                        <span class="c-card__label">{"Email Status"}</span>
-                        <span class={classes!("c-card__value", if user.is_email_verified { "is-verified" } else { "is-unverified" })}>
-                            {if user.is_email_verified { "Verified" } else { "Not Verified" }}
-                        </span>
+                        <div class="stat-content">
+                            <span class="c-card__label">{"Email Status"}</span>
+                            <span class={classes!("c-card__value", if user.is_email_verified { "is-verified" } else { "is-unverified" })}>
+                                {if user.is_email_verified { "Verified" } else { "Not Verified" }}
+                            </span>
+                        </div>
                     </div>
                     <div class="c-card c-card--stat">
                         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -296,8 +287,10 @@ impl Dashboard {
                             <line x1="8" y1="2" x2="8" y2="6"></line>
                             <line x1="3" y1="10" x2="21" y2="10"></line>
                         </svg>
-                        <span class="c-card__label">{"Account Created"}</span>
-                        <span class="c-card__value">{&user.created_at}</span>
+                        <div class="stat-content">
+                            <span class="c-card__label">{"Account Created"}</span>
+                            <span class="c-card__value">{&user.created_at}</span>
+                        </div>
                     </div>
                 </div>
             }
@@ -327,18 +320,26 @@ impl Dashboard {
                             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                 <path d="M22 17H2a3 3 0 0 0 3-3V9a7 7 0 0 1 14 0v5a3 3 0 0 0 3 3zm-8.27 4a2 2 0 0 1-3.46 0"></path>
                             </svg>
-                            <span class="c-card__label">{"Email Notifications"}</span>
-                            <div class="c-form-check">
-                                <input type="checkbox" class="c-form-check-input" checked=true />
+                            <div class="stat-content">
+                                <span class="c-card__label">{"Email Notifications"}</span>
+                                <span class="c-card__value">
+                                    <div class="c-form-check">
+                                        <input type="checkbox" class="c-form-check-input" checked=true />
+                                    </div>
+                                </span>
                             </div>
                         </div>
                         <div class="c-card c-card--stat">
                             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                 <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
                             </svg>
-                            <span class="c-card__label">{"Two-Factor Authentication"}</span>
-                            <div class="c-form-check">
-                                <input type="checkbox" class="c-form-check-input" />
+                            <div class="stat-content">
+                                <span class="c-card__label">{"Two-Factor Authentication"}</span>
+                                <span class="c-card__value">
+                                    <div class="c-form-check">
+                                        <input type="checkbox" class="c-form-check-input" />
+                                    </div>
+                                </span>
                             </div>
                         </div>
                     </div>
