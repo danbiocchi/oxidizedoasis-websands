@@ -4,8 +4,6 @@ This document outlines the structure of the Oxidized Oasis WebSands project, a f
 
 ## Frontend (`/frontend`)
 
-The frontend is built using Rust with Yew framework, organized into a modular structure for maintainability and scalability.
-
 ```
 frontend/
 ├── dist/                    # Build output directory
@@ -79,9 +77,31 @@ frontend/
 └── Trunk.toml           # Trunk bundler configuration
 ```
 
-## Backend (`/src`)
+### Frontend Architecture Rationale
 
-The backend follows a clean architecture pattern, separating concerns into distinct layers.
+The frontend architecture follows several key principles:
+
+1. **Component-Based Structure**
+   - Separates reusable UI components from page-specific components
+   - Enables component reusability and maintains DRY principles
+   - Makes testing and maintenance easier by isolating component logic
+
+2. **State Management**
+   - Services directory handles business logic and state management
+   - Uses context providers for global state
+   - Keeps components focused on presentation while services handle data
+
+3. **CSS Organization**
+   - Modular CSS architecture with clear separation of concerns
+   - Prevents CSS specificity issues
+   - Makes styles more maintainable
+
+4. **Routing System**
+   - Centralized routing configuration
+   - Consistent navigation management
+   - Easy to maintain and modify application flow
+
+## Backend (`/src`)
 
 ```
 src/
@@ -156,9 +176,31 @@ src/
 └── main.rs            # Application entry point
 ```
 
-## Tests (`/tests`)
+### Backend Architecture Rationale
 
-Integration tests for the application.
+The backend implements Clean Architecture principles for several reasons:
+
+1. **API Layer**
+   - Separates web-specific code from business logic
+   - Easy to modify endpoints without affecting core functionality
+   - Simplified testing of API endpoints
+
+2. **Common Layer**
+   - Reduces code duplication
+   - Centralizes error handling and validation
+   - Provides consistent patterns across the application
+
+3. **Core Layer**
+   - Contains pure business logic and domain models
+   - Easy to test in isolation
+   - Protected from external system changes
+
+4. **Infrastructure Layer**
+   - External services can be swapped easily
+   - Centralized configuration
+   - Flexible middleware management
+
+## Tests (`/tests`)
 
 ```
 tests/
@@ -166,11 +208,62 @@ tests/
 └── user_tests.rs       # General user functionality tests
 ```
 
-## Database Migrations (`/migrations`)
+### Testing Strategy Rationale
 
-SQL migration files for database schema management.
+The testing structure provides:
+
+1. **Organized Test Separation**
+   - CRUD tests isolated from general functionality
+   - Clear identification of test purposes
+   - Easy to maintain and extend
+
+2. **Integration Focus**
+   - Full system interaction testing
+   - Verifies component integration
+   - Catches real-world usage issues
+
+## Database Migrations (`/migrations`)
 
 ```
 migrations/
 ├── 20240901010340_initial_schema.sql
 └── 20240902010341_add_password_reset.sql
+```
+
+### Migration Strategy Rationale
+
+The migration system provides:
+
+1. **Version Control**
+   - Timestamped ordering
+   - Documented changes
+   - Easy rollback capability
+
+2. **Incremental Updates**
+   - Single-purpose changes
+   - Clear database evolution
+   - Safe production updates
+
+## Overall Architecture Benefits
+
+This project structure delivers:
+
+1. **Maintainability**
+   - Clear separation of concerns
+   - Modular design
+   - Consistent patterns
+
+2. **Scalability**
+   - Independent layer scaling
+   - Easy feature addition
+   - Clear team work distribution
+
+3. **Security**
+   - Separated authentication
+   - Centralized security
+   - Protected sensitive logic
+
+4. **Performance**
+   - Optimized asset organization
+   - Independent service optimization
+   - Strategic caching capability
