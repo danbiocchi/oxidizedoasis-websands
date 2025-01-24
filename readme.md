@@ -199,26 +199,38 @@ Before you begin, ensure you have the following installed:
    ```
    Replace both files placeholders(.env and .env.test) with your actual database, SMTP, and other credentials.
 
-3. Build the frontend:
+3. Set up the database:
    ```sh
+   # On Windows, run the PowerShell script to set up the database
+   .\setup-database.ps1
+   ```
+   This script will:
+   - Check if PostgreSQL is installed
+   - Create the database if it doesn't exist
+   - Set up proper permissions for both superuser and application user
+   - Run all necessary database migrations
+
+4. Build and run the application:
+   ```sh
+   # On Windows, use the batch script to build frontend and run the application
+   .\build.bat
+   ```
+   This script will:
+   - Build the frontend using Trunk
+   - Run the backend server
+
+   Alternatively, you can run these steps manually:
+   ```sh
+   # Build frontend
    cd frontend
    trunk build
    cd ..
-   ```
 
-4. Build the backend:
-   ```sh
-   cargo build
-   ```
-
-5. Run the project:
-   ```sh
+   # Build and run backend
    cargo run
    ```
 
-6. The application will automatically create the database if it doesn't exist, run all necessary migrations, and start the server.
-
-7. Visit `http://localhost:8080` in your browser to access the application.
+5. Visit `http://localhost:8080` in your browser to access the application.
 
 ## 🔧 Configuration
 
