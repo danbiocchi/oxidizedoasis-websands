@@ -1,6 +1,9 @@
 use actix_web::web;
 
 pub mod user_routes;
+pub mod admin;
+
+pub use admin::configure as configure_admin_routes;
 
 pub fn configure_routes(cfg: &mut web::ServiceConfig) {
     user_routes::configure(cfg);

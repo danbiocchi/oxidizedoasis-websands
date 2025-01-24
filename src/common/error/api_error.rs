@@ -44,6 +44,20 @@ impl ApiError {
             status_code,
         }
     }
+
+    pub fn not_found(message: impl Into<String>) -> Self {
+        Self::new(message, ApiErrorType::NotFound)
+    }
+
+    pub fn bad_request(message: impl Into<String>) -> Self {
+        Self::new(message, ApiErrorType::Validation)
+    }
+}
+
+impl From<sqlx::Error> for ApiError {
+    fn from(err: sqlx::Error) -> Self {
+        ApiError::new(err.to_string(), ApiErrorType::Database)
+    }
 }
 
 impl From<ValidationError> for ApiError {

@@ -9,7 +9,8 @@ CREATE TABLE IF NOT EXISTS users (
     verification_token_expires_at TIMESTAMP WITH TIME ZONE,
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    role VARCHAR(20) NOT NULL DEFAULT 'user'
+    role VARCHAR(20) NOT NULL DEFAULT 'user',
+    is_active BOOLEAN NOT NULL DEFAULT true
 );
 
 -- Create indexes for users table

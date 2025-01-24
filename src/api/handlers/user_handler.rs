@@ -79,7 +79,8 @@ impl UserHandler {
                             "username": user.username,
                             "email": user.email,
                             "is_email_verified": user.is_email_verified,
-                            "created_at": user.created_at
+                            "created_at": user.created_at,
+                            "role": user.role
                         }
                     }
                 }))
@@ -156,7 +157,8 @@ impl UserHandler {
                                 "username": user.username,
                                 "email": user.email,
                                 "is_email_verified": user.is_email_verified,
-                                "created_at": user.created_at
+                                "created_at": user.created_at,
+                                "role": user.role
                             }
                         }
                     })),
@@ -196,7 +198,8 @@ impl UserHandler {
                                 "username": user.username,
                                 "email": user.email,
                                 "is_email_verified": user.is_email_verified,
-                                "created_at": user.created_at
+                                "created_at": user.created_at,
+                                "role": user.role
                             }
                         }
                     })),
@@ -247,7 +250,8 @@ impl UserHandler {
                                 "username": updated_user.username,
                                 "email": updated_user.email,
                                 "is_email_verified": updated_user.is_email_verified,
-                                "created_at": updated_user.created_at
+                                "created_at": updated_user.created_at,
+                                "role": updated_user.role
                             }
                         }
                     })),

@@ -9,7 +9,7 @@ use log::{debug, error, info, warn};
 use sqlx::postgres::Postgres;
 
 // Only import what we actually use
-use crate::api::routes::user_routes;
+use crate::api::routes::{user_routes, configure_admin_routes};
 use crate::api::handlers::user_handler::create_handler as create_user_handler;
 use crate::core::email::EmailService;
 use crate::infrastructure::{AppConfig, configure_cors, create_pool, RequestLogger, RateLimiter};
@@ -190,6 +190,7 @@ async fn main() -> std::io::Result<()> {
 
             // Routes configuration
             .configure(user_routes::configure)
+            .configure(configure_admin_routes)
 
             // Serve static files with proper MIME types
             .service(

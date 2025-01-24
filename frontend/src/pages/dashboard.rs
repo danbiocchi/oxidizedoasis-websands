@@ -7,7 +7,10 @@ use crate::services::auth;
 use crate::routes::Route;
 use yew_router::prelude::*;
 use gloo::console::log;
-use crate::components::icons::{DashboardIcon, ProfileIcon, SettingsIcon};
+use crate::components::icons::{
+    DashboardIcon, ProfileIcon, SettingsIcon,
+    UsersIcon, LogsIcon, SecurityIcon,
+};
 
 const NOTES_STORAGE_KEY: &str = "dashboard_notes";
 
@@ -16,6 +19,10 @@ pub enum DashboardView {
     Overview,
     Profile,
     Settings,
+    // Admin views
+    UserManagement,
+    SystemLogs,
+    SecurityIncidents,
 }
 
 #[derive(Debug, Deserialize)]
@@ -38,6 +45,13 @@ struct User {
     email: Option<String>,
     is_email_verified: bool,
     created_at: String,
+    role: String,
+}
+
+impl User {
+    fn is_admin(&self) -> bool {
+        self.role == "admin"
+    }
 }
 
 pub enum DashboardMsg {
@@ -154,7 +168,7 @@ impl Component for Dashboard {
                 <div class="c-sidebar">
                     
                     <div class="c-sidebar__nav">
-                        <div 
+                        <div
                             class={classes!("c-sidebar__item", if self.current_view == DashboardView::Overview { "is-active" } else { "" })}
                             onclick={ctx.link().callback(|_| DashboardMsg::ChangeView(DashboardView::Overview))}
                         >
@@ -162,7 +176,7 @@ impl Component for Dashboard {
                             <span class="c-sidebar__label">{"Overview"}</span>
                         </div>
                         
-                        <div 
+                        <div
                             class={classes!("c-sidebar__item", if self.current_view == DashboardView::Profile { "is-active" } else { "" })}
                             onclick={ctx.link().callback(|_| DashboardMsg::ChangeView(DashboardView::Profile))}
                         >
@@ -170,14 +184,46 @@ impl Component for Dashboard {
                             <span class="c-sidebar__label">{"Profile"}</span>
                         </div>
                         
-                        <div 
+                        <div
                             class={classes!("c-sidebar__item", if self.current_view == DashboardView::Settings { "is-active" } else { "" })}
                             onclick={ctx.link().callback(|_| DashboardMsg::ChangeView(DashboardView::Settings))}
                         >
                             <SettingsIcon />
                             <span class="c-sidebar__label">{"Settings"}</span>
                         </div>
-                        
+
+                        // Admin section
+                        if let Some(user) = &self.user_info {
+                            if user.is_admin() {
+                                <>
+                                    <div class="c-sidebar__divider">{"Admin"}</div>
+                                    
+                                    <div
+                                        class={classes!("c-sidebar__item", if self.current_view == DashboardView::UserManagement { "is-active" } else { "" })}
+                                        onclick={ctx.link().callback(|_| DashboardMsg::ChangeView(DashboardView::UserManagement))}
+                                    >
+                                        <UsersIcon />
+                                        <span class="c-sidebar__label">{"User Management"}</span>
+                                    </div>
+                                    
+                                    <div
+                                        class={classes!("c-sidebar__item", if self.current_view == DashboardView::SystemLogs { "is-active" } else { "" })}
+                                        onclick={ctx.link().callback(|_| DashboardMsg::ChangeView(DashboardView::SystemLogs))}
+                                    >
+                                        <LogsIcon />
+                                        <span class="c-sidebar__label">{"System Logs"}</span>
+                                    </div>
+                                    
+                                    <div
+                                        class={classes!("c-sidebar__item", if self.current_view == DashboardView::SecurityIncidents { "is-active" } else { "" })}
+                                        onclick={ctx.link().callback(|_| DashboardMsg::ChangeView(DashboardView::SecurityIncidents))}
+                                    >
+                                        <SecurityIcon />
+                                        <span class="c-sidebar__label">{"Security Incidents"}</span>
+                                    </div>
+                                </>
+                            }
+                        }
                     </div>
                 </div>
 
@@ -202,6 +248,51 @@ impl Dashboard {
             DashboardView::Overview => self.render_overview(),
             DashboardView::Profile => self.render_profile(),
             DashboardView::Settings => self.render_settings(),
+            DashboardView::UserManagement => self.render_user_management(),
+            DashboardView::SystemLogs => self.render_system_logs(),
+            DashboardView::SecurityIncidents => self.render_security_incidents(),
+        }
+    }
+
+    fn render_user_management(&self) -> Html {
+        html! {
+            <div class="l-grid l-grid--dashboard">
+                <div class="c-card c-card--dashboard">
+                    <h2 class="c-card__title">{"User Management"}</h2>
+                    <div class="l-grid l-grid--stats">
+                        // TODO: Implement user management UI
+                        <p>{"User management interface coming soon..."}</p>
+                    </div>
+                </div>
+            </div>
+        }
+    }
+
+    fn render_system_logs(&self) -> Html {
+        html! {
+            <div class="l-grid l-grid--dashboard">
+                <div class="c-card c-card--dashboard">
+                    <h2 class="c-card__title">{"System Logs"}</h2>
+                    <div class="l-grid l-grid--stats">
+                        // TODO: Implement system logs UI
+                        <p>{"System logs interface coming soon..."}</p>
+                    </div>
+                </div>
+            </div>
+        }
+    }
+
+    fn render_security_incidents(&self) -> Html {
+        html! {
+            <div class="l-grid l-grid--dashboard">
+                <div class="c-card c-card--dashboard">
+                    <h2 class="c-card__title">{"Security Incidents"}</h2>
+                    <div class="l-grid l-grid--stats">
+                        // TODO: Implement security incidents UI
+                        <p>{"Security incidents interface coming soon..."}</p>
+                    </div>
+                </div>
+            </div>
         }
     }
 
@@ -352,8 +443,6 @@ impl Dashboard {
 async fn fetch_user_info() -> Result<User, String> {
     let token = auth::get_token().ok_or("No auth token found")?;
 
-    log!("Fetching user info with token");
-
     let response = gloo::net::http::Request::get("/api/users/me")
         .header("Authorization", &format!("Bearer {}", token))
         .send()
@@ -365,12 +454,10 @@ async fn fetch_user_info() -> Result<User, String> {
     }
 
     let response_text = response.text().await
-        .map_err(|e| format!("Failed to get response text: {}", e.to_string()))?;
-
-    log!("Response body: {}", &response_text);
+        .map_err(|e| format!("Failed to get response text: {}", e))?;
 
     let data: DashboardResponse = serde_json::from_str(&response_text)
-        .map_err(|e| format!("Failed to parse response: {} - Response was: {}", e, response_text))?;
+        .map_err(|e| format!("Failed to parse response: {}", e))?;
 
     if !data.success {
         return Err(data.error.unwrap_or_else(|| "Unknown error occurred".to_string()));

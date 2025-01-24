@@ -39,8 +39,8 @@ impl AuthService {
             return Err(AuthError::new(AuthErrorType::InvalidCredentials));
         }
 
-        // Generate token
-        let token = create_jwt(user.id, &self.jwt_secret)
+        // Generate token with user role
+        let token = create_jwt(user.id, user.role.clone(), &self.jwt_secret)
             .map_err(|_| AuthError::new(AuthErrorType::InvalidToken))?;
 
         Ok((token, user))

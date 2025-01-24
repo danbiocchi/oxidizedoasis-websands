@@ -6,7 +6,7 @@
 /* Sidebar Container */
 .c-sidebar {
   position: fixed;
-  top: var(--header-height);
+  top: 0;
   left: 0;
   bottom: 0;
   width: 250px;

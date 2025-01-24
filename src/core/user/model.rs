@@ -43,6 +43,7 @@ pub struct User {
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
     pub role: String,
+    pub is_active: bool,
 }
 
 #[derive(Serialize)]
@@ -53,6 +54,7 @@ pub struct UserResponse {
     pub is_email_verified: bool,
     pub created_at: DateTime<Utc>,
     pub role: String,
+    pub is_active: bool,
 }
 
 impl From<User> for UserResponse {
@@ -64,6 +66,7 @@ impl From<User> for UserResponse {
             is_email_verified: user.is_email_verified,
             created_at: user.created_at,
             role: user.role,
+            is_active: user.is_active,
         }
     }
 }
