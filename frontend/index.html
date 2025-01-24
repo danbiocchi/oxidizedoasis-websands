@@ -29,6 +29,8 @@
     <!-- Resource Hints -->
     <link rel="preconnect" href="https://cdnjs.cloudflare.com">
     <link rel="dns-prefetch" href="https://cdnjs.cloudflare.com">
+    <link rel="modulepreload" href="/frontend.js">
+    <link rel="preload" href="/frontend_bg.wasm" as="fetch" type="application/wasm" crossorigin="anonymous">
     <link data-trunk rel="rust" data-wasm-opt="z" />
 </head>
     <body>

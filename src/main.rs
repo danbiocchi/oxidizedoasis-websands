@@ -7,6 +7,24 @@ use dotenv::dotenv;
 use env_logger::Env;
 use log::{debug, error, info, warn};
 use sqlx::postgres::Postgres;
+use serde_json::json;
+
+// Environment validation function
+fn validate_critical_env_vars() -> Result<(), Box<dyn std::error::Error>> {
+    let required_vars = [
+        "DATABASE_URL",
+        "JWT_SECRET",
+        "SMTP_SERVER",
+        "ADMIN_EMAIL",
+    ];
+    
+    for var in required_vars {
+        if env::var(var).is_err() {
+            return Err(format!("Missing required environment variable: {}", var).into());
+        }
+    }
+    Ok(())
+}
 
 // Only import what we actually use
 use crate::api::routes::{user_routes, configure_admin_routes};
@@ -60,6 +78,12 @@ async fn main() -> std::io::Result<()> {
         .init();
 
     info!("Starting OxidizedOasis-WebSands application");
+
+    // Validate critical environment variables
+    if let Err(e) = validate_critical_env_vars() {
+        error!("Environment validation failed: {}", e);
+        return Err(std::io::Error::new(std::io::ErrorKind::Other, e.to_string()));
+    }
 
     // Load configuration with proper error handling
     let config = match AppConfig::from_env() {
@@ -128,8 +152,6 @@ async fn main() -> std::io::Result<()> {
             .wrap(RequestLogger::new())
             .wrap(middleware::Logger::default())
             // 4. Global rate limiting protection
-            // Removed acrix governer
-            // 5. Password reset specific rate limiting
             .wrap(RateLimiter::new())
             // 6. Security headers
             .wrap(
@@ -153,16 +175,17 @@ async fn main() -> std::io::Result<()> {
                     .add((
                         "Content-Security-Policy",
                         "default-src 'self'; \
-                         script-src 'self' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com 'unsafe-inline' 'unsafe-eval'; \
-                         style-src 'self' https://cdnjs.cloudflare.com 'unsafe-inline'; \
-                         img-src 'self' data: https:; \
-                         connect-src 'self' ws: wss:; \
+                         script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; \
+                         style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; \
+                         img-src 'self' data:; \
+                         connect-src 'self' ws://127.0.0.1:* wss://127.0.0.1:*; \
                          font-src 'self' https://cdnjs.cloudflare.com; \
                          object-src 'none'; \
                          base-uri 'self'; \
                          form-action 'self'; \
                          frame-ancestors 'none'; \
-                         worker-src 'self' blob:;"
+                         worker-src 'self' blob:; \
+                         upgrade-insecure-requests;"
                     ))
                     .add(("X-Content-Type-Options", "nosniff"))
             )
@@ -197,7 +220,6 @@ async fn main() -> std::io::Result<()> {
                 fs::Files::new("/static/css", "./frontend/static/css")
                     .prefer_utf8(true)
                     .use_last_modified(true)
-                    .show_files_listing()
             )
             .service(
                 fs::Files::new("/", "./frontend/dist")
@@ -215,10 +237,10 @@ async fn main() -> std::io::Result<()> {
                         .append_header(("Expires", "0"))
                         .body(contents),
                     Err(e) => {
-                        error!("Failed to read index.html: {}", e);
+                        error!("Failed to read index.html: {}", e); // Keep detailed logging
                         HttpResponse::InternalServerError()
-                            .content_type("text/plain")
-                            .body("Internal Server Error")
+                            .content_type("application/json")
+                            .body(r#"{"error": "An unexpected error occurred"}"#) // Generic public message
                     }
                 }
             }))

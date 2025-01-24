@@ -2,11 +2,14 @@ use yew::prelude::*;
 use gloo::storage::{LocalStorage, Storage};
 use gloo::timers::callback::Interval;
 use wasm_bindgen_futures::spawn_local;
+use wasm_bindgen::prelude::*;
+use wasm_bindgen::JsCast;
 use serde::Deserialize;
 use crate::services::auth;
 use crate::routes::Route;
 use yew_router::prelude::*;
 use gloo::console::log;
+use web_sys::{CustomEvent, EventTarget};
 use crate::components::icons::{
     DashboardIcon, ProfileIcon, SettingsIcon,
     UsersIcon, LogsIcon, SecurityIcon,

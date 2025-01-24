@@ -20,6 +20,13 @@ struct RateLimit {
 }
 
 const RATE_LIMITS: &[RateLimit] = &[
+    // Global default rate limit
+    RateLimit {
+        path: "*",  // Wildcard for all paths
+        max_requests: 1000,
+        window_seconds: 3600, // 1 hour
+        error_message: "Too many requests. Please try again later",
+    },
     RateLimit {
         path: "/users/login",
         max_requests: 5,
@@ -122,19 +129,12 @@ where
         }
 
         // Find matching rate limit configuration
-        let rate_limit = match RATE_LIMITS.iter().find(|rl| {
-            debug!("Comparing against rate limit path: {}", rl.path);
-            base_path == rl.path
-        }) {
-            Some(rl) => rl,
-            None => {
-                // No rate limit for this path
-                let fut = self.service.call(req);
-                return Box::pin(async move {
-                    fut.await.map(|res| res.map_into_left_body())
-                });
-            }
-        };
+        let rate_limit = RATE_LIMITS.iter()
+            .find(|rl| {
+                debug!("Comparing against rate limit path: {}", rl.path);
+                rl.path == "*" || base_path == rl.path
+            })
+            .expect("Global rate limit should always match");
 
         let ip = req
             .connection_info()
