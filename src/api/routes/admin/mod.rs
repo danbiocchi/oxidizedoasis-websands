@@ -1,16 +1,18 @@
 use actix_web::web;
 use actix_web_httpauth::middleware::HttpAuthentication;
 use crate::infrastructure::middleware::admin_validator;
+use log::debug;
 
 mod user_management;
 mod logs;
 mod security;
 
 pub fn configure(cfg: &mut web::ServiceConfig) {
+    debug!("Configuring admin routes");
     let admin_auth = HttpAuthentication::bearer(admin_validator);
     
     cfg.service(
-        web::scope("/admin")
+        web::scope("/api/admin")
             .wrap(admin_auth)
             .service(
                 web::scope("/users")

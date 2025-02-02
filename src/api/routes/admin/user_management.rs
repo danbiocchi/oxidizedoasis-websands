@@ -2,8 +2,10 @@ use actix_web::{web, HttpResponse};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 use crate::core::user::{User, UserRepository};
-use crate::common::error::ApiError;
+use crate::common::error::{ApiError, ApiErrorType};
+use crate::api::responses::ApiResponse;
 
+use log::debug;
 #[derive(Deserialize)]
 pub struct UpdateRoleRequest {
     role: String,
@@ -17,12 +19,9 @@ pub struct UpdateStatusRequest {
 #[derive(Serialize)]
 pub struct UserListResponse {
     users: Vec<UserAdminView>,
-    total: i64,
-    page: i32,
-    per_page: i32,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Debug)]
 pub struct UserAdminView {
     id: Uuid,
     username: String,
@@ -47,50 +46,46 @@ impl From<User> for UserAdminView {
     }
 }
 
-#[derive(Deserialize)]
-pub struct UserListQuery {
-    page: Option<i32>,
-    per_page: Option<i32>,
-    role: Option<String>,
-    search: Option<String>,
-}
-
 pub async fn list_users(
-    query: web::Query<UserListQuery>,
     repo: web::Data<UserRepository>,
 ) -> Result<HttpResponse, ApiError> {
-    let page = query.page.unwrap_or(1);
-    let per_page = query.per_page.unwrap_or(10).min(100);
-    let offset = (page - 1) * per_page;
-
-    let users = repo.find_all_paginated(offset, per_page, query.role.as_deref(), query.search.as_deref())
+    debug!("Handling GET /api/admin/users -> list_users");
+    let users = repo.find_all()
         .await
-        .map_err(ApiError::from)?;
+        .map_err(|e| {
+            debug!("Error fetching users: {:?}", e);
+            ApiError::from(e)
+        })?;
 
-    let total = repo.count_all(query.role.as_deref(), query.search.as_deref())
-        .await
-        .map_err(ApiError::from)?;
+    debug!("Fetched {} users from repository", users.len());
+    let users_view: Vec<UserAdminView> = users.into_iter().map(UserAdminView::from).collect();
+    debug!("Prepared {} user views", users_view.len());
 
-    let response = UserListResponse {
-        users: users.into_iter().map(UserAdminView::from).collect(),
-        total,
-        page,
-        per_page,
-    };
-
-    Ok(HttpResponse::Ok().json(response))
+    Ok(HttpResponse::Ok().json(ApiResponse::success(UserListResponse {
+        users: users_view
+    })))
 }
 
 pub async fn get_user(
     id: web::Path<Uuid>,
     repo: web::Data<UserRepository>,
 ) -> Result<HttpResponse, ApiError> {
+    debug!("Handling GET /api/admin/users/{} -> get_user", id);
     let user = repo.find_by_id(*id)
         .await
-        .map_err(ApiError::from)?
-        .ok_or_else(|| ApiError::not_found("User not found"))?;
+        .map_err(|e| {
+            debug!("Error fetching user {}: {:?}", id, e);
+            ApiError::from(e)
+        })?
+        .ok_or_else(|| {
+            debug!("User {} not found", id);
+            ApiError::not_found("User not found")
+        })?;
 
-    Ok(HttpResponse::Ok().json(UserAdminView::from(user)))
+    let user_view = UserAdminView::from(user);
+    debug!("Found user: {:?}", &user_view);
+
+    Ok(HttpResponse::Ok().json(ApiResponse::success(user_view)))
 }
 
 pub async fn update_user_role(
@@ -98,17 +93,30 @@ pub async fn update_user_role(
     req: web::Json<UpdateRoleRequest>,
     repo: web::Data<UserRepository>,
 ) -> Result<HttpResponse, ApiError> {
+    debug!("Handling PUT /api/admin/users/{}/role -> update_user_role with role: {}",
+           id, req.role);
+    
     // Validate role
     if !["user", "admin"].contains(&req.role.as_str()) {
+        debug!("Invalid role attempted: {}", req.role);
         return Err(ApiError::bad_request("Invalid role"));
     }
 
     let user = repo.update_role(*id, &req.role)
         .await
-        .map_err(ApiError::from)?
-        .ok_or_else(|| ApiError::not_found("User not found"))?;
+        .map_err(|e| {
+            debug!("Error updating role for user {}: {:?}", id, e);
+            ApiError::from(e)
+        })?
+        .ok_or_else(|| {
+            debug!("User {} not found for role update", id);
+            ApiError::not_found("User not found")
+        })?;
 
-    Ok(HttpResponse::Ok().json(UserAdminView::from(user)))
+    let user_view = UserAdminView::from(user);
+    debug!("Updated user role successfully: {:?}", &user_view);
+
+    Ok(HttpResponse::Ok().json(ApiResponse::success(user_view)))
 }
 
 pub async fn update_user_status(
@@ -116,10 +124,22 @@ pub async fn update_user_status(
     req: web::Json<UpdateStatusRequest>,
     repo: web::Data<UserRepository>,
 ) -> Result<HttpResponse, ApiError> {
+    debug!("Handling PUT /api/admin/users/{}/status -> update_user_status with is_active: {}",
+           id, req.is_active);
+
     let user = repo.update_status(*id, req.is_active)
         .await
-        .map_err(ApiError::from)?
-        .ok_or_else(|| ApiError::not_found("User not found"))?;
+        .map_err(|e| {
+            debug!("Error updating status for user {}: {:?}", id, e);
+            ApiError::from(e)
+        })?
+        .ok_or_else(|| {
+            debug!("User {} not found for status update", id);
+            ApiError::not_found("User not found")
+        })?;
 
-    Ok(HttpResponse::Ok().json(UserAdminView::from(user)))
+    let user_view = UserAdminView::from(user);
+    debug!("Updated user status successfully: {:?}", &user_view);
+
+    Ok(HttpResponse::Ok().json(ApiResponse::success(user_view)))
 }

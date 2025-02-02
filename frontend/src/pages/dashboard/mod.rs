@@ -258,7 +258,7 @@ impl Dashboard {
             DashboardView::Overview => html! { <Overview /> },
             DashboardView::Profile => html! { <Profile user={self.user_info.clone()} /> },
             DashboardView::Settings => html! { <Settings /> },
-            DashboardView::UserManagement => html! { <UserManagement user={self.user_info.clone()} /> },
+            DashboardView::UserManagement => html! { <UserManagement /> },
             DashboardView::SystemLogs => html! { <SystemLogs /> },
             DashboardView::SecurityIncidents => html! { <SecurityIncidents /> },
         }

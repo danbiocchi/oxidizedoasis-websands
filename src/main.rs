@@ -27,9 +27,10 @@ fn validate_critical_env_vars() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 // Only import what we actually use
-use crate::api::routes::{user_routes, configure_admin_routes};
+use crate::api::routes::configure_routes;
 use crate::api::handlers::user_handler::create_handler as create_user_handler;
 use crate::core::email::EmailService;
+use crate::core::user::{User, UserRepository};
 use crate::infrastructure::{AppConfig, configure_cors, create_pool, RequestLogger, RateLimiter};
 
 mod api;
@@ -142,6 +143,7 @@ async fn main() -> std::io::Result<()> {
         // Create new config instance for each worker
         let config = AppConfig::from_env().expect("Failed to load config");
 
+        debug!("Setting up new application instance");
         App::new()
             // Security middleware stack - order matters!
             // 1. Compression (should be first)
@@ -197,6 +199,7 @@ async fn main() -> std::io::Result<()> {
             .app_data(web::Data::new(email_service.clone()))
             .app_data(user_handler.clone())
             .app_data(web::Data::new(config))
+            .app_data(web::Data::new(UserRepository::new(pool.clone())))
 
             // JSON payload protection
             .app_data(web::JsonConfig::default()
@@ -211,16 +214,17 @@ async fn main() -> std::io::Result<()> {
                         .into()
                 }))
 
-            // Routes configuration
-            .configure(user_routes::configure)
-            .configure(configure_admin_routes)
-
             // Serve static files with proper MIME types
             .service(
                 fs::Files::new("/static/css", "./frontend/static/css")
                     .prefer_utf8(true)
                     .use_last_modified(true)
             )
+            
+            // API Routes configuration - after static CSS but before catch-all
+            .configure(configure_routes)
+            
+            // Catch-all static file serving
             .service(
                 fs::Files::new("/", "./frontend/dist")
                     .index_file("index.html")
@@ -256,3 +260,4 @@ async fn main() -> std::io::Result<()> {
         .run()
         .await
 }
+

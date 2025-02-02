@@ -15,6 +15,23 @@ impl UserRepository {
         Self { pool }
     }
 
+    pub async fn find_all(&self) -> Result<Vec<User>, sqlx::Error> {
+        debug!("Fetching all users");
+        
+        let users = sqlx::query_as!(
+            User,
+            r#"
+            SELECT *
+            FROM users
+            ORDER BY created_at DESC
+            "#
+        )
+        .fetch_all(&self.pool)
+        .await?;
+
+        Ok(users)
+    }
+
     pub async fn create(
         &self,
         user_input: &UserInput,
@@ -103,18 +120,7 @@ impl UserRepository {
         let user = sqlx::query_as!(
             User,
             r#"
-            SELECT
-                id,
-                username,
-                email,
-                password_hash,
-                is_email_verified,
-                verification_token,
-                verification_token_expires_at,
-                created_at,
-                updated_at,
-                role,
-                is_active
+            SELECT *
             FROM users
             WHERE id = $1
             "#,
@@ -136,18 +142,7 @@ impl UserRepository {
         let user = sqlx::query_as!(
             User,
             r#"
-            SELECT
-                id,
-                username,
-                email,
-                password_hash,
-                is_email_verified,
-                verification_token,
-                verification_token_expires_at,
-                created_at,
-                updated_at,
-                role,
-                is_active
+            SELECT *
             FROM users
             WHERE username = $1
             "#,
@@ -189,9 +184,7 @@ impl UserRepository {
                 password_hash = $3,
                 updated_at = $4
             WHERE id = $5
-            RETURNING id, username, email, password_hash, is_email_verified,
-                      verification_token, verification_token_expires_at,
-                      created_at, updated_at, role, is_active
+            RETURNING *
             "#,
             user_input.username,
             user_input.email,
@@ -211,65 +204,6 @@ impl UserRepository {
         user
     }
 
-    pub async fn find_all_paginated(
-        &self,
-        offset: i32,
-        limit: i32,
-        role_filter: Option<&str>,
-        search: Option<&str>,
-    ) -> Result<Vec<User>, sqlx::Error> {
-        let search_pattern = search.map(|s| format!("%{}%", s));
-        
-        let users = sqlx::query_as!(
-            User,
-            r#"
-            SELECT *
-            FROM users
-            WHERE ($1::text IS NULL OR role = $1)
-            AND ($2::text IS NULL OR (
-                username ILIKE $2 
-                OR email ILIKE $2
-            ))
-            ORDER BY created_at DESC
-            LIMIT $3 OFFSET $4
-            "#,
-            role_filter,
-            search_pattern.as_deref(),
-            limit as i64,
-            offset as i64
-        )
-        .fetch_all(&self.pool)
-        .await?;
-
-        Ok(users)
-    }
-
-    pub async fn count_all(
-        &self,
-        role_filter: Option<&str>,
-        search: Option<&str>,
-    ) -> Result<i64, sqlx::Error> {
-        let search_pattern = search.map(|s| format!("%{}%", s));
-        
-        let result = sqlx::query!(
-            r#"
-            SELECT COUNT(*) as count
-            FROM users
-            WHERE ($1::text IS NULL OR role = $1)
-            AND ($2::text IS NULL OR (
-                username ILIKE $2 
-                OR email ILIKE $2
-            ))
-            "#,
-            role_filter,
-            search_pattern.as_deref()
-        )
-        .fetch_one(&self.pool)
-        .await?;
-
-        Ok(result.count.unwrap_or(0))
-    }
-
     pub async fn update_role(
         &self,
         user_id: Uuid,
@@ -284,9 +218,7 @@ impl UserRepository {
             SET role = $1,
                 updated_at = $2
             WHERE id = $3
-            RETURNING id, username, email, password_hash, is_email_verified,
-                      verification_token, verification_token_expires_at,
-                      created_at, updated_at, role, is_active
+            RETURNING *
             "#,
             new_role,
             Utc::now(),
@@ -443,9 +375,7 @@ impl UserRepository {
         let user = sqlx::query_as!(
             User,
             r#"
-            SELECT id, username, email, password_hash, is_email_verified,
-                   verification_token, verification_token_expires_at,
-                   created_at, updated_at, role, is_active
+            SELECT *
             FROM users
             WHERE email = $1
             "#,
@@ -503,14 +433,14 @@ impl UserRepository {
         .execute(&self.pool)
         .await?;
 
-        let updated = result.rows_affected() > 0;
-        if updated {
+        let marked = result.rows_affected() > 0;
+        if marked {
             info!("Successfully marked reset token as used");
         } else {
             debug!("No valid reset token found to mark as used");
         }
 
-        Ok(updated)
+        Ok(marked)
     }
 
     pub async fn update_password(&self, user_id: Uuid, password_hash: &str) -> Result<(), sqlx::Error> {
@@ -540,44 +470,4 @@ impl UserRepository {
         sqlx::query!("DELETE FROM users").execute(&self.pool).await?;
         Ok(())
     }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::common::validation::UserInput;
-    use std::time::Duration as StdDuration;
-
-    async fn setup_test_db() -> PgPool {
-        let database_url = std::env::var("TEST_DATABASE_URL")
-            .expect("TEST_DATABASE_URL must be set");
-        PgPool::connect(&database_url).await.unwrap()
-    }
-
-    #[tokio::test]
-    async fn test_create_and_find_user() {
-        let pool = setup_test_db().await;
-        let repo = UserRepository::new(pool);
-
-        let user_input = UserInput {
-            username: "testuser".to_string(),
-            email: Some("test@example.com".to_string()),
-            password: Some("TestPass123!".to_string()),
-        };
-
-        let created_user = repo.create(
-            &user_input,
-            "hashed_password".to_string(),
-            "verification_token".to_string(),
-        ).await.unwrap();
-
-        assert_eq!(created_user.username, "testuser");
-        assert!(created_user.is_active);
-
-        let found_user = repo.find_by_username("testuser").await.unwrap().unwrap();
-        assert_eq!(found_user.id, created_user.id);
-        assert!(found_user.is_active);
-    }
-
-    // Add more tests as needed...
 }

@@ -27,10 +27,11 @@ impl ResponseError for AdminError {
 }
 
 pub async fn admin_validator(req: ServiceRequest, credentials: BearerAuth) -> Result<ServiceRequest, (Error, ServiceRequest)> {
+    debug!("Admin validator called for path: {}", req.path());
     let jwt_secret = std::env::var("JWT_SECRET").expect("JWT_SECRET must be set");
     let token = credentials.token();
 
-    debug!("Validating admin access");
+    debug!("Attempting to validate token for admin access");
 
     match validate_jwt(token, &jwt_secret) {
         Ok(claims) => {
