@@ -28,6 +28,7 @@
 /* Page Styles */
 @import './pages/auth/index.css';         /* Authentication pages */
 @import './pages/dashboard/data.css';       /* Dashboard Data Page Styles */
+@import './pages/dashboard/system-logs.css'; /* System Logs Page Styles */
 
 /* Utility Classes */
 @import './utils/animations.css';   /* Animation utilities */

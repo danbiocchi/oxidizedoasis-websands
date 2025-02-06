@@ -1,0 +1,203 @@
+/* System Logs Styles */
+
+/* Tabs */
+.c-tabs {
+    margin-bottom: 1.5rem;
+    border-bottom: 1px solid var(--color-border);
+}
+
+.c-tabs__list {
+    display: flex;
+    gap: 1rem;
+    padding: 0 1rem;
+}
+
+.c-tabs__tab {
+    padding: 0.75rem 1.5rem;
+    border: none;
+    background: none;
+    color: var(--color-text);
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: all 0.2s ease;
+}
+
+.c-tabs__tab:hover {
+    color: var(--color-primary);
+}
+
+.c-tabs__tab--active {
+    color: var(--color-primary);
+    border-bottom-color: var(--color-primary);
+}
+
+/* Filters */
+.c-filters__container {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+    padding: 1rem;
+    background-color: var(--color-background-alt);
+    border-radius: var(--border-radius);
+}
+
+.c-filters__input {
+    flex: 1;
+    padding: 0.5rem 1rem;
+    border: 1px solid var(--color-border);
+    border-radius: var(--border-radius);
+    background-color: var(--color-background);
+}
+
+.c-filters__date {
+    padding: 0.5rem 1rem;
+    border: 1px solid var(--color-border);
+    border-radius: var(--border-radius);
+    background-color: var(--color-background);
+    color: var(--color-text-muted);
+}
+
+/* Table */
+.c-table-container {
+    overflow-x: auto;
+    margin-bottom: 1.5rem;
+}
+
+.c-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.c-table th,
+.c-table td {
+    padding: 0.75rem 1rem;
+    text-align: left;
+    border-bottom: 1px solid var(--color-border);
+}
+
+.c-table th {
+    background-color: var(--color-background-alt);
+    font-weight: 600;
+}
+
+.c-table tr {
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+}
+
+.c-table tr:hover {
+    background-color: var(--color-background-hover);
+}
+
+/* Table Row Types */
+.c-table__row--error {
+    border-left: 3px solid var(--color-error);
+}
+
+.c-table__row--warning {
+    border-left: 3px solid var(--color-warning);
+}
+
+.c-table__row--info {
+    border-left: 3px solid var(--color-info);
+}
+
+.c-table__row--security {
+    border-left: 3px solid var(--color-primary);
+}
+
+.c-table__row--performance {
+    border-left: 3px solid var(--color-success);
+}
+
+/* Modal */
+.c-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+
+.c-modal__content {
+    background-color: var(--color-background);
+    border-radius: var(--border-radius);
+    padding: 1.5rem;
+    max-width: 600px;
+    width: 90%;
+    max-height: 90vh;
+    overflow-y: auto;
+    position: relative;
+}
+
+.c-modal__close {
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+    border: none;
+    background: none;
+    font-size: 1.5rem;
+    cursor: pointer;
+    color: var(--color-text-muted);
+    transition: color 0.2s ease;
+}
+
+.c-modal__close:hover {
+    color: var(--color-text);
+}
+
+.c-modal__title {
+    margin-bottom: 1rem;
+    font-size: 1.25rem;
+    font-weight: 600;
+}
+
+.c-modal__body {
+    line-height: 1.5;
+}
+
+.c-modal__body p {
+    margin-bottom: 0.75rem;
+}
+
+.c-modal__details {
+    margin-top: 1.5rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--color-border);
+}
+
+.c-modal__details h4 {
+    margin-bottom: 1rem;
+    font-weight: 600;
+}
+
+.c-modal__details-list {
+    display: grid;
+    gap: 0.75rem;
+}
+
+.c-modal__details-item {
+    display: flex;
+    gap: 0.5rem;
+}
+
+/* Responsive Adjustments */
+@media (max-width: 768px) {
+    .c-tabs__list {
+        flex-wrap: wrap;
+    }
+    
+    .c-filters__container {
+        flex-direction: column;
+    }
+    
+    .c-table th,
+    .c-table td {
+        padding: 0.5rem;
+    }
+}
