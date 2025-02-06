@@ -13,6 +13,14 @@ OxidizedOasis-WebSands is a robust, high-performance web application built with 
     <br></br>
     <img src="docs/images/login_dashboard.png" alt="Login Page Screenshot" width="600">
     <br></br>
+    <img src="docs/images/chat.png" alt="Login Page Screenshot" width="600">
+    <br></br>
+    <img src="docs/images/data.png" alt="Login Page Screenshot" width="600">
+    <br></br>
+    <img src="docs/images/system_logs.png" alt="Login Page Screenshot" width="600">
+    <br></br>
+    <img src="docs/images/log_details.png" alt="Login Page Screenshot" width="600">
+    <br></br>
 </p>
 
 ## 🌟 About This Project
