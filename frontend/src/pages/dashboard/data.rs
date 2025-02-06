@@ -1,52 +1,65 @@
 use yew::prelude::*;
+use web_sys::DragEvent;
 
-pub struct Data;
+#[function_component(Data)]
+pub fn data_page() -> Html {
+    let file_input_ref = use_node_ref();
 
-impl Component for Data {
-    type Message = ();
-    type Properties = ();
+    // Handler for drag over: prevents default behavior.
+    let on_drag_over = Callback::from(|e: DragEvent| {
+        e.prevent_default();
+    });
 
-    fn create(_ctx: &Context<Self>) -> Self {
-        Self
-    }
+    // Handler for file drop.
+    let on_drop = Callback::from(|e: DragEvent| {
+        e.prevent_default();
+        // TODO: Handle dropped files.
+    });
 
-    fn view(&self, _ctx: &Context<Self>) -> Html {
-        html! {
-            <div class="l-grid l-grid--dashboard">
-                <div class="c-card c-card--dashboard">
-                    <h2 class="c-card__title">{"Data"}</h2>
-                    <div class="l-grid l-grid--stats">
-                        <div class="c-card c-card--stat">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                                <polyline points="17 8 12 3 7 8"></polyline>
-                                <line x1="12" y1="3" x2="12" y2="15"></line>
-                            </svg>
-                            <div class="stat-content">
-                                <span class="c-card__label">{"Storage Used"}</span>
-                                <span class="c-card__value">{"0 MB"}</span>
-                            </div>
-                        </div>
-                        <div class="c-card c-card--stat">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path>
-                                <polyline points="13 2 13 9 20 9"></polyline>
-                            </svg>
-                            <div class="stat-content">
-                                <span class="c-card__label">{"Files"}</span>
-                                <span class="c-card__value">{"0"}</span>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="data-upload" style="margin-top: 20px; text-align: center;">
-                        <label class="c-button c-button--primary" style="cursor: pointer;">
-                            {"Upload Files"}
-                            <input type="file" multiple=true style="display: none;"/>
-                        </label>
-                        <p style="margin-top: 10px;">{"Drag and drop files here or click to upload"}</p>
-                    </div>
-                </div>
+    // Click handler to open file dialog.
+    let on_upload_click = {
+        let file_input_ref = file_input_ref.clone();
+        Callback::from(move |_| {
+            if let Some(input) = file_input_ref.cast::<web_sys::HtmlInputElement>() {
+                input.click();
+            }
+        })
+    };
+
+    html! {
+        <div class="c-card">
+            <div class="c-card__header">
+                <h2 class="c-card__title">{ "Upload Your Data Files" }</h2>
+                <p class="c-card__subtitle">{ "Drag and drop files into the area below or click to select files for upload." }</p>
             </div>
-        }
+            <div class="c-card__content">
+                <section class="upload-section">
+                    <div class="drag-drop-area"
+                         ondragover={on_drag_over}
+                         ondrop={on_drop}
+                         onclick={on_upload_click.clone()}>
+                        <p>{ "Drag and drop files here or click to select files" }</p>
+                        <input type="file" multiple=true ref={file_input_ref} style="display: none;" />
+                    </div>
+                    <button class="upload-button" onclick={on_upload_click}>
+                        { "Upload Files" }
+                    </button>
+                </section>
+                <section class="summary-panel">
+                    <div class="summary-card">
+                        <h2>{ "Upload Summary" }</h2>
+                        <p>{ "Storage Used: " }<span class="summary-value">{ "0 MB" }</span></p>
+                        <p>{ "Files Uploaded: " }<span class="summary-value">{ "0" }</span></p>
+                        <div class="file-type-breakdown">
+                            <p>{ "File Types:" }</p>
+                            <span class="file-badge">{ "PDF" }</span>
+                            <span class="file-badge">{ "DOCX" }</span>
+                            <span class="file-badge">{ "Images" }</span>
+                            <span class="file-badge">{ "Others" }</span>
+                        </div>
+                    </div>
+                </section>
+            </div>
+        </div>
     }
 }
