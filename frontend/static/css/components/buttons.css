@@ -134,6 +134,18 @@
   width: 100%;
 }
 
+/* Button Outline Variants */
+.c-button--outline-error {
+  background-color: transparent;
+  color: var(--color-error);
+  border-color: var(--color-error);
+}
+
+.c-button--outline-error:hover {
+  background-color: var(--color-error);
+  color: white;
+}
+
 /* Button Colors */
 .c-button--success {
   background-color: var(--color-success);
