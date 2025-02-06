@@ -1,4 +1,4 @@
-use yew::prelude::*;
+ use yew::prelude::*;
 
 pub struct Chat;
 
@@ -10,34 +10,62 @@ impl Component for Chat {
         Self
     }
 
+    fn update(&mut self, _ctx: &Context<Self>, _msg: Self::Message) -> bool {
+        false
+    }
+
     fn view(&self, _ctx: &Context<Self>) -> Html {
         html! {
-            <div class="l-grid l-grid--dashboard">
-                <div class="c-card c-card--dashboard">
-                    <h2 class="c-card__title">{"Chat"}</h2>
-                    <div class="l-grid l-grid--stats">
-                        <div class="c-card c-card--stat">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
-                            </svg>
-                            <div class="stat-content">
-                                <span class="c-card__label">{"Messages"}</span>
-                                <span class="c-card__value">{"0"}</span>
-                            </div>
+            <div class="c-card c-card--dashboard">
+                <h2 class="c-card__title">{"Chat"}</h2>
+
+                // Chat interface
+                <div class="chat-container">
+                    // Sidebar for chat history
+                    <div class="chat-sidebar">
+                        <div class="chat-history-item active">
+                            <h4>{"Conversation 1"}</h4>
+                            <p class="chat-history-preview">{"Latest message preview..."}</p>
                         </div>
-                        <div class="c-card c-card--stat">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <circle cx="12" cy="12" r="4"></circle>
-                                <path d="M16 8v5a3 3 0 0 0 6 0v-1a10 10 0 1 0-3.92 7.94"></path>
-                            </svg>
-                            <div class="stat-content">
-                                <span class="c-card__label">{"Online Status"}</span>
-                                <span class="c-card__value">{"Available"}</span>
-                            </div>
+                        <div class="chat-history-item">
+                            <h4>{"Conversation 2"}</h4>
+                            <p class="chat-history-preview">{"Another conversation preview..."}</p>
+                        </div>
+                        <div class="chat-history-item">
+                            <h4>{"Conversation 3"}</h4>
+                            <p class="chat-history-preview">{"More message previews..."}</p>
                         </div>
                     </div>
-                    <div class="chat-placeholder" style="margin-top: 20px; text-align: center;">
-                        <p>{"Chat functionality coming soon..."}</p>
+
+                    // Main chat interface
+                    <div class="chat-main">
+                        // Messages area
+                        <div class="chat-messages">
+                            <div class="message message--user">
+                                <p>{"Hi, how can I assist you today?"}</p>
+                                <div class="message__timestamp">{"09:00 AM"}</div>
+                            </div>
+                            <div class="message message--llm">
+                                <p>{"I'm looking for information on your services."}</p>
+                                <div class="message__timestamp">{"09:01 AM"}</div>
+                            </div>
+                        </div>
+
+                        // Input area
+                        <div class="chat-input">
+                            <form class="chat-input__form">
+                                <textarea 
+                                    class="chat-input__textarea"
+                                    placeholder="Type your message..."
+                                ></textarea>
+                                <button type="submit" class="chat-input__button">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <line x1="22" y1="2" x2="11" y2="13"></line>
+                                        <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                                    </svg>
+                                </button>
+                            </form>
+                        </div>
                     </div>
                 </div>
             </div>

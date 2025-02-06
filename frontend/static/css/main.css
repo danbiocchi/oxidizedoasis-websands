@@ -19,6 +19,7 @@
 @import './components/buttons.css';       /* Button styles */
 @import './components/cards.css';         /* Card containers */
 @import './components/loaders.css';       /* Loading indicators */
+@import './components/chat.css';          /* Chat interface */
 
 /* Form Components */
 @import './components/forms/inputs.css';     /* Form inputs */
