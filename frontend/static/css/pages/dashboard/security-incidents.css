@@ -1,0 +1,44 @@
+/* Security Incidents Styles */
+
+/* Filter Group Layout */
+.c-filters__group {
+    display: flex;
+    gap: var(--spacing-base);
+    flex-wrap: wrap;
+}
+
+/* Severity-specific row styles */
+.c-table__row--critical {
+    border-left: 3px solid var(--color-error);
+}
+
+.c-table__row--high {
+    border-left: 3px solid var(--color-warning);
+}
+
+.c-table__row--medium {
+    border-left: 3px solid var(--color-info);
+}
+
+.c-table__row--low {
+    border-left: 3px solid var(--color-success);
+}
+
+/* Modal list styles */
+.c-modal__body ul {
+    list-style: disc;
+    margin-left: var(--spacing-lg);
+    margin-bottom: var(--spacing-base);
+}
+
+.c-modal__body li {
+    margin-bottom: var(--spacing-xs);
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .c-filters__group {
+        flex-direction: column;
+        gap: var(--spacing-sm);
+    }
+}
