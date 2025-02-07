@@ -294,5 +294,5 @@ Project Link: [https://github.com/danbiocchi/oxidizedoasis-websands](https://git
 ---
 
 <p align="center">
-  Made with ❤️ by the OxidizedOasis-WebSands Team
+  Made in 🟥 🍁 🟥 with ❤️ by the OxidizedOasis-WebSands Team
 </p>
