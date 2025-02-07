@@ -3,7 +3,7 @@
 ## System Architecture Diagram
 
 ```mermaid
-graph TD
+graph LR
     A[OxidizedOasis] --> B[Frontend]
     A --> C[Backend]
     
