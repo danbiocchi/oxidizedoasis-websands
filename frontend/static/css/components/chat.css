@@ -2,8 +2,8 @@
 .chat-container {
     display: flex;
     flex-direction: row;
-    height: calc(100vh - 500px);
-    margin-top: var(--spacing-lg);
+    height: calc(100vh - 300px);
+    margin-top: var(--spacing-sm);
     background: var(--color-surface);
     border-radius: var(--border-radius-lg);
     border: 1px solid var(--color-text-light);
@@ -166,7 +166,7 @@
 /* Responsive Design */
 @media (max-width: 768px) {
     .chat-container {
-        height: calc(100vh - 300px);
+        height: calc(100vh - 200px);
     }
 
     .chat-sidebar {
@@ -198,5 +198,6 @@
  
 /* Chat Heading */
 .chat-heading {
-    padding-bottom: 5px;
+    padding-bottom: 2px;
+    margin-bottom: var(--spacing-xs);
 }
