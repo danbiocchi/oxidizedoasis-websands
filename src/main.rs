@@ -40,9 +40,8 @@ mod infrastructure;
 
 /// Sets up the database connection with migrations
 /// Includes timeout protection to prevent hanging during startup
-async fn setup_database(run_migrations: bool) -> Result<sqlx::Pool<Postgres>, Box<dyn std::error::Error>> {
-    let config = AppConfig::from_env()?;
-    let pool = create_pool(&config).await?;
+async fn setup_database(config: &AppConfig, run_migrations: bool) -> Result<sqlx::Pool<Postgres>, Box<dyn std::error::Error>> {
+    let pool = create_pool(config).await?;
 
     if run_migrations {
         info!("Running database migrations");
@@ -95,6 +94,9 @@ async fn main() -> std::io::Result<()> {
         }
     };
 
+    // Clone the config for use in the HttpServer closure
+    let config_clone = config.clone();
+    
     // Store configuration values we need after the move into HttpServer::new
     let server_host = config.server.host.clone();
     let server_port = config.server.port.clone();
@@ -108,7 +110,7 @@ async fn main() -> std::io::Result<()> {
     // This prevents the application from hanging during startup
     let pool = match tokio::time::timeout(
         Duration::from_secs(30),
-        setup_database(run_migrations)
+        setup_database(&config, run_migrations)
     ).await {
         Ok(Ok(pool)) => pool,
         Ok(Err(e)) => {
@@ -134,28 +136,17 @@ async fn main() -> std::io::Result<()> {
     let server_addr = format!("{}:{}", server_host, server_port);
     debug!("Server will be listening on: {}", server_addr);
 
-    // Global rate limiting configuration
-    // Allows bursts while preventing DOS attacks
-
-
     // Start HTTP server with security configurations
     HttpServer::new(move || {
-        // Create new config instance for each worker
-        let config = AppConfig::from_env().expect("Failed to load config");
-
+        let config = config_clone.clone();
         debug!("Setting up new application instance");
         App::new()
             // Security middleware stack - order matters!
-            // 1. Compression (should be first)
-            .wrap(middleware::Compress::default())
+            // 1. Rate limiting first to prevent DoS
+            .wrap(RateLimiter::new())
             // 2. CORS protection
             .wrap(configure_cors())
-            // 3. Request logging for security auditing
-            .wrap(RequestLogger::new())
-            .wrap(middleware::Logger::default())
-            // 4. Global rate limiting protection
-            .wrap(RateLimiter::new())
-            // 6. Security headers
+            // 3. Security headers
             .wrap(
                 middleware::DefaultHeaders::new()
                     // Prevent XSS attacks
@@ -189,10 +180,11 @@ async fn main() -> std::io::Result<()> {
                          worker-src 'self' blob:; \
                          upgrade-insecure-requests;"
                     ))
-                    .add(("X-Content-Type-Options", "nosniff"))
             )
-            // Enhanced logging for security auditing
-            .wrap(middleware::Logger::new("%a %r %s %b %{Referer}i %{User-Agent}i %T"))
+            // 4. Enhanced request logging for security auditing (with referer and user agent)
+            .wrap(RequestLogger::new())
+            // 5. Compression last (after security controls)
+            .wrap(middleware::Compress::default())
 
             // App Data
             .app_data(web::Data::new(pool.clone()))

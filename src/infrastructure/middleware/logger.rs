@@ -54,14 +54,36 @@ where
         let method = req.method().clone();
         let path = req.path().to_string();
         let remote_addr = req.connection_info().peer_addr().unwrap_or("unknown").to_string();
-        let headers = req.headers().clone();
+        
+        // Extract and clone header values to avoid lifetime issues
+        let referer = if let Some(referer_header) = req.headers().get("Referer") {
+            match referer_header.to_str() {
+                Ok(val) => val.to_string(),
+                Err(_) => "invalid".to_string(),
+            }
+        } else {
+            "none".to_string()
+        };
+        
+        let user_agent = if let Some(ua_header) = req.headers().get("User-Agent") {
+            match ua_header.to_str() {
+                Ok(val) => val.to_string(),
+                Err(_) => "invalid".to_string(),
+            }
+        } else {
+            "none".to_string()
+        };
+        
+        let headers_count = req.headers().len();
 
         debug!(
-            "Incoming request: {} {} from {} with {} headers",
+            "Incoming request: {} {} from {} with {} headers, Referer: {}, User-Agent: {}",
             method,
             path,
             remote_addr,
-            headers.len()
+            headers_count,
+            referer,
+            user_agent
         );
 
         let fut = self.service.call(req);
@@ -75,42 +97,50 @@ where
             match status.as_u16() {
                 200..=299 => {
                     info!(
-                        "SUCCESS: {} {} {} [{}ms] from {}",
+                        "SUCCESS: {} {} {} [{}ms] from {} UA:\"{}\" Ref:\"{}\"",
                         method,
                         path,
                         status.as_u16(),
                         duration.as_millis(),
-                        remote_addr
+                        remote_addr,
+                        user_agent,
+                        referer
                     );
                 }
                 400..=499 => {
                     warn!(
-                        "CLIENT ERROR: {} {} {} [{}ms] from {}",
+                        "CLIENT ERROR: {} {} {} [{}ms] from {} UA:\"{}\" Ref:\"{}\"",
                         method,
                         path,
                         status.as_u16(),
                         duration.as_millis(),
-                        remote_addr
+                        remote_addr,
+                        user_agent,
+                        referer
                     );
                 }
                 500..=599 => {
                     warn!(
-                        "SERVER ERROR: {} {} {} [{}ms] from {}",
+                        "SERVER ERROR: {} {} {} [{}ms] from {} UA:\"{}\" Ref:\"{}\"",
                         method,
                         path,
                         status.as_u16(),
                         duration.as_millis(),
-                        remote_addr
+                        remote_addr,
+                        user_agent,
+                        referer
                     );
                 }
                 _ => {
                     info!(
-                        "OTHER: {} {} {} [{}ms] from {}",
+                        "OTHER: {} {} {} [{}ms] from {} UA:\"{}\" Ref:\"{}\"",
                         method,
                         path,
                         status.as_u16(),
                         duration.as_millis(),
-                        remote_addr
+                        remote_addr,
+                        user_agent,
+                        referer
                     );
                 }
             }
