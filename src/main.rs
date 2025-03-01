@@ -31,6 +31,7 @@ use crate::api::routes::configure_routes;
 use crate::api::handlers::user_handler::create_handler as create_user_handler;
 use crate::core::email::EmailService;
 use crate::core::user::{User, UserRepository};
+use crate::core::auth::token_revocation::TokenRevocationService;
 use crate::infrastructure::{AppConfig, configure_cors, create_pool, RequestLogger, RateLimiter};
 
 mod api;
@@ -125,7 +126,30 @@ async fn main() -> std::io::Result<()> {
 
     // Initialize services
     let email_service = Arc::new(EmailService::new());
-
+    
+    // Initialize token revocation service
+    let token_revocation_service = Arc::new(TokenRevocationService::new(pool.clone()));
+    crate::core::auth::jwt::init_token_revocation(token_revocation_service.clone());
+    
+    // Start a background task to clean up expired revoked tokens
+    let cleanup_service = token_revocation_service.clone();
+    tokio::spawn(async move {
+        let mut interval = tokio::time::interval(Duration::from_secs(3600)); // Run every hour
+        loop {
+            interval.tick().await;
+            match cleanup_service.cleanup_expired_tokens().await {
+                Ok(count) => {
+                    if count > 0 {
+                        info!("Cleaned up {} expired revoked tokens", count);
+                    }
+                },
+                Err(e) => {
+                    error!("Failed to clean up expired revoked tokens: {:?}", e);
+                }
+            }
+        }
+    });
+    
     // Create user handler
     let user_handler = web::Data::new(create_user_handler(
         pool.clone(),

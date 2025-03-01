@@ -99,7 +99,7 @@ impl Component for Dashboard {
         let navigator = ctx.link().navigator().unwrap();
 
         // Check for authentication token
-        if auth::get_token().is_none() {
+        if !auth::is_authenticated() {
             navigator.push(&Route::Login);
             return Self {
                 user_info: None,
@@ -301,31 +301,72 @@ impl Dashboard {
 }
 
 async fn fetch_user_info() -> Result<User, String> {
-    let token = auth::get_token().ok_or("No auth token found")?;
+    let token = auth::get_auth_token().ok_or("No auth token found")?;
 
-    let response = gloo::net::http::Request::get("/api/users/me")
-        .header("Authorization", &format!("Bearer {}", token))
-        .send()
-        .await
-        .map_err(|e| format!("Network error: {}", e.to_string()))?;
+    let request = gloo::net::http::Request::get("/api/users/me")
+        .header("Authorization", &format!("Bearer {}", token));
 
+    let response = request.send().await.map_err(|e| e.to_string())?;
+
+    // Check if response is not successful (not in the 200-299 range)
     if !response.ok() {
-        return Err("Unauthorized access".to_string());
+        // If unauthorized (401), try to refresh the token
+        if response.status() == 401 || response.status() == 403 {
+            // Token may be expired, try to refresh
+            match auth::refresh_access_token().await {
+                Ok(()) => {
+                    // Token refreshed, retry the request
+                    let new_token = auth::get_auth_token().ok_or("No auth token found after refresh")?;
+                    let new_request = gloo::net::http::Request::get("/api/users/me")
+                        .header("Authorization", &format!("Bearer {}", new_token));
+                    let new_response = new_request.send().await.map_err(|e| e.to_string())?;
+
+                    // Check if the new response is successful
+                    if !new_response.ok() {
+                        return Err("Unauthorized access after refresh".to_string());
+                    }
+
+                    let response_text = new_response.text().await.map_err(|e| e.to_string())?;
+                    log!("Response after refresh: {}", &response_text);
+
+                    let data: DashboardResponse = serde_json::from_str(&response_text)
+                        .map_err(|e| format!("Failed to parse response: {}", e))?;
+
+                    if !data.success {
+                        return Err(data.error.unwrap_or_else(|| "Unknown error occurred".into()));
+                    }
+
+                    match data.data {
+                        Some(user_data) => Ok(user_data.user),
+                        None => Err("No user data in response".into())
+                    }
+                }
+                Err(e) => {
+                    // Refresh token failed, redirect to login
+                    auth::remove_tokens(); // Clear invalid tokens
+                    Err(format!("Token refresh failed: {}", e))
+                }
+            }
+        } else {
+            // Handle other error status codes
+            Err(format!("API error: Status {}", response.status()))
+        }
     }
+ else {
+        // Process successful response
+        let response_text = response.text().await.map_err(|e| e.to_string())?;
 
-    let response_text = response.text().await
-        .map_err(|e| format!("Failed to get response text: {}", e))?;
+        log!("Response: {}", &response_text);
 
-    let data: DashboardResponse = serde_json::from_str(&response_text)
-        .map_err(|e| format!("Failed to parse response: {}", e))?;
+        let data: DashboardResponse = serde_json::from_str(&response_text)
+            .map_err(|e| format!("Failed to parse response: {}", e))?;
 
-    if !data.success {
-        return Err(data.error.unwrap_or_else(|| "Unknown error occurred".to_string()));
-    }
-
-    match data.data {
-        Some(user_data) => Ok(user_data.user),
-        None => Err("No user data in response".to_string()),
+        if !data.success {
+            Err(data.error.unwrap_or_else(|| "Unknown error occurred".into()))
+   
+    } else {
+            data.data.map(|user_data| user_data.user).ok_or_else(|| "No user data in response".into())
+        }
     }
 }
 

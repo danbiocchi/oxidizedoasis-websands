@@ -1,10 +1,10 @@
-use crate::core::auth::jwt::validate_jwt;
+use crate::core::auth::jwt::{validate_jwt, TokenType};
 use actix_web::error::ResponseError;
 use actix_web::{dev::ServiceRequest, Error, HttpMessage, HttpResponse};
 use actix_web_httpauth::extractors::bearer::BearerAuth;
 use serde_json::json;
 use std::fmt;
-use log::{error, debug, info};
+use log::{error, debug, info, warn};
 
 
 #[derive(Debug)]
@@ -33,9 +33,21 @@ pub async fn jwt_auth_validator(req: ServiceRequest, credentials: BearerAuth) ->
 
     debug!("Validating JWT token");
 
-    match validate_jwt(token, &jwt_secret) {
+    // Validate as an access token - we don't accept refresh tokens for API access
+    let validation_result = validate_jwt(token, &jwt_secret, Some(TokenType::Access)).await;
+    
+    match validation_result {
         Ok(claims) => {
             info!("Token validated successfully for user: {}", claims.sub);
+            
+            // Check token expiration time and warn if it's close to expiring
+            let now = chrono::Utc::now().timestamp();
+            let remaining_time = claims.exp - now;
+            
+            if remaining_time < 300 { // Less than 5 minutes remaining
+                warn!("Token for user {} is about to expire in {} seconds", claims.sub, remaining_time);
+            }
+            
             // Add claims to request extensions for use in handlers
             req.extensions_mut().insert(claims);
             Ok(req)

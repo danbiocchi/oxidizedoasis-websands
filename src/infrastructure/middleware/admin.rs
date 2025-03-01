@@ -3,8 +3,8 @@ use actix_web::{dev::ServiceRequest, Error, HttpMessage, HttpResponse};
 use actix_web_httpauth::extractors::bearer::BearerAuth;
 use serde_json::json;
 use std::fmt;
-use log::{error, debug};
-use crate::core::auth::jwt::{validate_jwt, Claims};
+use log::{error, debug, warn};
+use crate::core::auth::jwt::{validate_jwt, Claims, TokenType};
 
 #[derive(Debug)]
 pub struct AdminError {
@@ -33,13 +33,26 @@ pub async fn admin_validator(req: ServiceRequest, credentials: BearerAuth) -> Re
 
     debug!("Attempting to validate token for admin access");
 
-    match validate_jwt(token, &jwt_secret) {
+    // Validate as an access token - we don't accept refresh tokens for API access
+    let validation_result = validate_jwt(token, &jwt_secret, Some(TokenType::Access)).await;
+    
+    match validation_result {
         Ok(claims) => {
+            // Check if the user has admin role
             if claims.role != "admin" {
-                error!("Access denied: User role is not admin");
+                error!("Access denied: User {} with role {} attempted to access admin endpoint", 
+                       claims.sub, claims.role);
                 return Err((AdminError {
                     message: "Access denied: Insufficient privileges".to_string()
                 }.into(), req));
+            }
+            
+            // Check token expiration time and warn if it's close to expiring
+            let now = chrono::Utc::now().timestamp();
+            let remaining_time = claims.exp - now;
+            
+            if remaining_time < 300 { // Less than 5 minutes remaining
+                warn!("Admin token for user {} is about to expire in {} seconds", claims.sub, remaining_time);
             }
             
             debug!("Admin access granted for user: {}", claims.sub);

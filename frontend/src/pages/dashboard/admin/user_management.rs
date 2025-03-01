@@ -156,7 +156,7 @@ impl Component for UserManagement {
 }
 
 async fn fetch_users() -> Result<Vec<UserAdminView>, String> {
-    let token = auth::get_token().ok_or("No auth token found")?;
+    let token = auth::get_auth_token().ok_or("No auth token found")?;
 
     let response = gloo::net::http::Request::get("/api/admin/users")
         .header("Authorization", &format!("Bearer {}", token))
@@ -165,21 +165,64 @@ async fn fetch_users() -> Result<Vec<UserAdminView>, String> {
         .map_err(|e| format!("Network error: {}", e.to_string()))?;
 
     if !response.ok() {
-        return Err(format!("Failed to fetch users: {}", response.status()));
-    }
+        // If unauthorized (401) or forbidden (403), try to refresh the token
+        if response.status() == 401 || response.status() == 403 {
+            // Token may be expired, try to refresh
+            match auth::refresh_access_token().await {
+                Ok(()) => {
+                    // Token refreshed, retry the request
+                    let new_token = auth::get_auth_token().ok_or("No auth token found after refresh")?;
+                    let new_response = gloo::net::http::Request::get("/api/admin/users")
+                        .header("Authorization", &format!("Bearer {}", new_token))
+                        .send()
+                        .await
+                        .map_err(|e| format!("Network error after refresh: {}", e.to_string()))?;
+                    
+                    // Check if the new response is successful
+                    if !new_response.ok() {
+                        return Err("Unauthorized access after refresh".to_string());
+                    }
+                    
+                    let response_text = new_response.text().await
+                        .map_err(|e| format!("Failed to get response text: {}", e))?;
+                    
+                    let api_response: ApiResponse<UserListResponse> = serde_json::from_str(&response_text)
+                        .map_err(|e| format!("Failed to parse response: {}", e))?;
+                    
+                    if !api_response.success {
+                        return Err(api_response.error.unwrap_or_else(|| "Unknown error occurred".to_string()));
+                    }
+                    
+                    match api_response.data {
+                        Some(user_list) => return Ok(user_list.users),
+                        None => return Err("No user data in response".to_string()),
+                    }
+                }
+                Err(e) => {
+                    // Refresh token failed, clear tokens
+                    auth::remove_tokens();
+                    return Err(format!("Token refresh failed: {}", e));
+                }
+            }
+        } else {
+            // Handle other error status codes
+            return Err(format!("Failed to fetch users: {}", response.status()));
+        }
+    } else {
+        // Process successful response
+        let response_text = response.text().await
+            .map_err(|e| format!("Failed to get response text: {}", e))?;
 
-    let response_text = response.text().await
-        .map_err(|e| format!("Failed to get response text: {}", e))?;
+        let api_response: ApiResponse<UserListResponse> = serde_json::from_str(&response_text)
+            .map_err(|e| format!("Failed to parse response: {}", e))?;
 
-    let api_response: ApiResponse<UserListResponse> = serde_json::from_str(&response_text)
-        .map_err(|e| format!("Failed to parse response: {}", e))?;
-
-    if !api_response.success {
-        return Err(api_response.error.unwrap_or_else(|| "Unknown error occurred".to_string()));
-    }
-
-    match api_response.data {
-        Some(user_list) => Ok(user_list.users),
-        None => Err("No user data in response".to_string()),
+        if !api_response.success {
+            return Err(api_response.error.unwrap_or_else(|| "Unknown error occurred".to_string()));
+        }
+        
+        match api_response.data {
+            Some(user_list) => Ok(user_list.users),
+            None => Err("No user data in response".to_string()),
+        }
     }
 }

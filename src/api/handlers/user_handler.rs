@@ -10,6 +10,12 @@ use crate::core::auth::AuthService;
 use crate::core::email::EmailServiceTrait;
 use crate::common::validation::{UserInput, LoginInput, TokenQuery};
 use crate::core::user::model::{PasswordResetRequest, PasswordResetSubmit};
+use serde::{Serialize, Deserialize};
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct RefreshToken {
+    pub token: String,
+}
 
 pub struct UserHandler {
     user_service: Arc<UserService>,
@@ -67,13 +73,14 @@ impl UserHandler {
         login_input: web::Json<LoginInput>,
     ) -> impl Responder {
         match self.auth_service.login(login_input.into_inner()).await {
-            Ok((token, user)) => {
+            Ok((token_pair, user)) => {
                 info!("User logged in successfully: {}", user.id);
                 HttpResponse::Ok().json(json!({
                     "success": true,
                     "message": "Login successful",
                     "data": {
-                        "token": token,
+                        "access_token": token_pair.access_token,
+                        "refresh_token": token_pair.refresh_token,
                         "user": {
                             "id": user.id,
                             "username": user.username,
@@ -393,6 +400,67 @@ impl UserHandler {
             }))
         }
     }
+    
+    /// Logout a user by revoking their tokens
+    /// Refresh an access token using a refresh token
+    pub async fn refresh_token(
+        &self,
+        refresh_token: web::Json<RefreshToken>,
+    ) -> impl Responder {
+        debug!("Attempting to refresh access token");
+        
+        match self.auth_service.refresh_token(&refresh_token.token).await {
+            Ok(new_access_token) => {
+                info!("Access token refreshed successfully");
+                HttpResponse::Ok().json(json!({
+                    "success": true,
+                    "message": "Token refreshed successfully",
+                    "data": {
+                        "access_token": new_access_token
+                    }
+                }))
+            },
+            Err(e) => {
+                error!("Failed to refresh token: {:?}", e);
+                HttpResponse::Unauthorized().json(json!({
+                    "success": false,
+                    "message": "Invalid refresh token",
+                    "error": "Authentication failed"
+                }))
+            }
+        }
+    }
+    
+    pub async fn logout_user(
+        &self,
+        auth: BearerAuth,
+        refresh_token: Option<web::Json<RefreshToken>>,
+    ) -> impl Responder {
+        // Get the access token from the auth header
+        let access_token = auth.token();
+        
+        // Get the refresh token from the request body if provided
+        let refresh_token = refresh_token.map(|rt| rt.into_inner().token);
+        
+        // Logout the user by revoking their tokens
+        match self.auth_service.logout(access_token, refresh_token.as_deref()).await {
+            Ok(()) => {
+                info!("User logged out successfully");
+                HttpResponse::Ok().json(json!({
+                    "success": true,
+                    "message": "Logged out successfully"
+                }))
+            },
+            Err(e) => {
+                error!("Failed to logout: {:?}", e);
+                HttpResponse::InternalServerError().json(json!({
+                    "success": false,
+                    "message": "Failed to logout",
+                    "error": "Internal server error"
+                }))
+            }
+        }
+    }
 }
 
 // Factory function to create handler instance
@@ -473,4 +541,19 @@ pub async fn delete_user_handler(
     auth: BearerAuth,
 ) -> impl Responder {
     handler.delete_user(user_id, auth).await
+}
+
+pub async fn logout_user_handler(
+    handler: web::Data<UserHandler>,
+    auth: BearerAuth,
+    refresh_token: Option<web::Json<RefreshToken>>,
+) -> impl Responder {
+    handler.logout_user(auth, refresh_token).await
+}
+
+pub async fn refresh_token_handler(
+    handler: web::Data<UserHandler>,
+    refresh_token: web::Json<RefreshToken>,
+) -> impl Responder {
+    handler.refresh_token(refresh_token).await
 }

@@ -8,6 +8,7 @@ use crate::services::auth_context::AuthContext;
 use yew_router::prelude::*;
 use crate::routes::Route;
 use gloo::console::log;
+use serde_json::Value;
 
 #[derive(Default, Clone, Serialize)]
 struct LoginForm {
@@ -24,7 +25,10 @@ struct LoginResponse {
 
 #[derive(Deserialize)]
 struct LoginData {
-    token: String,
+    #[serde(default)]
+    access_token: String,
+    #[serde(default)]
+    refresh_token: String,
     user: User,
 }
 
@@ -35,6 +39,8 @@ struct User {
     email: String,
     is_email_verified: bool,
     created_at: String,
+    #[serde(default)]
+    role: String,
 }
 
 #[function_component(Login)]
@@ -81,7 +87,18 @@ pub fn login() -> Html {
                                 if login_resp.success {
                                     if let Some(data) = login_resp.data {
                                         log!("Login successful");
-                                        auth::set_token(&data.token);
+                                        
+                                        // Handle token data
+                                        if !data.access_token.is_empty() {
+                                            log!("Received access token");
+                                            auth::set_access_token(&data.access_token);
+                                            
+                                            if !data.refresh_token.is_empty() {
+                                                log!("Received refresh token");
+                                                auth::set_refresh_token(&data.refresh_token);
+                                            }
+                                        }
+                                        
                                         set_auth.emit(true);
                                         navigator.push(&Route::Dashboard);
                                     } else {
@@ -93,6 +110,42 @@ pub fn login() -> Html {
                             },
                             Err(e) => {
                                 log!("Failed to parse login response:", e.to_string());
+                                
+                                // Try to parse as raw JSON to debug
+                                match resp.text().await {
+                                    Ok(text) => {
+                                        let text_clone = text.clone();
+                                        log!("Raw response:", text_clone);
+                                        
+                                        // Try to manually extract tokens from JSON
+                                        if let Ok(json) = serde_json::from_str::<Value>(&text) {
+                                            if let Some(data) = json.get("data") {
+                                                let mut has_token = false;
+                                                
+                                                // Try to get access token
+                                                if let Some(access_token) = data.get("access_token").and_then(|t| t.as_str()) {
+                                                    log!("Found access token, setting");
+                                                    auth::set_access_token(access_token);
+                                                    has_token = true;
+                                                    
+                                                    // Try to get refresh token
+                                                    if let Some(refresh_token) = data.get("refresh_token").and_then(|t| t.as_str()) {
+                                                        log!("Found refresh token, setting");
+                                                        auth::set_refresh_token(refresh_token);
+                                                    }
+                                                }
+                                                
+                                                if has_token {
+                                                    set_auth.emit(true);
+                                                    navigator.push(&Route::Dashboard);
+                                                    return;
+                                                }
+                                            }
+                                        }
+                                    },
+                                    Err(_) => {}
+                                }
+                                
                                 error.set(Some("An error occurred while processing the response".to_string()));
                             }
                         }
