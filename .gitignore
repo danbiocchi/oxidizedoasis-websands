@@ -19,3 +19,6 @@ frontend/dist/
 Thumbs.db
 
 cline_docs/
+
+.clinerules-*
+.roomodes
