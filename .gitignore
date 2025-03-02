@@ -4,7 +4,6 @@
 .env
 .env.test
 
-
 # Ignore logs
 *.log
 
@@ -13,12 +12,13 @@
 .idea/
 frontend/dist/
 
-
 # Ignore OS-generated files
 .DS_Store
-Thumbs.db
+Thumbs.db 
 
-cline_docs/
-
+# Ignore AI Agent Files
+cline_docs/ 
 .clinerules-*
 .roomodes
+memory-bank/
+projectBrief.md
