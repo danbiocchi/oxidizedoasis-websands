@@ -92,6 +92,7 @@ pub fn logout() {
 // Refresh access token using refresh token
 pub async fn refresh_access_token() -> Result<(), String> {
     if let Some(refresh_token) = get_refresh_token() {
+        log!("Refreshing tokens using refresh token");
         match Request::post("/users/refresh")
             .json(&json!({
                 "token": refresh_token
@@ -103,11 +104,20 @@ pub async fn refresh_access_token() -> Result<(), String> {
             Ok(response) => {
                 match response.json::<serde_json::Value>().await {
                     Ok(data) => {
-                        if let Some(new_token) = data.get("data").and_then(|d| d.get("access_token")).and_then(|t| t.as_str()) {
-                            set_access_token(new_token);
-                            return Ok(());
+                        // Extract both tokens from the response
+                        let data_obj = data.get("data");
+                        let new_access_token = data_obj.and_then(|d| d.get("access_token")).and_then(|t| t.as_str());
+                        let new_refresh_token = data_obj.and_then(|d| d.get("refresh_token")).and_then(|t| t.as_str());
+                        
+                        if let (Some(access_token), Some(refresh_token)) = (new_access_token, new_refresh_token) {
+                            // Store both new tokens
+                            log!("Received new token pair, updating storage");
+                            set_token_pair(access_token, refresh_token);
+                            Ok(())
+                        } else {
+                            log!("Invalid token response format");
+                            Err("Invalid response format: missing tokens".to_string())
                         }
-                        Err("Invalid response format".to_string())
                     },
                     Err(e) => Err(format!("Failed to parse response: {}", e))
                 }

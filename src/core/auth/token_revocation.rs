@@ -1,8 +1,10 @@
 use sqlx::{PgPool, Error as SqlxError};
 use uuid::Uuid;
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, Utc, Duration};
 use log::{debug, error, info, warn};
 use crate::core::auth::jwt::TokenType;
+use crate::core::auth::active_token::ActiveTokenService;
+use std::sync::Arc;
 
 /// Represents a revoked token in the database
 #[derive(Debug)]
@@ -19,12 +21,18 @@ pub struct RevokedToken {
 /// Service for managing token revocation
 pub struct TokenRevocationService {
     pool: PgPool,
+    active_token_service: Option<Arc<ActiveTokenService>>,
 }
 
 impl TokenRevocationService {
     /// Create a new TokenRevocationService
     pub fn new(pool: PgPool) -> Self {
-        Self { pool }
+        Self { pool, active_token_service: None }
+    }
+    
+    /// Set the active token service
+    pub fn set_active_token_service(&mut self, service: Arc<ActiveTokenService>) {
+        self.active_token_service = Some(service);
     }
 
     /// Check if a token is revoked
@@ -86,14 +94,53 @@ impl TokenRevocationService {
     ) -> Result<u64, SqlxError> {
         warn!("Revoking all tokens for user: {}", user_id);
         
-        // This is a placeholder. In a real implementation, we would need to know
-        // all the JTIs for the user's tokens, which would require tracking them.
-        // For now, we'll just add a note that this would revoke all tokens.
+        let mut revoked_count = 0;
         
-        info!("Would revoke all tokens for user: {}", user_id);
+        // Get all active tokens for the user if the active token service is available
+        if let Some(active_service) = &self.active_token_service {
+            match active_service.get_user_tokens(user_id).await {
+                Ok(tokens) => {
+                    info!("Found {} active tokens for user {}", tokens.len(), user_id);
+                    
+                    // Revoke each token
+                    for token in tokens {
+                        let token_type = match token.token_type.as_str() {
+                            "access" => TokenType::Access,
+                            "refresh" => TokenType::Refresh,
+                            _ => continue, // Skip invalid token types
+                        };
+                        
+                        match self.revoke_token(
+                            &token.jti,
+                            user_id,
+                            token_type,
+                            token.expires_at,
+                            reason,
+                        ).await {
+                            Ok(_) => {
+                                revoked_count += 1;
+                                debug!("Revoked token {} for user {}", token.jti, user_id);
+                            },
+                            Err(e) => {
+                                error!("Failed to revoke token {} for user {}: {:?}", token.jti, user_id, e);
+                            }
+                        }
+                    }
+                    
+                    // Remove all active tokens for the user
+                    if let Err(e) = active_service.remove_all_user_tokens(user_id).await {
+                        error!("Failed to remove active tokens for user {}: {:?}", user_id, e);
+                    }
+                },
+                Err(e) => {
+                    error!("Failed to get active tokens for user {}: {:?}", user_id, e);
+                }
+            }
+        } else {
+            warn!("Active token service not available, cannot revoke all tokens for user {}", user_id);
+        }
         
-        // Return 0 as we didn't actually revoke any tokens
-        Ok(0)
+        Ok(revoked_count)
     }
 
     /// Clean up expired revoked tokens

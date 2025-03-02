@@ -32,6 +32,7 @@ use crate::api::handlers::user_handler::create_handler as create_user_handler;
 use crate::core::email::EmailService;
 use crate::core::user::{User, UserRepository};
 use crate::core::auth::token_revocation::TokenRevocationService;
+use crate::core::auth::active_token::ActiveTokenService;
 use crate::infrastructure::{AppConfig, configure_cors, create_pool, RequestLogger, RateLimiter};
 
 mod api;
@@ -127,8 +128,15 @@ async fn main() -> std::io::Result<()> {
     // Initialize services
     let email_service = Arc::new(EmailService::new());
     
-    // Initialize token revocation service
-    let token_revocation_service = Arc::new(TokenRevocationService::new(pool.clone()));
+    // Initialize active token service first
+    let active_token_service = Arc::new(ActiveTokenService::new(pool.clone()));
+    crate::core::auth::jwt::init_active_token_service(active_token_service.clone());
+    
+    // Initialize token revocation service with active token service
+    // Create a mutable instance first, set the active token service, then wrap in Arc
+    let mut token_revocation_service_mut = TokenRevocationService::new(pool.clone());
+    token_revocation_service_mut.set_active_token_service(active_token_service.clone());
+    let token_revocation_service = Arc::new(token_revocation_service_mut);
     crate::core::auth::jwt::init_token_revocation(token_revocation_service.clone());
     
     // Start a background task to clean up expired revoked tokens
@@ -145,6 +153,25 @@ async fn main() -> std::io::Result<()> {
                 },
                 Err(e) => {
                     error!("Failed to clean up expired revoked tokens: {:?}", e);
+                }
+            }
+        }
+    });
+
+    // Start a background task to clean up expired active tokens
+    let cleanup_active_service = active_token_service.clone();
+    tokio::spawn(async move {
+        let mut interval = tokio::time::interval(Duration::from_secs(3600)); // Run every hour
+        loop {
+            interval.tick().await;
+            match cleanup_active_service.cleanup_expired_tokens().await {
+                Ok(count) => {
+                    if count > 0 {
+                        info!("Cleaned up {} expired active tokens", count);
+                    }
+                },
+                Err(e) => {
+                    error!("Failed to clean up expired active tokens: {:?}", e);
                 }
             }
         }
@@ -276,4 +303,3 @@ async fn main() -> std::io::Result<()> {
         .run()
         .await
 }
-

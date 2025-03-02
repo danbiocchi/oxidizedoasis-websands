@@ -3,6 +3,7 @@ use std::sync::Arc;
 use bcrypt::{hash, DEFAULT_COST};
 use uuid::Uuid;
 use log::{debug, error, info};
+use chrono::Utc;
 
 use crate::common::{
     error::{ApiError, ApiErrorType, DbError},
@@ -124,12 +125,35 @@ impl UserService {
             None
         };
 
-        self.repository.update(id, &validated_input, password_hash)
+        let updated_user = self.repository.update(id, &validated_input, password_hash.clone())
             .await
             .map_err(|e| {
                 error!("Failed to update user {}: {}", id, e);
                 ApiError::from(DbError::from(e))  // Convert sqlx::Error -> DbError -> ApiError
             })
+?;
+
+        // If password was changed, revoke all tokens
+        if password_hash.is_some() {
+            unsafe {
+                let service_ptr = &raw const crate::core::auth::jwt::TOKEN_REVOCATION_SERVICE;
+                if let Some(service) = &*service_ptr {
+                    match service.revoke_all_user_tokens(
+                        id,
+                        Some("Password changed"),
+                    ).await {
+                        Ok(count) => {
+                            info!("Revoked {} tokens after password change for user {}", count, id);
+                        },
+                        Err(e) => {
+                            error!("Failed to revoke tokens after password change: {:?}", e);
+                            // Continue even if revocation fails
+                        }
+                    }
+                }
+            }
+        }
+        Ok(updated_user)
     }
 
     pub async fn delete_user(&self, id: Uuid) -> Result<(), ApiError> {
@@ -257,6 +281,26 @@ impl UserService {
                 error!("Failed to mark reset token as used: {}", e);
                 ApiError::from(DbError::from(e))
             })?;
+
+        // Revoke all tokens for the user
+        unsafe {
+            let service_ptr = &raw const crate::core::auth::jwt::TOKEN_REVOCATION_SERVICE;
+            if let Some(service) = &*service_ptr {
+                match service.revoke_all_user_tokens(
+                    reset_token.user_id,
+                    Some("Password reset"),
+                ).await {
+                    Ok(count) => {
+                        info!("Revoked {} tokens after password reset for user {}", 
+                              count, reset_token.user_id);
+                    },
+                    Err(e) => {
+                        error!("Failed to revoke tokens after password reset: {:?}", e);
+                        // Continue even if revocation fails
+                    }
+                }
+            }
+        }
 
         info!("Successfully reset password for user: {}", reset_token.user_id);
         Ok(())

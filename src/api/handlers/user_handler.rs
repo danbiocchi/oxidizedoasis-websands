@@ -410,13 +410,14 @@ impl UserHandler {
         debug!("Attempting to refresh access token");
         
         match self.auth_service.refresh_token(&refresh_token.token).await {
-            Ok(new_access_token) => {
-                info!("Access token refreshed successfully");
+            Ok(token_pair) => {
+                info!("Tokens refreshed successfully");
                 HttpResponse::Ok().json(json!({
                     "success": true,
                     "message": "Token refreshed successfully",
                     "data": {
-                        "access_token": new_access_token
+                        "access_token": token_pair.access_token,
+                        "refresh_token": token_pair.refresh_token
                     }
                 }))
             },

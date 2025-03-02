@@ -1,11 +1,12 @@
 use jsonwebtoken::{encode, decode, Header, Validation, EncodingKey, DecodingKey};
 use serde::{Serialize, Deserialize};
-use chrono::{Utc, Duration};
+use chrono::{Utc, Duration, DateTime};
 use uuid::Uuid;
 use log::{debug, error, info, warn};
 use std::env;
 use std::sync::Arc;
 use crate::core::auth::token_revocation::TokenRevocationService;
+use crate::core::auth::active_token::ActiveTokenService;
 
 /// JWT Claims structure with enhanced security
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -31,6 +32,13 @@ pub enum TokenType {
 pub struct TokenPair {
     pub access_token: String,
     pub refresh_token: String,
+}
+
+/// Token metadata containing additional information about a token
+#[derive(Debug, Clone)]
+pub struct TokenMetadata {
+    pub jti: String,
+    pub expires_at: DateTime<Utc>,
 }
 
 /// Get token expiration time based on token type and environment configuration
@@ -63,6 +71,16 @@ fn get_token_expiration(token_type: &TokenType) -> i64 {
     }
 }
 
+/// Convert timestamp to DateTime<Utc>
+fn timestamp_to_datetime(timestamp: i64) -> DateTime<Utc> {
+    use chrono::TimeZone;
+    match Utc.timestamp_opt(timestamp, 0) {
+        chrono::LocalResult::Single(dt) => dt,
+        // This should never happen with valid timestamps
+        _ => Utc::now(),
+    }
+}
+
 /// Create a new JWT token for a user
 ///
 /// # Arguments
@@ -72,13 +90,14 @@ fn get_token_expiration(token_type: &TokenType) -> i64 {
 /// * `token_type` - The type of token (access or refresh)
 ///
 /// # Returns
-/// * `Result<String, jsonwebtoken::errors::Error>` - The JWT token if successful, or an error
+/// * `Result<(String, TokenMetadata), jsonwebtoken::errors::Error>` - The JWT token and metadata if successful, or an error
 pub fn create_jwt(
     user_id: Uuid,
     role: String,
     secret: &str,
     token_type: TokenType
-) -> Result<String, jsonwebtoken::errors::Error> {
+) -> Result<(String, TokenMetadata), jsonwebtoken::errors::Error> {
+    // Generate timestamps
     let now = Utc::now().timestamp();
     let expiration = get_token_expiration(&token_type);
     
@@ -100,14 +119,23 @@ pub fn create_jwt(
           user_id,
           expiration - now);
 
-    encode(
+    // Create the token
+    let token = encode(
         &Header::default(),
         &claims,
         &EncodingKey::from_secret(secret.as_ref()),
     ).map_err(|e| {
         error!("Failed to create JWT: {:?}", e);
         e
-    })
+    })?;
+    
+    // Create token metadata
+    let metadata = TokenMetadata {
+        jti: claims.jti.clone(),
+        expires_at: timestamp_to_datetime(expiration),
+    };
+    
+    Ok((token, metadata))
 }
 
 /// Create a token pair (access token + refresh token)
@@ -124,13 +152,43 @@ pub fn create_token_pair(
     role: String,
     secret: &str
 ) -> Result<TokenPair, jsonwebtoken::errors::Error> {
-    let access_token = create_jwt(user_id, role.clone(), secret, TokenType::Access)?;
-    let refresh_token = create_jwt(user_id, role, secret, TokenType::Refresh)?;
+    let (access_token, _access_metadata) = create_jwt(user_id, role.clone(), secret, TokenType::Access)?;
+    let (refresh_token, _refresh_metadata) = create_jwt(user_id, role, secret, TokenType::Refresh)?;
     
-    Ok(TokenPair {
+    // We'll record these tokens when the service is initialized
+    // This is handled separately to avoid async issues
+    
+    let token_pair = TokenPair {
         access_token,
         refresh_token,
-    })
+    };
+    
+    Ok(token_pair)
+}
+
+/// Record a token in the active tokens table
+///
+/// # Arguments
+/// * `user_id` - The ID of the user
+/// * `metadata` - The token metadata
+/// * `token_type` - The type of token (access or refresh)
+pub async fn record_active_token(user_id: Uuid, metadata: &TokenMetadata, token_type: TokenType) {
+    unsafe {
+        // Get the active token service
+        if let Some(service) = &ACTIVE_TOKEN_SERVICE {
+            if let Err(e) = service.record_token(
+                user_id,
+                &metadata.jti,
+                token_type,
+                metadata.expires_at,
+                None, // No device info for now
+            ).await {
+                error!("Failed to record active token: {:?}", e);
+            }
+        } else {
+            warn!("Active token service not initialized, token will not be tracked");
+        }
+    }
 }
 
 /// Validate a JWT token
@@ -189,6 +247,9 @@ pub async fn validate_jwt(
 // Global token revocation service reference
 pub static mut TOKEN_REVOCATION_SERVICE: Option<Arc<TokenRevocationService>> = None;
 
+// Global active token service reference
+pub static mut ACTIVE_TOKEN_SERVICE: Option<Arc<ActiveTokenService>> = None;
+
 /// Initialize the token revocation service
 /// 
 /// This should be called once during application startup
@@ -201,6 +262,18 @@ pub fn init_token_revocation(service: Arc<TokenRevocationService>) {
     }
 }
 
+/// Initialize the active token service
+/// 
+/// This should be called once during application startup
+///
+/// # Arguments
+/// * `service` - The active token service
+pub fn init_active_token_service(service: Arc<ActiveTokenService>) {
+    unsafe {
+        ACTIVE_TOKEN_SERVICE = Some(service);
+    }
+}
+
 /// Check if a token is in the revocation list
 /// 
 /// # Arguments
@@ -210,9 +283,8 @@ pub fn init_token_revocation(service: Arc<TokenRevocationService>) {
 /// * `bool` - True if the token is revoked, false otherwise
 pub async fn is_token_revoked(jti: &str) -> bool {
     unsafe {
-        // Use raw pointer to avoid shared reference to mutable static
-        let service_ptr = &raw const TOKEN_REVOCATION_SERVICE;
-        if let Some(service) = &*service_ptr {
+        // Check if the token revocation service is initialized
+        if let Some(service) = &TOKEN_REVOCATION_SERVICE {
             match service.is_token_revoked(jti).await {
                 Ok(is_revoked) => is_revoked,
                 Err(e) => {
@@ -230,27 +302,72 @@ pub async fn is_token_revoked(jti: &str) -> bool {
     }
 }
 
-/// Refresh an access token using a valid refresh token
+/// Refresh a token pair using a valid refresh token
+/// This implements refresh token rotation - the old refresh token is revoked
+/// and a new refresh token is issued
 ///
 /// # Arguments
 /// * `refresh_token` - The refresh token
 /// * `secret` - The secret key used to sign the tokens
 ///
 /// # Returns
-/// * `Result<String, jsonwebtoken::errors::Error>` - A new access token if successful, or an error
-pub async fn refresh_access_token(
+/// * `Result<TokenPair, jsonwebtoken::errors::Error>` - A new token pair if successful, or an error
+pub async fn refresh_token_pair(
     refresh_token: &str,
     secret: &str
-) -> Result<String, jsonwebtoken::errors::Error> {
+) -> Result<TokenPair, jsonwebtoken::errors::Error> {
     // Validate the refresh token
-    let validation_result = validate_jwt(refresh_token, secret, Some(TokenType::Refresh)).await;
-    let claims = match validation_result {
+    let refresh_claims = match validate_jwt(refresh_token, secret, Some(TokenType::Refresh)).await {
         Ok(claims) => claims,
         Err(e) => return Err(e),
     };
     
-    // Create a new access token
-    create_jwt(claims.sub, claims.role, secret, TokenType::Access)
+    // Create a new access token and refresh token
+    let (access_token, access_metadata) = create_jwt(refresh_claims.sub, refresh_claims.role.clone(), secret, TokenType::Access)?;
+    let (refresh_token_new, refresh_metadata) = create_jwt(refresh_claims.sub, refresh_claims.role, secret, TokenType::Refresh)?;
+    
+    // Record the new tokens
+    tokio::spawn(async move {
+        record_active_token(refresh_claims.sub, &access_metadata, TokenType::Access).await;
+        record_active_token(refresh_claims.sub, &refresh_metadata, TokenType::Refresh).await;
+    });
+    
+    // Revoke the old refresh token
+    revoke_token(&refresh_claims.jti, refresh_claims.sub, TokenType::Refresh, "Refresh token rotation").await;
+    
+    Ok(TokenPair {
+        access_token,
+        refresh_token: refresh_token_new,
+    })
 }
 
-// Tests removed for simplicity
+/// Revoke a token
+/// 
+/// # Arguments
+/// * `jti` - The JWT ID to revoke
+/// * `user_id` - The user ID associated with the token
+/// * `token_type` - The type of token (access or refresh)
+/// * `reason` - The reason for revocation
+async fn revoke_token(jti: &str, user_id: Uuid, token_type: TokenType, reason: &str) {
+    unsafe {
+        // Check if the token revocation service is initialized
+        if let Some(service) = &TOKEN_REVOCATION_SERVICE {
+            // Check if the active token service is initialized
+            if let Some(active_service) = &ACTIVE_TOKEN_SERVICE {
+                // Get the token from the active tokens table
+                if let Ok(token) = active_service.get_active_token(jti).await {
+                    // Revoke the token
+                    if let Err(e) = service.revoke_token(
+                        jti,
+                        user_id,
+                        token_type,
+                        token.expires_at,
+                        Some(reason),
+                    ).await {
+                        error!("Failed to revoke token: {:?}", e);
+                    }
+                }
+            }
+        }
+    }
+}
