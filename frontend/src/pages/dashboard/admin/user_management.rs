@@ -2,6 +2,7 @@ use yew::prelude::*;
 use serde::Deserialize;
 use wasm_bindgen_futures::spawn_local;
 use crate::services::auth;
+use crate::services::request::{RequestInterceptor, RequestBuilderExt};
 use chrono::{DateTime, Utc};
 
 #[derive(Debug, Clone, Deserialize)]
@@ -156,77 +157,38 @@ impl Component for UserManagement {
 }
 
 async fn fetch_users() -> Result<Vec<UserAdminView>, String> {
-    // Create request with CSRF token
-    let mut request = gloo::net::http::Request::get("/api/admin/users");
-    
-    // Add CSRF token if available
-    if let Some(csrf_token) = auth::get_csrf_token() {
-        request = request.header("X-CSRF-Token", &csrf_token);
+    // Use the RequestInterceptor to handle token refresh and CSRF token automatically
+    let request = RequestInterceptor::get("/api/cookie/admin/users");
+    let response = request.send_with_retry().await?;
+
+    // Check if the response is successful
+    if !response.ok() {
+        // If we still get unauthorized after the RequestInterceptor's automatic retry,
+        // it means we don't have admin privileges
+        let status = response.status();
+        if status == 401 {
+            auth::remove_tokens(); // Clear tokens as they might be invalid
+            return Err("Unauthorized access. Please log in again.".to_string());
+        } else if status == 403 {
+            return Err("Access forbidden. You don't have admin privileges.".to_string());
+        } else {
+            return Err(format!("Failed to fetch users: {}", status));
+        }
     }
     
-    let response = request.send().await
-        .map_err(|e| format!("Network error: {}", e.to_string()))?;
+    // Process successful response
+    let response_text = response.text().await
+        .map_err(|e| format!("Failed to get response text: {}", e))?;
 
-    if !response.ok() {
-        if response.status() == 401 || response.status() == 403 {
-            match auth::refresh_access_token().await {
-                Ok(()) => {
-                    // Cookies refreshed, retry the request with new CSRF token
-                    let mut new_request = gloo::net::http::Request::get("/api/admin/users");
-                    
-                    // Add new CSRF token if available
-                    if let Some(csrf_token) = auth::get_csrf_token() {
-                        new_request = new_request.header("X-CSRF-Token", &csrf_token);
-                    }
-                    
-                    let new_response = new_request.send().await
-                        .map_err(|e| format!("Network error after refresh: {}", e.to_string()))?;
-                    
-                    // Check if the new response is successful
-                    if !new_response.ok() {
-                        return Err("Unauthorized access after refresh".to_string());
-                    }
-                    
-                    let response_text = new_response.text().await
-                        .map_err(|e| format!("Failed to get response text: {}", e))?;
-                    
-                    let api_response: ApiResponse<UserListResponse> = serde_json::from_str(&response_text)
-                        .map_err(|e| format!("Failed to parse response: {}", e))?;
-                    
-                    if !api_response.success {
-                        return Err(api_response.error.unwrap_or_else(|| "Unknown error occurred".to_string()));
-                    }
-                    
-                    match api_response.data {
-                        Some(user_list) => return Ok(user_list.users),
-                        None => return Err("No user data in response".to_string()),
-                    }
-                }
-                Err(e) => {
-                    // Refresh token failed, clear tokens
-                    auth::remove_tokens();
-                    return Err(format!("Token refresh failed: {}", e));
-                }
-            }
-        } else {
-            // Handle other error status codes
-            return Err(format!("Failed to fetch users: {}", response.status()));
-        }
-    } else {
-        // Process successful response
-        let response_text = response.text().await
-            .map_err(|e| format!("Failed to get response text: {}", e))?;
+    let api_response: ApiResponse<UserListResponse> = serde_json::from_str(&response_text)
+        .map_err(|e| format!("Failed to parse response: {}", e))?;
 
-        let api_response: ApiResponse<UserListResponse> = serde_json::from_str(&response_text)
-            .map_err(|e| format!("Failed to parse response: {}", e))?;
-
-        if !api_response.success {
-            return Err(api_response.error.unwrap_or_else(|| "Unknown error occurred".to_string()));
-        }
-        
-        match api_response.data {
-            Some(user_list) => Ok(user_list.users),
-            None => Err("No user data in response".to_string()),
-        }
+    if !api_response.success {
+        return Err(api_response.error.unwrap_or_else(|| "Unknown error occurred".to_string()));
+    }
+    
+    match api_response.data {
+        Some(user_list) => Ok(user_list.users),
+        None => Err("No user data in response".to_string()),
     }
 }
