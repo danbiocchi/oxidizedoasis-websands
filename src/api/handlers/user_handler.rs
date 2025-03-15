@@ -1,15 +1,18 @@
-use actix_web::{web, HttpResponse, Responder, http::header};
+use actix_web::{web, HttpResponse, Responder, http::header, cookie::{Cookie, SameSite}, HttpRequest, HttpMessage};
 use sqlx::PgPool;
 use uuid::Uuid;
 use std::sync::Arc;
 use log::{debug, error, info, warn};
 use actix_web_httpauth::extractors::bearer::BearerAuth;
 use serde_json::json;
+use crate::core::auth::jwt::Claims;
 use crate::core::user::{UserRepository, UserService};
 use crate::core::auth::AuthService;
 use crate::core::email::EmailServiceTrait;
 use crate::common::validation::{UserInput, LoginInput, TokenQuery};
 use crate::core::user::model::{PasswordResetRequest, PasswordResetSubmit};
+use time;
+use crate::infrastructure::middleware::csrf::{CsrfToken, generate_csrf_token};
 use serde::{Serialize, Deserialize};
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -75,7 +78,46 @@ impl UserHandler {
         match self.auth_service.login(login_input.into_inner()).await {
             Ok((token_pair, user)) => {
                 info!("User logged in successfully: {}", user.id);
-                HttpResponse::Ok().json(json!({
+                
+                // Create response
+                let mut response = HttpResponse::Ok();
+                
+                // Set cookies
+                let domain = std::env::var("SERVER_HOST").unwrap_or_else(|_| "127.0.0.1".to_string());
+                let secure = std::env::var("ENVIRONMENT").unwrap_or_else(|_| "development".to_string()) != "development";
+                
+                // Access token cookie
+                let access_cookie = Cookie::build("access_token", token_pair.access_token.clone())
+                    .path("/")
+                    .domain(&domain)
+                    .http_only(true)
+                    .secure(secure)
+                    .same_site(SameSite::Strict)
+                    .max_age(time::Duration::minutes(30))
+                    .finish();
+                
+                // Refresh token cookie
+                let refresh_cookie = Cookie::build("refresh_token", token_pair.refresh_token.clone())
+                    .path("/")
+                    .domain(&domain)
+                    .http_only(true)
+                    .secure(secure)
+                    .same_site(SameSite::Strict)
+                    .max_age(time::Duration::days(7))
+                    .finish();
+                
+                // Generate CSRF token
+                let csrf_token = generate_csrf_token();
+                let csrf_cookie = Cookie::build("csrf_token", csrf_token.token.clone())
+                    .path("/")
+                    .domain(&domain)
+                    .http_only(false) // Must be accessible from JavaScript
+                    .secure(secure)
+                    .same_site(SameSite::Strict)
+                    .max_age(time::Duration::days(7))
+                    .finish();
+                
+                response.cookie(access_cookie).cookie(refresh_cookie).cookie(csrf_cookie).json(json!({
                     "success": true,
                     "message": "Login successful",
                     "data": {
@@ -88,6 +130,8 @@ impl UserHandler {
                             "is_email_verified": user.is_email_verified,
                             "created_at": user.created_at,
                             "role": user.role
+,
+                            "csrf_token": csrf_token.token // Include CSRF token in response for frontend to use
                         }
                     }
                 }))
@@ -228,6 +272,49 @@ impl UserHandler {
                     "error": "Authentication failed"
                 }))
             }
+        }
+    }
+
+    pub async fn get_current_user_from_cookie(
+        &self,
+        req: HttpRequest,
+    ) -> impl Responder {
+        // Get claims from request extensions (added by CookieAuthMiddleware)
+        if let Some(claims) = req.extensions().get::<Claims>() {
+            debug!("Found claims in request extensions: {:?}", claims);
+   
+       
+            match self.user_service.get_user_by_id(claims.sub).await {
+                Ok(user) => HttpResponse::Ok().json(json!({
+                    "success": true,
+                    "data": {
+                        "user": {
+                            "id": user.id,
+                            "username": user.username,
+                            "email": user.email,
+                            "is_email_verified": user.is_email_verified,
+                            "created_at": user.created_at,
+                            "role": user.role
+                        }
+                    }
+,
+                    "csrf_token": req.cookie("csrf_token").map(|c| c.value().to_string())
+                })),
+                Err(e) => {
+                    error!("Failed to fetch current user from cookie: {:?}", e);
+                    HttpResponse::NotFound().json(json!({
+                        "success": false,
+                        "message": "User not found",
+                        "error": "Not found"
+                    }))
+                }
+            }
+        } else {
+            HttpResponse::Unauthorized().json(json!({
+                "success": false,
+                "message": "No access token cookie found",
+                "error": "Missing authentication"
+            }))
         }
     }
 
@@ -407,18 +494,60 @@ impl UserHandler {
         &self,
         refresh_token: web::Json<RefreshToken>,
     ) -> impl Responder {
-        debug!("Attempting to refresh access token");
+        debug!("Attempting to refresh access token from JSON body");
         
         match self.auth_service.refresh_token(&refresh_token.token).await {
             Ok(token_pair) => {
                 info!("Tokens refreshed successfully");
-                HttpResponse::Ok().json(json!({
+                
+                // Create response
+                let mut response = HttpResponse::Ok();
+                
+                // Set cookies
+                let domain = std::env::var("SERVER_HOST").unwrap_or_else(|_| "127.0.0.1".to_string());
+                let secure = std::env::var("ENVIRONMENT").unwrap_or_else(|_| "development".to_string()) != "development";
+                
+                // Access token cookie
+                let access_cookie = Cookie::build("access_token", token_pair.access_token.clone())
+                    .path("/")
+                    .domain(&domain)
+                    .http_only(true)
+                    .secure(secure)
+                    .same_site(SameSite::Strict)
+                    .max_age(time::Duration::minutes(30))
+                    .finish();
+                
+                // Refresh token cookie
+                let refresh_cookie = Cookie::build("refresh_token", token_pair.refresh_token.clone())
+                    .path("/")
+                    .domain(&domain)
+                    .http_only(true)
+                    .secure(secure)
+                    .same_site(SameSite::Strict)
+                    .max_age(time::Duration::days(7))
+                    .finish();
+                
+                // Generate CSRF token
+                let csrf_token = generate_csrf_token();
+                let csrf_cookie = Cookie::build("csrf_token", csrf_token.token.clone())
+                    .path("/")
+                    .domain(&domain)
+                    .http_only(false) // Must be accessible from JavaScript
+                    .secure(secure)
+                    .same_site(SameSite::Strict)
+                    .max_age(time::Duration::days(7))
+                    .finish();
+                
+                response.cookie(access_cookie).cookie(refresh_cookie).cookie(csrf_cookie).json(json!({
                     "success": true,
                     "message": "Token refreshed successfully",
                     "data": {
                         "access_token": token_pair.access_token,
+ // Still include in response for backward compatibility
                         "refresh_token": token_pair.refresh_token
                     }
+,
+                    "csrf_token": csrf_token.token
                 }))
             },
             Err(e) => {
@@ -429,6 +558,59 @@ impl UserHandler {
                     "error": "Authentication failed"
                 }))
             }
+        }
+    }
+    
+    /// Refresh token using cookie
+    pub async fn refresh_token_from_cookie(
+        &self,
+        req: HttpRequest,
+    ) -> impl Responder {
+        // Get refresh token from cookie
+        if let Some(cookie) = req.cookie("refresh_token") {
+            debug!("Attempting to refresh access token from cookie");
+            
+            match self.auth_service.refresh_token(cookie.value()).await {
+                Ok(token_pair) => {
+                    info!("Tokens refreshed successfully from cookie");
+                    
+                    // Create response with new cookies (similar to refresh_token method)
+                    let mut response = HttpResponse::Ok();
+                    
+                    // Set cookies (same as in refresh_token method)
+                    let domain = std::env::var("SERVER_HOST").unwrap_or_else(|_| "127.0.0.1".to_string());
+                    let secure = std::env::var("ENVIRONMENT").unwrap_or_else(|_| "development".to_string()) != "development";
+                    
+                    // Set cookies (same as in refresh_token method)
+                    let access_cookie = Cookie::build("access_token", token_pair.access_token)
+                        .path("/").domain(&domain).http_only(true).secure(secure)
+                        .same_site(SameSite::Strict).max_age(time::Duration::minutes(30)).finish();
+                    
+                    let refresh_cookie = Cookie::build("refresh_token", token_pair.refresh_token)
+                        .path("/").domain(&domain).http_only(true).secure(secure)
+                        .same_site(SameSite::Strict).max_age(time::Duration::days(7)).finish();
+
+                    // Generate CSRF token
+                    let csrf_token = generate_csrf_token();
+                    let csrf_cookie = Cookie::build("csrf_token", csrf_token.token.clone())
+                        .path("/")
+                        .domain(&domain)
+                        .http_only(false) // Must be accessible from JavaScript
+                        .secure(secure)
+                        .same_site(SameSite::Strict)
+                        .max_age(time::Duration::days(7))
+                        .finish();
+                        
+                    response.cookie(access_cookie).cookie(refresh_cookie).cookie(csrf_cookie).json(json!({
+                        "success": true, 
+                        "message": "Token refreshed successfully",
+                        "csrf_token": csrf_token.token
+                    }))
+                },
+                Err(e) => HttpResponse::Unauthorized().json(json!({"success": false, "message": "Invalid refresh token", "error": e.to_string()}))
+            }
+        } else {
+            HttpResponse::Unauthorized().json(json!({"success": false, "message": "No refresh token cookie found", "error": "Missing refresh token"}))
         }
     }
     
@@ -446,8 +628,118 @@ impl UserHandler {
         // Logout the user by revoking their tokens
         match self.auth_service.logout(access_token, refresh_token.as_deref()).await {
             Ok(()) => {
+                // Create response
+                let mut response = HttpResponse::Ok();
+                
+                // Set cookies with immediate expiration to clear them
+                let domain = std::env::var("SERVER_HOST").unwrap_or_else(|_| "127.0.0.1".to_string());
+                let secure = std::env::var("ENVIRONMENT").unwrap_or_else(|_| "development".to_string()) != "development";
+                
+                // Clear access token cookie
+                let access_cookie = Cookie::build("access_token", "")
+                    .path("/")
+                    .domain(&domain)
+                    .http_only(true)
+                    .secure(secure)
+                    .max_age(time::Duration::seconds(0))
+                    .finish();
+                
+                // Clear refresh token cookie
+                let refresh_cookie = Cookie::build("refresh_token", "")
+                    .path("/")
+                    .domain(&domain)
+                    .http_only(true)
+                    .secure(secure)
+                    .max_age(time::Duration::seconds(0))
+                    .finish();
+                
+                // Clear CSRF token cookie
+                let csrf_cookie = Cookie::build("csrf_token", "")
+                    .path("/")
+                    .domain(&domain)
+                    .http_only(false)
+                    .secure(secure)
+                    .max_age(time::Duration::seconds(0))
+                    .finish();
+                
                 info!("User logged out successfully");
-                HttpResponse::Ok().json(json!({
+                response.cookie(access_cookie).cookie(refresh_cookie).cookie(csrf_cookie).json(json!({
+                    "success": true,
+                    "message": "Logged out successfully"
+                }))
+            },
+            Err(e) => {
+                error!("Failed to logout: {:?}", e);
+                HttpResponse::InternalServerError().json(json!({
+                    "success": false,
+                    "message": "Failed to logout",
+                    "error": "Internal server error"
+                }))
+            }
+        }
+    }
+    
+    pub async fn logout_user_from_cookie(
+        &self,
+        req: HttpRequest,
+        auth: Option<BearerAuth>,
+    ) -> impl Responder {
+        // Try to get access token from cookie first
+        let access_token = if let Some(cookie) = req.cookie("access_token") {
+            cookie.value().to_string()
+        } else if let Some(auth) = auth {
+            // Fallback to Authorization header for backward compatibility
+            auth.token().to_string()
+        } else {
+            return HttpResponse::Unauthorized().json(json!({
+                "success": false,
+                "message": "No authentication token found",
+                "error": "Missing access token"
+            }));
+        };
+        
+        // Get refresh token from cookie if available
+        let refresh_token = req.cookie("refresh_token").map(|c| c.value().to_string());
+        
+        // Logout the user by revoking their tokens
+        match self.auth_service.logout(&access_token, refresh_token.as_deref()).await {
+            Ok(()) => {
+                // Create response
+                let mut response = HttpResponse::Ok();
+                
+                // Set cookies with immediate expiration to clear them
+                let domain = std::env::var("SERVER_HOST").unwrap_or_else(|_| "127.0.0.1".to_string());
+                let secure = std::env::var("ENVIRONMENT").unwrap_or_else(|_| "development".to_string()) != "development";
+                
+                // Clear access token cookie
+                let access_cookie = Cookie::build("access_token", "")
+                    .path("/")
+                    .domain(&domain)
+                    .http_only(true)
+                    .secure(secure)
+                    .max_age(time::Duration::seconds(0))
+                    .finish();
+                
+                // Clear refresh token cookie
+                let refresh_cookie = Cookie::build("refresh_token", "")
+                    .path("/")
+                    .domain(&domain)
+                    .http_only(true)
+                    .secure(secure)
+                    .max_age(time::Duration::seconds(0))
+                    .finish();
+                
+                // Clear CSRF token cookie
+                let csrf_cookie = Cookie::build("csrf_token", "")
+                    .path("/")
+                    .domain(&domain)
+                    .http_only(false)
+                    .secure(secure)
+                    .max_age(time::Duration::seconds(0))
+                    .finish();
+                
+                info!("User logged out successfully");
+                response.cookie(access_cookie).cookie(refresh_cookie).cookie(csrf_cookie).json(json!({
                     "success": true,
                     "message": "Logged out successfully"
                 }))
@@ -483,6 +775,7 @@ pub async fn login_user_handler(
 ) -> impl Responder {
     handler.login_user(login_input).await
 }
+ 
 
 pub async fn verify_email_handler(
     handler: web::Data<UserHandler>,
@@ -504,6 +797,13 @@ pub async fn get_current_user_handler(
     auth: BearerAuth,
 ) -> impl Responder {
     handler.get_current_user(auth).await
+}
+
+pub async fn get_current_user_from_cookie_handler(
+    handler: web::Data<UserHandler>,
+    req: HttpRequest,
+) -> impl Responder {
+    handler.get_current_user_from_cookie(req).await
 }
 
 pub async fn update_user_handler(
@@ -546,10 +846,10 @@ pub async fn delete_user_handler(
 
 pub async fn logout_user_handler(
     handler: web::Data<UserHandler>,
-    auth: BearerAuth,
-    refresh_token: Option<web::Json<RefreshToken>>,
+    req: HttpRequest,
+    auth: Option<BearerAuth>,
 ) -> impl Responder {
-    handler.logout_user(auth, refresh_token).await
+    handler.as_ref().logout_user_from_cookie(req, auth).await
 }
 
 pub async fn refresh_token_handler(
@@ -557,4 +857,12 @@ pub async fn refresh_token_handler(
     refresh_token: web::Json<RefreshToken>,
 ) -> impl Responder {
     handler.refresh_token(refresh_token).await
+}
+ 
+
+pub async fn refresh_token_from_cookie_handler(
+    handler: web::Data<UserHandler>,
+    req: HttpRequest,
+) -> impl Responder {
+    handler.refresh_token_from_cookie(req).await
 }

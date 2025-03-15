@@ -20,6 +20,7 @@ jsonwebtoken = "9.3"
 serde_json = "1.0.127"
 actix-web-httpauth = "0.8"
 futures = "0.3.30"
+futures-util = "0.3.30"
 lettre = "0.11.7"
 rand = "0.8.5"
 chrono = { version = "0.4", features = ["serde"] }
@@ -32,6 +33,8 @@ url = "2.5.2"
 derive_more = { version = "1.0.0", features = ["display", "error", "from", "debug"] }
 num_cpus = "1.16.0"
 dashmap = "5.5.3"
+
+time = { version = "0.3", features = ["serde"] }
 
 
 [dev-dependencies]

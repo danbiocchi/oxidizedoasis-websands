@@ -29,12 +29,12 @@
     <!-- Resource Hints -->
     <link rel="preconnect" href="https://cdnjs.cloudflare.com">
     <link rel="dns-prefetch" href="https://cdnjs.cloudflare.com">
-    <link rel="modulepreload" href="/frontend.js">
-    <link rel="preload" href="/frontend_bg.wasm" as="fetch" type="application/wasm" crossorigin="anonymous">
+    <link rel="preload" href="/frontend.js" as="script">
+    <link rel="preload" href="/frontend_bg.wasm" as="fetch" crossorigin="anonymous">
     
-<script type="module" nonce="j98GtO+7vWjuXNZH0Z8f9A==">
-import init, * as bindings from '/frontend-25916904373e7ca7.js';
-const wasm = await init({ module_or_path: '/frontend-25916904373e7ca7_bg.wasm' });
+<script type="module" nonce="5AbTo80XbtECZG5M2kakuA==">
+import init, * as bindings from '/frontend-816a4b7076bae18b.js';
+const wasm = await init({ module_or_path: '/frontend-816a4b7076bae18b_bg.wasm' });
 
 
 window.wasmBindings = bindings;
@@ -43,7 +43,7 @@ window.wasmBindings = bindings;
 dispatchEvent(new CustomEvent("TrunkApplicationStarted", {detail: {wasm}}));
 
 </script>
-<link rel="modulepreload" href="/frontend-25916904373e7ca7.js" crossorigin=anonymous integrity="sha384-1+LFv80riP/MetHTWI6oTOapa0mAheMPzO/nigXFG2DBqR6B+4IbDGREUsoU9krb"><link rel="preload" href="/frontend-25916904373e7ca7_bg.wasm" crossorigin=anonymous integrity="sha384-sbrhokaraxLOXG7d8tBRTZQDtHZeaxUpRf0cVEW32nSdd9QDq8QHmn/PLwsBlaNt" as="fetch" type="application/wasm"></head>
+<link rel="modulepreload" href="/frontend-816a4b7076bae18b.js" crossorigin=anonymous integrity="sha384-/hpzIjY5W4PqqmXKQqSR560zi+BxDMJV7N3UPctn2XhmmLvUaaPC22C2LCmsqp6V"><link rel="preload" href="/frontend-816a4b7076bae18b_bg.wasm" crossorigin=anonymous integrity="sha384-5deOH1nGNnYWrTnpFUzxew9GBf0LpAXXXMmmEAfE60irJe1Jeca//OB2db6acJrU" as="fetch" type="application/wasm"></head>
     <body>
     <div id="app"></div>
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.5.1/dist/confetti.browser.min.js" defer></script>

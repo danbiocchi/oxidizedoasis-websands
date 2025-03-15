@@ -16,14 +16,14 @@ struct LoginForm {
     password: String,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Clone, serde::Serialize)]
 struct LoginResponse {
     success: bool,
     message: String,
     data: Option<LoginData>,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Clone, serde::Serialize)]
 struct LoginData {
     #[serde(default)]
     access_token: String,
@@ -32,7 +32,7 @@ struct LoginData {
     user: User,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Clone, serde::Serialize)]
 struct User {
     id: String,
     username: String,
@@ -41,6 +41,8 @@ struct User {
     created_at: String,
     #[serde(default)]
     role: String,
+    #[serde(default)]
+    csrf_token: String,
 }
 
 #[function_component(Login)]
@@ -84,19 +86,19 @@ pub fn login() -> Html {
 
                         match resp.json::<LoginResponse>().await {
                             Ok(login_resp) => {
+                                let login_resp_clone = login_resp.clone();
                                 if login_resp.success {
-                                    if let Some(data) = login_resp.data {
+                                    if let Some(data) = &login_resp_clone.data {
                                         log!("Login successful");
                                         
-                                        // Handle token data
-                                        if !data.access_token.is_empty() {
-                                            log!("Received access token");
-                                            auth::set_access_token(&data.access_token);
-                                            
-                                            if !data.refresh_token.is_empty() {
-                                                log!("Received refresh token");
-                                                auth::set_refresh_token(&data.refresh_token);
-                                            }
+                                        // Store CSRF token from user data
+                                        if !data.user.csrf_token.is_empty() {
+                                            log!("Found CSRF token in user data");
+                                            auth::set_csrf_token(&data.user.csrf_token);
+                                        } else {
+                                            // Try to extract from the full response
+                                            let json_value = serde_json::to_value(&login_resp_clone).unwrap_or_default();
+                                            auth::store_csrf_token_from_response(&json_value);
                                         }
                                         
                                         set_auth.emit(true);
@@ -117,28 +119,19 @@ pub fn login() -> Html {
                                         let text_clone = text.clone();
                                         log!("Raw response:", text_clone);
                                         
-                                        // Try to manually extract tokens from JSON
+                                        // Try to manually extract CSRF token from JSON
                                         if let Ok(json) = serde_json::from_str::<Value>(&text) {
                                             if let Some(data) = json.get("data") {
-                                                let mut has_token = false;
-                                                
-                                                // Try to get access token
-                                                if let Some(access_token) = data.get("access_token").and_then(|t| t.as_str()) {
-                                                    log!("Found access token, setting");
-                                                    auth::set_access_token(access_token);
-                                                    has_token = true;
-                                                    
-                                                    // Try to get refresh token
-                                                    if let Some(refresh_token) = data.get("refresh_token").and_then(|t| t.as_str()) {
-                                                        log!("Found refresh token, setting");
-                                                        auth::set_refresh_token(refresh_token);
+                                                if let Some(user) = data.get("user") {
+                                                    if let Some(csrf_token) = user.get("csrf_token").and_then(|t| t.as_str()) {
+                                                        log!("Found CSRF token, setting");
+                                                        auth::set_csrf_token(csrf_token);
+                                                        
+                                                        // Authentication successful
+                                                        set_auth.emit(true);
+                                                        navigator.push(&Route::Dashboard);
+                                                        return;
                                                     }
-                                                }
-                                                
-                                                if has_token {
-                                                    set_auth.emit(true);
-                                                    navigator.push(&Route::Dashboard);
-                                                    return;
                                                 }
                                             }
                                         }

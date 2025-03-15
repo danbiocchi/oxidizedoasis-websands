@@ -156,26 +156,30 @@ impl Component for UserManagement {
 }
 
 async fn fetch_users() -> Result<Vec<UserAdminView>, String> {
-    let token = auth::get_auth_token().ok_or("No auth token found")?;
-
-    let response = gloo::net::http::Request::get("/api/admin/users")
-        .header("Authorization", &format!("Bearer {}", token))
-        .send()
-        .await
+    // Create request with CSRF token
+    let mut request = gloo::net::http::Request::get("/api/admin/users");
+    
+    // Add CSRF token if available
+    if let Some(csrf_token) = auth::get_csrf_token() {
+        request = request.header("X-CSRF-Token", &csrf_token);
+    }
+    
+    let response = request.send().await
         .map_err(|e| format!("Network error: {}", e.to_string()))?;
 
     if !response.ok() {
-        // If unauthorized (401) or forbidden (403), try to refresh the token
         if response.status() == 401 || response.status() == 403 {
-            // Token may be expired, try to refresh
             match auth::refresh_access_token().await {
                 Ok(()) => {
-                    // Token refreshed, retry the request
-                    let new_token = auth::get_auth_token().ok_or("No auth token found after refresh")?;
-                    let new_response = gloo::net::http::Request::get("/api/admin/users")
-                        .header("Authorization", &format!("Bearer {}", new_token))
-                        .send()
-                        .await
+                    // Cookies refreshed, retry the request with new CSRF token
+                    let mut new_request = gloo::net::http::Request::get("/api/admin/users");
+                    
+                    // Add new CSRF token if available
+                    if let Some(csrf_token) = auth::get_csrf_token() {
+                        new_request = new_request.header("X-CSRF-Token", &csrf_token);
+                    }
+                    
+                    let new_response = new_request.send().await
                         .map_err(|e| format!("Network error after refresh: {}", e.to_string()))?;
                     
                     // Check if the new response is successful
