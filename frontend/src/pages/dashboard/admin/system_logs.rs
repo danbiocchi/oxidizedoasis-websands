@@ -198,24 +198,65 @@ impl SystemLogs {
     fn render_detail_modal(&self, ctx: &Context<Self>) -> Html {
         if let Some(index) = self.selected_entry {
             if let Some(log) = self.logs.get(index) {
-                let onclose = ctx.link().callback(|_| Msg::CloseModal);
+                let overlay_close = ctx.link().callback(|_| Msg::CloseModal);
+                let button_close = ctx.link().callback(|_| Msg::CloseModal);
+                let footer_close = ctx.link().callback(|_| Msg::CloseModal);
                 
                 html! {
                     <div class="c-modal">
-                        <div class="c-modal__content">
-                            <button class="c-modal__close" onclick={onclose}>{"×"}</button>
-                            <h3 class="c-modal__title">{"Log Details"}</h3>
+                        <div class="c-modal__overlay" onclick={overlay_close}></div>
+                        <div class="c-modal__container c-modal__container--system-logs">
+                            <div class="c-modal__header">
+                                <h3 class="c-modal__title">{"Log Details"}</h3>
+                                <button 
+                                    class="c-modal__close" 
+                                    onclick={button_close}
+                                    aria-label="Close"
+                                >
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                                    </svg>
+                                </button>
                             
+</div>
                             <div class="c-modal__body">
-                                <p><strong>{"Timestamp: "}</strong>{&log.timestamp}</p>
-                                <p><strong>{"Severity: "}</strong>{self.get_severity_label(&log.severity)}</p>
-                                <p><strong>{"Source: "}</strong>{&log.source}</p>
-                                <p><strong>{"Message: "}</strong>{&log.message}</p>
+                                <div class="c-log-detail">
+                                    <div class="c-log-detail__field">
+                                        <div class="c-log-detail__label">{"Timestamp:"}</div>
+                                        <div class="c-log-detail__value">{&log.timestamp}</div>
+                                    </div>
+                                    
+                                    <div class="c-log-detail__field">
+                                        <div class="c-log-detail__label">{"Severity:"}</div>
+                                        <div class={classes!("c-log-detail__value", format!("c-log-detail__value--{}", self.get_severity_class(&log.severity)))}>
+                                            {self.get_severity_label(&log.severity)}
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="c-log-detail__field">
+                                        <div class="c-log-detail__label">{"Source:"}</div>
+                                        <div class="c-log-detail__value">{&log.source}</div>
+                                    </div>
+                                    
+                                    <div class="c-log-detail__field">
+                                        <div class="c-log-detail__label">{"Message:"}</div>
+                                        <div class="c-log-detail__value">{&log.message}</div>
+                                    </div>
+                                </div>
                                 
-                                <div class="c-modal__details">
-                                    <h4>{"Additional Details"}</h4>
+                                <div class="c-log-detail__section">
+                                    <h4 class="c-log-detail__section-title">{"Additional Details"}</h4>
                                     {self.render_log_details(&log.details)}
                                 </div>
+                            </div>
+                            <div class="c-modal__footer">
+                                <button 
+                                    class="c-button c-button--secondary-user-detail c-button--user-detail" 
+                                    onclick={footer_close}
+                                >
+                                    {"Close"}
+                                </button>
                             </div>
                         </div>
                     </div>
@@ -259,6 +300,16 @@ impl SystemLogs {
         }
     }
 
+    fn get_severity_class(&self, severity: &LogSeverity) -> &'static str {
+        match severity {
+            LogSeverity::Error => "error",
+            LogSeverity::Warning => "warning",
+            LogSeverity::Info => "info",
+            LogSeverity::Security => "security",
+            LogSeverity::Performance => "performance",
+        }
+    }
+
     fn render_table_header(&self) -> Html {
         html! {
             <tr>
@@ -272,12 +323,12 @@ impl SystemLogs {
 
     fn render_log_details(&self, details: &HashMap<String, String>) -> Html {
         html! {
-            <div class="c-modal__details-list">
+            <div class="c-log-detail__list">
                 {details.iter().map(|(key, value)| {
                     html! {
-                        <div class="c-modal__details-item">
-                            <strong>{format!("{}: ", key)}</strong>
-                            <span>{value}</span>
+                        <div class="c-log-detail__field">
+                            <div class="c-log-detail__label">{format!("{}:", key)}</div>
+                            <div class="c-log-detail__value">{value}</div>
                         </div>
                     }
                 }).collect::<Html>()}

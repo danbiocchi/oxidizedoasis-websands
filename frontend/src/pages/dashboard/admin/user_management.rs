@@ -312,10 +312,20 @@ impl Component for UserManagement {
                     // Delete confirmation modal
                     if self.show_delete_modal {
                         <div class="c-modal">
-                            <div class="c-modal__overlay"></div>
-                            <div class="c-modal__container">
+                            <div class="c-modal__overlay" onclick={ctx.link().callback(|_| Msg::CancelDelete)}></div>
+                            <div class="c-modal__container c-modal--danger">
                                 <div class="c-modal__header">
                                     <h3 class="c-modal__title">{"Confirm Delete"}</h3>
+                                    <button 
+                                        class="c-modal__close" 
+                                        onclick={ctx.link().callback(|_| Msg::CancelDelete)}
+                                        aria-label="Close"
+                                    >
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                            <line x1="18" y1="6" x2="6" y2="18"></line>
+                                            <line x1="6" y1="6" x2="18" y2="18"></line>
+                                        </svg>
+                                    </button>
                                 </div>
                                 <div class="c-modal__body">
                                     <p class="c-modal__text">
@@ -327,7 +337,7 @@ impl Component for UserManagement {
                                     <div class="c-form__group">
                                         <input 
                                             type="text" 
-                                            class="c-form__input" 
+                                            class="c-form__input c-form__input--user-detail" 
                                             placeholder="Type DELETE to confirm"
                                             value={self.delete_confirmation_text.clone()}
                                             oninput={ctx.link().callback(|e: InputEvent| {
@@ -339,14 +349,14 @@ impl Component for UserManagement {
                                 </div>
                                 <div class="c-modal__footer">
                                     <button 
-                                        class="c-button c-button--secondary" 
+                                        class="c-button c-button--secondary-user-detail c-button--user-detail" 
                                         onclick={ctx.link().callback(|_| Msg::CancelDelete)}
                                         disabled={self.is_loading}
                                     >
                                         {"Cancel"}
                                     </button>
                                     <button 
-                                        class="c-button c-button--danger" 
+                                        class="c-button c-button--danger c-button--user-detail" 
                                         onclick={ctx.link().callback(|_| Msg::ConfirmDelete)}
                                         disabled={self.is_loading || self.delete_confirmation_text != "DELETE"}
                                     >

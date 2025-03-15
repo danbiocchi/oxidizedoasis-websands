@@ -35,10 +35,138 @@
     margin-bottom: var(--spacing-xs);
 }
 
+/* Incident Detail Styling */
+.c-incident-detail {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-sm);
+    margin-bottom: var(--spacing-lg);
+}
+
+.c-incident-detail__field {
+    display: grid;
+    grid-template-columns: 120px 1fr;
+    gap: var(--spacing-lg);
+    align-items: center;
+    padding: var(--spacing-xs) 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.c-incident-detail__label {
+    font-weight: 600;
+    color: var(--color-text-light-dark-mode);
+    font-size: 0.9rem;
+}
+
+.c-incident-detail__value {
+    color: var(--color-text-dark-mode);
+    font-family: var(--font-family-mono);
+    background-color: rgba(0, 0, 0, 0.15);
+    padding: var(--spacing-sm) var(--spacing-md);
+    border-radius: var(--border-radius-base);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    overflow-wrap: break-word;
+    white-space: normal;
+    max-width: 100%;
+    display: inline-block;
+}
+
+.c-incident-detail__value--critical {
+    color: #ef4444;
+    border-left: 3px solid #ef4444;
+}
+
+.c-incident-detail__value--high {
+    color: #f59e0b;
+    border-left: 3px solid #f59e0b;
+}
+
+.c-incident-detail__value--medium {
+    color: #0ea5e9;
+    border-left: 3px solid #0ea5e9;
+}
+
+.c-incident-detail__value--low {
+    color: #10b981;
+    border-left: 3px solid #10b981;
+}
+
+.c-incident-detail__value--open {
+    color: #f59e0b;
+    border-left: 3px solid #f59e0b;
+}
+
+.c-incident-detail__value--in-progress {
+    color: #0ea5e9;
+    border-left: 3px solid #0ea5e9;
+}
+
+.c-incident-detail__value--resolved {
+    color: #10b981;
+    border-left: 3px solid #10b981;
+}
+
+.c-incident-detail__value--closed {
+    color: #94a3b8;
+    border-left: 3px solid #94a3b8;
+}
+
+.c-incident-detail__section {
+    margin-top: var(--spacing-xl);
+    padding-top: var(--spacing-md);
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.c-incident-detail__section-title {
+    font-size: var(--font-size-lg);
+    font-weight: 600;
+    color: var(--color-primary-light);
+    margin-bottom: var(--spacing-sm);
+}
+
+.c-incident-detail__list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-sm);
+}
+
+/* Security Incidents Modal Specific Styles */
+.c-modal__container--security-incidents {
+    max-height: 90vh;
+    width: 85%;
+    max-width: 700px;
+    overflow-y: auto;
+    margin-top: 60px;
+    margin-bottom: 30px;
+    padding: 0 var(--spacing-lg);
+}
+
+.c-modal__container--security-incidents .c-modal__body {
+    max-height: 50vh;
+    overflow-y: auto;
+    padding: var(--spacing-lg) var(--spacing-2xl);
+    word-break: break-word;
+}
+
+.c-incident-detail__field {
+    grid-template-columns: 140px 1fr;
+    gap: var(--spacing-md);
+    padding: var(--spacing-sm) 0;
+}
+
 /* Responsive adjustments */
 @media (max-width: 768px) {
     .c-filters__group {
         flex-direction: column;
         gap: var(--spacing-sm);
+    }
+    
+    .c-incident-detail__field {
+        grid-template-columns: 1fr;
+        gap: var(--spacing-xs);
+    }
+    
+    .c-incident-detail__label {
+        padding-bottom: 0;
     }
 }

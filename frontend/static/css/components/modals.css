@@ -1,0 +1,207 @@
+/**
+ * Modal Components
+ * Styles for modal dialogs and overlays
+ */
+
+/* Modal Base */
+.c-modal {
+  position: fixed;
+  top: 30px;
+  left: 0;
+  width: 100%;
+  height: calc(100% - 30px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: var(--z-index-modal);
+  padding: var(--spacing-3xl) var(--spacing-lg) var(--spacing-lg);
+}
+
+/* Modal Overlay */
+.c-modal__overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(4px);
+  z-index: var(--z-index-modal-backdrop);
+}
+
+/* Modal Container */
+.c-modal__container {
+  position: relative;
+  background-color: var(--color-surface-dark);
+  border-radius: var(--border-radius-lg);
+  box-shadow: var(--shadow-xl);
+  width: 100%;
+  max-width: 500px;
+  max-height: 85vh;
+  overflow-y: auto;
+  z-index: var(--z-index-modal);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  animation: modalFadeIn 0.3s ease-out;
+}
+
+/* Modal Header */
+.c-modal__header {
+  padding: var(--spacing-lg) var(--spacing-xl);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.c-modal__title {
+  margin: 0;
+  font-size: var(--font-size-xl);
+  font-weight: 600;
+  color: var(--color-text-dark-mode);
+}
+
+.c-modal__close {
+  background: none;
+  border: none;
+  color: var(--color-text-light-dark-mode);
+  cursor: pointer;
+  padding: var(--spacing-xs);
+  border-radius: var(--border-radius-full);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.c-modal__close:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+  color: var(--color-text-dark-mode);
+}
+
+/* Modal Body */
+.c-modal__body {
+  padding: var(--spacing-xl);
+}
+
+.c-modal__text {
+  margin: 0 0 var(--spacing-md);
+  color: var(--color-text-dark-mode);
+  line-height: 1.5;
+  font-size: var(--font-size-base);
+}
+
+.c-modal__text--warning {
+  color: var(--color-warning);
+  font-weight: 500;
+  background-color: rgba(234, 179, 8, 0.15);
+  padding: var(--spacing-md) var(--spacing-lg);
+  border-radius: var(--border-radius-base);
+  border-left: 3px solid var(--color-warning);
+  margin-bottom: var(--spacing-lg);
+}
+
+/* Modal Footer */
+.c-modal__footer {
+  padding: var(--spacing-lg) var(--spacing-xl);
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--spacing-lg);
+}
+
+/* Modal Animation */
+@keyframes modalFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Modal Sizes */
+.c-modal__container--sm {
+  max-width: 400px;
+}
+
+.c-modal__container--lg {
+  max-width: 700px;
+}
+
+.c-modal__container--xl {
+  max-width: 900px;
+}
+
+.c-modal__container--full {
+  max-width: 95vw;
+  max-height: 95vh;
+}
+
+/* Modal Variants */
+.c-modal--danger .c-modal__header {
+  border-bottom-color: rgba(239, 68, 68, 0.2);
+}
+
+.c-modal--danger .c-modal__title {
+  color: var(--color-danger);
+}
+
+/* Button state for delete confirmation */
+.c-button--danger:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background-color: var(--color-danger-dark);
+}
+
+.c-button--danger:not(:disabled):hover {
+  background-color: var(--color-danger-dark);
+  transform: translateY(-2px);
+}
+
+/* Responsive Adjustments */
+@media (max-width: 767px) {
+  .c-modal__container {
+    max-width: 100%;
+  }
+  
+  .c-modal__header,
+  .c-modal__body,
+  .c-modal__footer {
+    padding: var(--spacing-md);
+  }
+  
+  .c-modal__footer {
+    flex-direction: column-reverse;
+    gap: var(--spacing-sm);
+  }
+  
+  .c-modal__footer .c-button {
+    width: 100%;
+  }
+}
+
+/* High Contrast Mode */
+@media (prefers-contrast: high) {
+  .c-modal__container {
+    border: 2px solid currentColor;
+    box-shadow: none;
+  }
+  
+  .c-modal__header,
+  .c-modal__footer {
+    border-color: currentColor;
+  }
+  
+  .c-modal__text--warning {
+    border: 1px solid currentColor;
+  }
+}
+
+/* Reduced Motion */
+@media (prefers-reduced-motion: reduce) {
+  .c-modal__container {
+    animation: none;
+  }
+}

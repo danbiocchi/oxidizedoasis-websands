@@ -238,33 +238,84 @@ impl SecurityIncidents {
     fn render_detail_modal(&self, ctx: &Context<Self>) -> Html {
         if let Some(index) = self.selected_incident {
             if let Some(incident) = self.incidents.get(index) {
-                let onclose = ctx.link().callback(|_| Msg::CloseModal);
+                let overlay_close = ctx.link().callback(|_| Msg::CloseModal);
+                let button_close = ctx.link().callback(|_| Msg::CloseModal);
+                let footer_close = ctx.link().callback(|_| Msg::CloseModal);
                 
                 html! {
                     <div class="c-modal">
-                        <div class="c-modal__content">
-                            <button class="c-modal__close" onclick={onclose}>{"×"}</button>
-                            <h3 class="c-modal__title">{"Incident Details"}</h3>
+                        <div class="c-modal__overlay" onclick={overlay_close}></div>
+                        <div class="c-modal__container" style="max-width: 650px; margin-top: 50px; padding: 0 20px;">
+                            <div class="c-modal__header">
+                                <h3 class="c-modal__title">{"Incident Details"}</h3>
+                                <button 
+                                    class="c-modal__close" 
+                                    onclick={button_close}
+                                    aria-label="Close"
+                                >
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                                    </svg>
+                                </button>
                             
+</div>
                             <div class="c-modal__body">
-                                <p><strong>{"ID: "}</strong>{&incident.id}</p>
-                                <p><strong>{"Timestamp: "}</strong>{&incident.timestamp}</p>
-                                <p><strong>{"Severity: "}</strong>{self.get_severity_label(&incident.severity)}</p>
-                                <p><strong>{"Status: "}</strong>{self.get_status_label(&incident.status)}</p>
-                                <p><strong>{"Type: "}</strong>{&incident.incident_type}</p>
-                                <p><strong>{"Description: "}</strong>{&incident.description}</p>
+                                <div class="c-incident-detail">
+                                    <div class="c-incident-detail__field">
+                                        <div class="c-incident-detail__label" style="width: 120px;">{"ID:"}</div>
+                                        <div class="c-incident-detail__value" style="display: inline-block; max-width: 400px;">{&incident.id}</div>
+                                    </div>
+                                    
+                                    <div class="c-incident-detail__field">
+                                        <div class="c-incident-detail__label" style="width: 120px;">{"Timestamp:"}</div>
+                                        <div class="c-incident-detail__value" style="display: inline-block; max-width: 400px;">{&incident.timestamp}</div>
+                                    </div>
+                                    
+                                    <div class="c-incident-detail__field">
+                                        <div class="c-incident-detail__label" style="width: 120px;">{"Severity:"}</div>
+                                        <div class={classes!("c-incident-detail__value", format!("c-incident-detail__value--{}", self.get_severity_class(&incident.severity)))} style="display: inline-block; max-width: 400px;">
+                                            {self.get_severity_label(&incident.severity)}
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="c-incident-detail__field">
+                                        <div class="c-incident-detail__label" style="width: 120px;">{"Status:"}</div>
+                                        <div class={classes!("c-incident-detail__value", format!("c-incident-detail__value--{}", self.get_status_class(&incident.status)))} style="display: inline-block; max-width: 400px;">
+                                            {self.get_status_label(&incident.status)}
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="c-incident-detail__field">
+                                        <div class="c-incident-detail__label" style="width: 120px;">{"Type:"}</div>
+                                        <div class="c-incident-detail__value" style="display: inline-block; max-width: 400px;">{&incident.incident_type}</div>
+                                    </div>
+                                    
+                                    <div class="c-incident-detail__field">
+                                        <div class="c-incident-detail__label" style="width: 120px;">{"Description:"}</div>
+                                        <div class="c-incident-detail__value" style="display: inline-block; max-width: 400px;">{&incident.description}</div>
+                                    </div>
+                                </div>
                                 
-                                <div class="c-modal__details">
-                                    <h4>{"Affected Systems"}</h4>
+                                <div class="c-incident-detail__section">
+                                    <h4 class="c-incident-detail__section-title">{"Affected Systems"}</h4>
                                     <ul>
                                         {incident.affected_systems.iter().map(|system| {
                                             html! { <li>{system}</li> }
                                         }).collect::<Html>()}
                                     </ul>
                                     
-                                    <h4>{"Additional Details"}</h4>
+                                    <h4 class="c-incident-detail__section-title">{"Additional Details"}</h4>
                                     {self.render_incident_details(&incident.details)}
                                 </div>
+                            </div>
+                            <div class="c-modal__footer">
+                                <button 
+                                    class="c-button c-button--secondary-user-detail c-button--user-detail" 
+                                    onclick={footer_close}
+                                >
+                                    {"Close"}
+                                </button>
                             </div>
                         </div>
                     </div>
@@ -305,14 +356,32 @@ impl SecurityIncidents {
         }
     }
 
+    fn get_severity_class(&self, severity: &IncidentSeverity) -> &'static str {
+        match severity {
+            IncidentSeverity::Critical => "critical",
+            IncidentSeverity::High => "high",
+            IncidentSeverity::Medium => "medium",
+            IncidentSeverity::Low => "low",
+        }
+    }
+
+    fn get_status_class(&self, status: &IncidentStatus) -> &'static str {
+        match status {
+            IncidentStatus::Open => "open",
+            IncidentStatus::InProgress => "in-progress",
+            IncidentStatus::Resolved => "resolved",
+            IncidentStatus::Closed => "closed",
+        }
+    }
+
     fn render_incident_details(&self, details: &HashMap<String, String>) -> Html {
         html! {
-            <div class="c-modal__details-list">
+            <div class="c-incident-detail__list">
                 {details.iter().map(|(key, value)| {
                     html! {
-                        <div class="c-modal__details-item">
-                            <strong>{format!("{}: ", key)}</strong>
-                            <span>{value}</span>
+                        <div class="c-incident-detail__field">
+                            <div class="c-incident-detail__label" style="width: 120px;">{format!("{}:", key)}</div>
+                            <div class="c-incident-detail__value" style="display: inline-block; max-width: 400px;">{value}</div>
                         </div>
                     }
                 }).collect::<Html>()}
