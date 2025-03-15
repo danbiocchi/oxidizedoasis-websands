@@ -10,6 +10,7 @@ use crate::services::auth;
 pub struct RequestInterceptor;
 
 impl RequestInterceptor {
+    #[allow(dead_code)]
     /// Creates a GET request with automatic token refresh and retry capabilities
     pub fn get(url: &str) -> RequestBuilder {
         let mut request = Request::get(url);
@@ -25,6 +26,7 @@ impl RequestInterceptor {
         request
     }
 
+    #[allow(dead_code)]
     /// Creates a POST request with automatic token refresh and retry capabilities
     pub fn post(url: &str) -> RequestBuilder {
         let mut request = Request::post(url);
@@ -40,6 +42,7 @@ impl RequestInterceptor {
         request
     }
 
+    #[allow(dead_code)]
     /// Creates a PUT request with automatic token refresh and retry capabilities
     pub fn put(url: &str) -> RequestBuilder {
         let mut request = Request::put(url);
@@ -55,6 +58,7 @@ impl RequestInterceptor {
         request
     }
 
+    #[allow(dead_code)]
     /// Creates a DELETE request with automatic token refresh and retry capabilities
     pub fn delete(url: &str) -> RequestBuilder {
         let mut request = Request::delete(url);
@@ -71,6 +75,7 @@ impl RequestInterceptor {
     }
     
     /// Check if token is about to expire and refresh proactively
+    #[allow(dead_code)]
     fn check_token_expiration() {
         // This will trigger the token refresh timer setup if needed
         auth::setup_token_refresh_timer();
@@ -100,24 +105,22 @@ impl RequestBuilderExt for RequestBuilder {
                         // We need to recreate the request since we can't clone RequestBuilder
                         // Get the URL from the response
                         let url = response.url().to_string();
+                        log!("Retrying request to URL: {}", &url);
                         
-                        // Create a new request with the same method
-                        // We can determine the method from the response status text
-                        // This is a bit of a hack, but it works for our purposes
-                        let method = if url.contains("logout") {
-                            "POST"
-                        } else if url.contains("refresh") {
-                            "GET"
-                        } else {
-                            "GET" // Default to GET
-                        };
+                        // Extract the HTTP method from the URL path
+                        let method = determine_http_method(&url);
+                        log!("Determined HTTP method: {}", method);
                         
+                        // Create a new request with the determined method
                         let mut new_request = match method {
                             "GET" => Request::get(&url),
                             "POST" => Request::post(&url),
                             "PUT" => Request::put(&url),
                             "DELETE" => Request::delete(&url),
-                            _ => Request::get(&url), // Default to GET if unknown
+                            _ => {
+                                log!("Unknown method, defaulting to GET");
+                                Request::get(&url)
+                            }
                         };
                         
                         // Add the new CSRF token
@@ -146,5 +149,42 @@ impl RequestBuilderExt for RequestBuilder {
                 Ok(response)
             }
         })
+    }
+}
+
+// Helper function to determine HTTP method based on URL path
+fn determine_http_method(url: &str) -> &'static str {
+    // Extract the path part of the URL
+    let path = url.split('?').next().unwrap_or(url);
+    
+    // Check for specific patterns in the URL to determine the HTTP method
+    if path.contains("/users/logout") {
+        "POST"
+    } else if path.contains("/users/refresh") {
+        "GET"
+    } else if path.contains("/admin/users/") {
+        // Admin user management endpoints
+        if path.contains("/role") || path.contains("/status") {
+            "PUT"
+        } else if path.ends_with("/users") {
+            // List users endpoint
+            "GET"
+        } else {
+            // User detail endpoint - could be GET or PUT
+            // Default to GET for safety
+            "GET"
+        }
+    } else if path.contains("edit") || path.contains("update") {
+        // Edit/update operations are typically PUT
+        "PUT"
+    } else if path.contains("delete") || path.contains("remove") {
+        // Delete operations
+        "DELETE"
+    } else if path.contains("create") || path.contains("add") || path.contains("login") || path.contains("register") {
+        // Create/add operations are typically POST
+        "POST"
+    } else {
+        // Default to GET for other endpoints
+        "GET"
     }
 }

@@ -18,6 +18,7 @@ pub struct AuthError {
 }
 
 impl AuthError {
+    #[allow(dead_code)]
     pub fn new(message: String, _status_code: u16) -> Self {
         Self { message }
     }
@@ -102,6 +103,7 @@ async fn jwt_auth_validator_internal(
 pub struct CookieAuth;
 
 impl CookieAuth {
+    #[allow(dead_code)]
     pub fn new() -> Self {
         CookieAuth
     }

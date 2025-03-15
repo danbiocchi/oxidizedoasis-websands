@@ -49,6 +49,7 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
 }
 
 // Public routes configuration 
+#[allow(dead_code)]
 pub fn configure_public_routes(cfg: &mut web::ServiceConfig) {
     cfg.service(
         web::scope("/users")
@@ -68,6 +69,7 @@ pub fn configure_public_routes(cfg: &mut web::ServiceConfig) {
 }
 
 // Protected routes configuration
+#[allow(dead_code)]
 pub fn configure_protected_routes(cfg: &mut web::ServiceConfig) {
     // Bearer token authentication routes
     cfg.service(

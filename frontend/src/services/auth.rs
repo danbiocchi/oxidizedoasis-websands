@@ -32,6 +32,7 @@ struct JwtClaims {
 }
 
 // Store CSRF token
+#[allow(dead_code)]
 pub fn set_csrf_token(token: &str) {
     LocalStorage::set(CSRF_TOKEN_KEY, token).expect("failed to set CSRF token");
 }
@@ -47,16 +48,19 @@ fn get_token_expiry() -> Option<u64> {
 }
 
 // Get CSRF token
+#[allow(dead_code)]
 pub fn get_csrf_token() -> Option<String> {
     LocalStorage::get(CSRF_TOKEN_KEY).ok()
 }
 
 // Get auth token (for backward compatibility)
+#[allow(dead_code)]
 pub fn get_auth_token() -> Option<String> {
     // For backward compatibility, try to get from localStorage
     LocalStorage::get(AUTH_TOKEN_KEY).ok()
 }
 
+#[allow(dead_code)]
 // Remove tokens
 pub fn remove_tokens() {
     LocalStorage::delete(CSRF_TOKEN_KEY);
@@ -69,12 +73,14 @@ pub fn remove_tokens() {
 
 // Check if user is authenticated
 // This now relies on the server to check cookies
+#[allow(dead_code)]
 pub fn is_authenticated() -> bool {
     // We'll check if we have a CSRF token as a proxy for being logged in
     get_csrf_token().is_some()
 }
 
 // Setup a timer to refresh the token before it expires
+#[allow(dead_code)]
 pub fn setup_token_refresh_timer() {
     // Clear any existing timer
     clear_token_refresh_timer();
@@ -177,6 +183,7 @@ fn decode_jwt_expiry(token: &str) -> Option<u64> {
 }
 
 // Store CSRF token from login response
+#[allow(dead_code)]
 pub fn store_csrf_token_from_response(data: &serde_json::Value) {
     // Try to get CSRF token from user data structure
     let user_csrf_token = data.get("data")
@@ -210,6 +217,7 @@ pub fn store_csrf_token_from_response(data: &serde_json::Value) {
 }
 
 // Logout - revoke tokens on server and remove from storage
+#[allow(dead_code)]
 pub fn logout() {
     // Call logout API to revoke tokens
     spawn_local(async move {
@@ -237,6 +245,7 @@ pub fn logout() {
 }
 
 // Refresh access token using refresh token
+#[allow(dead_code)]
 pub async fn refresh_access_token() -> Result<(), String> {
     log!("Refreshing tokens using cookie-based endpoint");
 

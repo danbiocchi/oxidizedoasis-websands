@@ -39,6 +39,8 @@ pub enum DashboardView {
     Settings,
     // Admin views
     UserManagement,
+    UserInspect(String), // User ID for inspection
+    UserEdit(String),    // User ID for editing
     SystemLogs,
     SecurityIncidents,
 }
@@ -67,6 +69,7 @@ pub struct User {
 }
 
 impl User {
+    #[allow(dead_code)]
     pub fn is_admin(&self) -> bool {
         self.role == "admin"
     }
@@ -80,6 +83,7 @@ pub enum DashboardMsg {
     NotesSaved(Result<(), String>),
     Tick,
     ChangeView(DashboardView),
+    HandleCustomViewChange(String),
 }
 
 pub struct Dashboard {
@@ -119,6 +123,33 @@ impl Component for Dashboard {
             let link = ctx.link().clone();
             Some(Interval::new(1000, move || link.send_message(DashboardMsg::Tick)))
         };
+        
+        // Set up event listener for custom view changes
+        let window = web_sys::window().unwrap();
+        let link = ctx.link().clone();
+        let callback = Closure::wrap(Box::new(move |e: web_sys::Event| {
+            if let Some(custom_event) = e.dyn_ref::<web_sys::CustomEvent>() {
+                // Get the detail value
+                let detail_result = js_sys::Reflect::get(&custom_event, &JsValue::from_str("detail"));
+                
+                if let Ok(detail) = detail_result {
+                    // Try to convert to string without consuming the detail value
+                    let detail_str_option = detail.as_string();
+                    
+                    if let Some(detail_str) = detail_str_option {
+                        // Log the detail string
+                        log!("Received custom event with detail: {}", &detail_str);
+                        
+                        // Clone the string before sending it in the message
+                        let detail_str_clone = detail_str.clone();
+                        link.send_message(DashboardMsg::HandleCustomViewChange(detail_str_clone));
+                    }
+                }
+            }
+        }) as Box<dyn FnMut(_)>);
+        
+        window.add_event_listener_with_callback("changeView", callback.as_ref().unchecked_ref()).unwrap();
+        callback.forget(); // Prevent callback from being garbage collected
 
         Self {
             user_info: None,
@@ -176,11 +207,31 @@ impl Component for Dashboard {
                 match view {
                     DashboardView::Overview | DashboardView::Profile | DashboardView::Chat |
                     DashboardView::Data | DashboardView::Settings | DashboardView::UserManagement |
-                    DashboardView::SystemLogs | DashboardView::SecurityIncidents => {
+                    DashboardView::SystemLogs | DashboardView::SecurityIncidents | 
+                    DashboardView::UserInspect(_) | DashboardView::UserEdit(_) => {
                         self.current_view = view;
                         true
                     }
                 }
+            }
+            DashboardMsg::HandleCustomViewChange(detail) => {
+                if detail.starts_with("UserInspect:") {
+                    if let Some(user_id) = detail.strip_prefix("UserInspect:") {
+                        log!("Changing view to UserInspect with ID: {}", user_id);
+                        self.current_view = DashboardView::UserInspect(user_id.to_string());
+                        return true;
+                    }
+                } else if detail.starts_with("UserEdit:") {
+                    if let Some(user_id) = detail.strip_prefix("UserEdit:") {
+                        log!("Changing view to UserEdit with ID: {}", user_id);
+                        self.current_view = DashboardView::UserEdit(user_id.to_string());
+                        return true;
+                    }
+                } else if detail == "UserManagement" {
+                    self.current_view = DashboardView::UserManagement;
+                    return true;
+                }
+                false
             }
         }
     }
@@ -295,6 +346,8 @@ impl Dashboard {
             DashboardView::Data => html! { <Data /> },
             DashboardView::Settings => html! { <Settings /> },
             DashboardView::UserManagement => html! { <UserManagement /> },
+            DashboardView::UserInspect(ref user_id) => html! { <admin::UserDetail user_id={user_id.clone()} mode="inspect" /> },
+            DashboardView::UserEdit(ref user_id) => html! { <admin::UserDetail user_id={user_id.clone()} mode="edit" /> },
             DashboardView::SystemLogs => html! { <SystemLogs /> },
             DashboardView::SecurityIncidents => html! { <SecurityIncidents /> },
         }
