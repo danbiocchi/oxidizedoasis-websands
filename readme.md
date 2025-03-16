@@ -46,7 +46,7 @@ Comprehensive documentation for OxidizedOasis-WebSands is available to help deve
 
 ## ✨ Key Features
 
-- 🔒 Robust user authentication system with JWT (JSON Web Tokens)
+- 🔒 Advanced user authentication system with JWT (JSON Web Tokens)
 - ✉️ Secure user registration with email verification
 - 🔑 Secure password reset with time-limited tokens and email verification
 - 🔐 Password hashing using bcrypt for enhanced security
@@ -65,6 +65,16 @@ Comprehensive documentation for OxidizedOasis-WebSands is available to help deve
 - 🔄 Lazy loading for non-critical styles
 - 📦 Minimized render-blocking CSS
 - 💾 Browser caching optimization for styles
+
+## 🔐 JWT Authentication System
+
+OxidizedOasis-WebSands implements a comprehensive JWT-based authentication system with the following features:
+- 🔑 Secure token generation with configurable expiration times
+- 🚫 Token revocation system to immediately invalidate compromised tokens
+- 📊 Active token tracking for monitoring user sessions across devices
+- 🔄 Automatic token refresh mechanism to maintain seamless user experience
+- 🔍 Token validation with signature verification and expiration checks
+- 🔒 Role-based access control integrated with JWT claims
 
 ## 🛠️ Technology Stack
 
@@ -146,6 +156,10 @@ Before you begin, ensure you have the following installed:
     # JWT Configuration
     JWT_SECRET=your_jwt_secret_key
     
+    # JWT Token Settings
+    JWT_EXPIRATION_HOURS=24
+    JWT_REFRESH_EXPIRATION_DAYS=7
+    
     # Email Configuration
     SMTP_USERNAME=your_smtp_username
     SMTP_PASSWORD=your_smtp_password
@@ -193,6 +207,10 @@ Before you begin, ensure you have the following installed:
     
     # Test JWT Configuration
     TEST_JWT_SECRET=your_test_jwt_secret_key
+    
+    # Test JWT Token Settings
+    TEST_JWT_EXPIRATION_HOURS=24
+    TEST_JWT_REFRESH_EXPIRATION_DAYS=7
     
     # Test Email Configuration
     TEST_SMTP_USERNAME=your_test_smtp_username
