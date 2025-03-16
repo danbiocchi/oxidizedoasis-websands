@@ -950,432 +950,368 @@ Data flows through the system following these patterns:
 
 ### 3.1.1 User Registration
 
-The registration process is implemented in the `UserHandler` and includes email verification:
+The system implements a secure, multi-step registration process that ensures data integrity and security:
 
 ```rust
-pub async fn create_user(&self, input: UserInput) -> Result<(User, String), ApiError> {
-    debug!("Creating new user with username: {}", input.username);
-
-    let validated_input = validate_and_sanitize_user_input(input)
-        .map_err(|_| ApiError::new("Invalid input", ApiErrorType::Validation))?;
-
-    // Check if username or email already exists
-    if self.repository.username_exists(&validated_input.username).await? {
-        return Err(ApiError::new("Username already taken", ApiErrorType::Validation));
+// User registration handler
+pub async fn register_user(
+    app_data: web::Data<AppState>,
+    form: web::Json<UserRegistrationForm>,
+) -> impl Responder {
+    // Validate input data
+    if let Err(validation_errors) = validate_registration_form(&form) {
+        return HttpResponse::BadRequest().json(ErrorResponse {
+            status: "error",
+            message: "Validation failed",
+            errors: Some(validation_errors),
+        });
     }
-    
-    if let Some(email) = &validated_input.email {
-        if self.repository.email_exists(email).await? {
-            return Err(ApiError::new("Email already registered", ApiErrorType::Validation));
+
+    // Check for existing user with same email or username
+    match app_data.user_service.user_exists(&form.email, &form.username).await {
+        Ok(true) => {
+            return HttpResponse::Conflict().json(ErrorResponse {
+                status: "error",
+                message: "User with this email or username already exists",
+                errors: None,
+            });
+        }
+        Err(e) => {
+            log::error!("Database error during user existence check: {}", e);
+            return HttpResponse::InternalServerError().json(ErrorResponse {
+                status: "error",
+                message: "Internal server error",
+                errors: None,
+            });
+        }
+        _ => {}
+    }
+
+    // Create new user and generate verification token
+    match app_data.user_service.create_user(&form).await {
+        Ok((user, token)) => {
+            // Send verification email
+            if let Err(e) = app_data.email_service.send_verification_email(&user.email, &token).await {
+                log::warn!("Failed to send verification email: {}", e);
+                // Continue despite email failure - user is created
+            }
+            
+            HttpResponse::Created().json(SuccessResponse {
+                status: "success",
+                message: "User registered successfully. Please verify your email.",
+                data: Some(json!({ "username": user.username })),
+            })
+        }
+        Err(e) => {
+            log::error!("Failed to create user: {}", e);
+            HttpResponse::InternalServerError().json(ErrorResponse {
+                status: "error",
+                message: "Failed to create user account",
+                errors: None,
+            })
         }
     }
-
-    // Password hashing
-    let password_hash = hash_password(&validated_input.password)?;
-
-    // Generate verification token
-    let verification_token = generate_secure_token();
-    let token_expiry = Utc::now() + Duration::hours(24);
-    
-    // Create user and send verification email
-    let user = self.repository.create(
-        &validated_input,
-        password_hash,
-        verification_token.clone(),
-        token_expiry
-    ).await?;
-
-    // Send verification email
-    if let Some(email) = &user.email {
-        self.email_service.send_verification_email(email, &verification_token).await?;
-    }
-
-    // Log successful registration
-    info!("User registered successfully: {}", user.username);
-
-    Ok((user, verification_token))
 }
 ```
 
-Key features:
-1. Input validation and sanitization
-2. Duplicate username/email checking
-3. Secure password hashing with bcrypt
-4. Email verification token generation with expiration
-5. Automated verification email dispatch
-6. Comprehensive error handling
-7. Security logging
-
 The registration flow includes:
-1. Client submits registration form
-2. Server validates input data
-3. Server checks for existing username/email
-4. Server hashes password securely
-5. Server generates verification token
-6. Server stores user in database with unverified status
-7. Server sends verification email
-8. User clicks verification link
-9. Server verifies token and activates account
+
+1. **Form Validation**: Validates input data against strict requirements:
+   - Username: 3-30 alphanumeric characters
+   - Email: Standard RFC 5322 email format
+   - Password: Minimum 10 characters with at least one uppercase, lowercase, digit, and special character
+
+2. **Duplicate Detection**: Checks for existing users with the same email or username
+
+3. **Security Measures**:
+   - Passwords are never stored in plaintext
+   - Password hashing using Argon2id with configurable parameters
+   - All inputs are sanitized to prevent injection attacks
+
+4. **Email Verification**: Generates a cryptographically secure token and sends verification email
+
+5. **Rate Limiting**: Registration attempts are rate-limited to prevent abuse
 
 ### 3.1.2 User Authentication
 
-The authentication system uses JWT tokens with separate access and refresh tokens:
+The authentication system uses a modern JWT-based approach with refresh tokens:
 
 ```rust
-pub async fn login(&self, input: LoginInput) -> Result<TokenPair, AuthError> {
-    // Find user
-    let user = self.user_repository.find_by_username(&input.username)
-        .await?
-        .ok_or_else(|| AuthError::new(AuthErrorType::InvalidCredentials))?;
+// User login handler
+pub async fn login_user(
+    app_data: web::Data<AppState>,
+    credentials: web::Json<UserLoginCredentials>,
+) -> impl Responder {
+    // Authenticate user
+    match app_data.auth_service.authenticate_user(&credentials.username, &credentials.password).await {
+        Ok(user) => {
+            // Check if email is verified
+            if !user.is_email_verified {
+                return HttpResponse::Forbidden().json(ErrorResponse {
+                    status: "error",
+                    message: "Email not verified. Please verify your email before logging in.",
+                    errors: None,
+                });
+            }
 
-    // Verify email status
-    if !user.is_email_verified {
-        return Err(AuthError::new(AuthErrorType::EmailNotVerified));
+            // Generate JWT pair
+            match app_data.auth_service.generate_token_pair(&user).await {
+                Ok((access_token, refresh_token)) => {
+                    // Set refresh token in HTTP-only cookie
+                    let refresh_cookie = Cookie::build("refresh_token", refresh_token.clone())
+                        .path("/")
+                        .secure(true)
+                        .http_only(true)
+                        .same_site(SameSite::Strict)
+                        .max_age(time::Duration::days(7))
+                        .finish();
+
+                    // Return response with tokens
+                    HttpResponse::Ok()
+                        .cookie(refresh_cookie)
+                        .json(json!({
+                            "status": "success",
+                            "message": "Login successful",
+                            "data": {
+                                "access_token": access_token,
+                                "token_type": "Bearer",
+                                "expires_in": 900 // 15 minutes in seconds
+                            }
+                        }))
+                }
+                Err(e) => {
+                    log::error!("Token generation error: {}", e);
+                    HttpResponse::InternalServerError().json(ErrorResponse {
+                        status: "error",
+                        message: "Authentication error",
+                        errors: None,
+                    })
+                }
+            }
+        }
+        Err(e) => {
+            log::warn!("Authentication attempt failed: {}", e);
+            // Use constant-time comparison to prevent timing attacks
+            HttpResponse::Unauthorized().json(ErrorResponse {
+                status: "error",
+                message: "Invalid username or password",
+                errors: None,
+            })
+        }
     }
-
-    // Verify password
-    verify_password(&input.password, &user.password_hash)?;
-
-    // Check for account lockout
-    if self.is_account_locked(user.id).await? {
-        return Err(AuthError::new(AuthErrorType::AccountLocked));
-    }
-
-    // Generate token pair
-    let token_pair = self.token_service.create_token_pair(user.id, &user.role).await?;
-
-    // Log successful login
-    info!("User logged in successfully: {}", user.username);
-    
-    // Reset failed login attempts
-    self.reset_failed_login_attempts(user.id).await?;
-
-    Ok(token_pair)
-}
-
-pub async fn refresh_token(&self, refresh_token: &str) -> Result<TokenPair, AuthError> {
-    // Validate refresh token
-    let claims = self.token_service.validate_token(
-        refresh_token, 
-        TokenType::Refresh
-    ).await?;
-    
-    // Revoke the old refresh token
-    self.token_service.revoke_token(&claims.jti, claims.sub).await?;
-    
-    // Generate new token pair
-    let token_pair = self.token_service.create_token_pair(
-        claims.sub, 
-        &claims.role
-    ).await?;
-    
-    Ok(token_pair)
-}
-
-pub async fn request_password_reset(&self, email: &str) -> Result<(), ApiError> {
-    // Find user by email
-    let user = match self.repository.find_user_by_email(email).await {
-        Ok(Some(user)) => user,
-        Ok(None) => return Ok(()), // Return success to prevent email enumeration
-        Err(e) => return Err(ApiError::from(DbError::from(e))),
-    };
-
-    // Verify email is verified
-    if !user.is_email_verified {
-        return Err(ApiError::new("Email not verified", ApiErrorType::Validation));
-    }
-
-    // Create password reset token
-    let reset_token = self.repository.create_password_reset_token(user.id).await?;
-
-    // Send password reset email
-    self.email_service.send_password_reset_email(email, &reset_token.token).await?;
-
-    // Log password reset request
-    info!("Password reset requested for user: {}", user.username);
-
-    Ok(())
 }
 ```
 
-Features:
-1. Credential validation with security against timing attacks
-2. Email verification check
-3. Account lockout protection
-4. JWT token generation with separate access and refresh tokens
-5. Token rotation for security
-6. Secure password reset flow
-7. Protection against email enumeration
+Authentication features include:
+
+1. **Secure Token Implementation**:
+   - Access tokens: Short-lived JWTs (15 minutes)
+   - Refresh tokens: Longer-lived tokens (7 days) stored securely
+   - Stateful refresh tokens tracked in the database for revocation capability
+
+2. **Security Mechanisms**:
+   - Password verification using Argon2id with time-constant comparison
+   - Failed login attempt tracking with temporary account lockout
+   - Secure cookie handling for refresh tokens
+
+3. **Token Management**:
+   - Token refresh endpoints for seamless user experience
+   - Token revocation on logout or security events
+   - Cross-device logout capability
 
 ### 3.1.3 Profile Management
 
-Profile management functionality allows users to update their information:
+Users can manage their profiles through a set of secure endpoints:
 
 ```rust
-pub async fn update_user(
-    &self,
-    id: Uuid,
-    input: UserUpdateInput,
-    current_user: &AuthenticatedUser
-) -> Result<User, ApiError> {
-    // Authorization check
-    if id != current_user.id && current_user.role != "admin" {
-        return Err(ApiError::new("Unauthorized", ApiErrorType::Authorization));
-    }
-
-    // Validate input
-    let validated_input = validate_and_sanitize_user_update_input(input)?;
-    
-    // Check if email change requires verification
-    let email_verification_required = if let Some(ref email) = validated_input.email {
-        let current_user = self.repository.find_by_id(id).await?
-            .ok_or_else(|| ApiError::new("User not found", ApiErrorType::NotFound))?;
-        
-        if let Some(current_email) = &current_user.email {
-            email != current_email
-        } else {
-            true
-        }
-    } else {
-        false
-    };
-    
-    // Handle password update
-    let password_hash = if let Some(ref password) = validated_input.password {
-        Some(hash_password(password)?)
-    } else {
-        None
+// Update user profile handler
+pub async fn update_profile(
+    app_data: web::Data<AppState>,
+    identity: Identity,
+    form: web::Json<ProfileUpdateForm>,
+) -> impl Responder {
+    // Extract user ID from identity
+    let user_id = match identity.id() {
+        Some(id) => id,
+        None => return HttpResponse::Unauthorized().json(ErrorResponse {
+            status: "error",
+            message: "Authentication required",
+            errors: None,
+        }),
     };
 
-    // Update user
-    let mut user = self.repository.update(
-        id, 
-        &validated_input, 
-        password_hash
-    ).await?;
-    
-    // Handle email verification if needed
-    if email_verification_required {
-        let verification_token = generate_secure_token();
-        let token_expiry = Utc::now() + Duration::hours(24);
-        
-        // Update user with verification token
-        self.repository.update_verification_token(
-            id, 
-            &verification_token, 
-            token_expiry
-        ).await?;
-        
-        // Set user as unverified
-        self.repository.set_email_verified(id, false).await?;
-        
-        // Send verification email
-        if let Some(email) = &validated_input.email {
-            self.email_service.send_verification_email(
-                email, 
-                &verification_token
-            ).await?;
-        }
-        
-        // Update user object to reflect changes
-        user.is_email_verified = false;
-        user.verification_token = Some(verification_token);
-        user.verification_token_expires_at = Some(token_expiry);
+    // Validate profile data
+    if let Err(validation_errors) = validate_profile_update(&form) {
+        return HttpResponse::BadRequest().json(ErrorResponse {
+            status: "error",
+            message: "Validation failed",
+            errors: Some(validation_errors),
+        });
     }
 
-    // Log profile update
-    info!("User profile updated: {}", user.username);
-
-    Ok(user)
+    // Update profile in database
+    match app_data.user_service.update_profile(&user_id, &form).await {
+        Ok(updated_user) => {
+            HttpResponse::Ok().json(SuccessResponse {
+                status: "success",
+                message: "Profile updated successfully",
+                data: Some(json!({
+                    "username": updated_user.username,
+                    "display_name": updated_user.display_name,
+                    "bio": updated_user.bio,
+                })),
+            })
+        }
+        Err(e) => {
+            log::error!("Profile update error: {}", e);
+            HttpResponse::InternalServerError().json(ErrorResponse {
+                status: "error",
+                message: "Failed to update profile",
+                errors: None,
+            })
+        }
+    }
 }
 ```
 
-Features:
-1. Profile updates with validation
-2. Password changes with secure hashing
-3. Email updates with verification
-4. Authorization checks
-5. Audit logging
-6. Comprehensive error handling
+Profile management features include:
+
+1. **User Data Management**:
+   - Profile information updating
+   - Email address changing with re-verification
+   - Password changing with current password verification
+   - Account preferences management
+
+2. **Security Considerations**:
+   - Authentication required for all profile operations
+   - Sensitive actions require password re-entry
+   - All changes are logged for security audit
+
+3. **Account Recovery**:
+   - Password reset via email
+   - Time-limited recovery tokens
+   - Account reclamation process for lost accounts
 
 ## 3.2 Authentication and Authorization
 
 ### 3.2.1 JWT Implementation
 
-JWT authentication is implemented using the `jsonwebtoken` crate with a dual-token approach:
+The system uses JSON Web Tokens (JWT) for authentication with a comprehensive implementation:
 
 ```rust
-#[derive(Debug, Serialize, Deserialize)]
-pub struct Claims {
-    pub sub: Uuid,            // Subject (user ID)
-    pub exp: i64,             // Expiration time
-    pub iat: i64,             // Issued at time
-    pub nbf: i64,             // Not before time
-    pub jti: String,          // JWT ID (unique identifier)
-    pub iss: String,          // Issuer
-    pub aud: String,          // Audience
-    pub role: String,         // User role
-    pub token_type: TokenType, // Token type (access or refresh)
+pub struct AuthService {
+    jwt_secret: String,
+    token_duration: Duration,
+    refresh_token_duration: Duration,
+    token_repository: Arc<TokenRepository>,
+    user_repository: Arc<UserRepository>,
 }
 
-pub fn create_access_token(
-    user_id: Uuid, 
-    role: &str, 
-    secret: &str
-) -> Result<String, JwtError> {
-    let expiration = Utc::now()
-        .checked_add_signed(Duration::minutes(30))
-        .expect("valid timestamp")
-        .timestamp();
+impl AuthService {
+    pub fn new(
+        jwt_secret: String,
+        token_duration: Duration,
+        refresh_token_duration: Duration,
+        token_repository: Arc<TokenRepository>,
+        user_repository: Arc<UserRepository>,
+    ) -> Self {
+        Self {
+            jwt_secret,
+            token_duration,
+            refresh_token_duration,
+            token_repository,
+            user_repository,
+        }
+    }
 
-    let claims = Claims {
-        sub: user_id,
-        exp: expiration,
-        iat: Utc::now().timestamp(),
-        nbf: Utc::now().timestamp(),
-        jti: Uuid::new_v4().to_string(),
-        iss: "oxidizedoasis-websands".to_string(),
-        aud: "api".to_string(),
-        role: role.to_string(),
-        token_type: TokenType::Access,
-    };
+    pub async fn generate_token_pair(&self, user: &User) -> Result<(String, String), AuthError> {
+        // Generate access token
+        let access_token = self.generate_access_token(user)?;
+        
+        // Generate refresh token
+        let refresh_token = Uuid::new_v4().to_string();
+        let expires_at = Utc::now() + self.refresh_token_duration;
+        
+        // Store refresh token in database
+        self.token_repository.store_refresh_token(&user.id, &refresh_token, expires_at).await?;
+        
+        Ok((access_token, refresh_token))
+    }
 
-    encode(
-        &Header::default(),
-        &claims,
-        &EncodingKey::from_secret(secret.as_ref()),
-    ).map_err(|e| JwtError::Encoding(e.to_string()))
-}
+    fn generate_access_token(&self, user: &User) -> Result<String, AuthError> {
+        let expiration = Utc::now()
+            .checked_add_signed(self.token_duration)
+            .expect("Valid timestamp")
+            .timestamp();
 
-pub fn create_refresh_token(
-    user_id: Uuid, 
-    role: &str, 
-    secret: &str
-) -> Result<String, JwtError> {
-    let expiration = Utc::now()
-        .checked_add_signed(Duration::days(7))
-        .expect("valid timestamp")
-        .timestamp();
+        let claims = Claims {
+            sub: user.id.to_string(),
+            role: user.role.clone(),
+            exp: expiration as usize,
+            iat: Utc::now().timestamp() as usize,
+        };
 
-    let claims = Claims {
-        sub: user_id,
-        exp: expiration,
-        iat: Utc::now().timestamp(),
-        nbf: Utc::now().timestamp(),
-        jti: Uuid::new_v4().to_string(),
-        iss: "oxidizedoasis-websands".to_string(),
-        aud: "api".to_string(),
-        role: role.to_string(),
-        token_type: TokenType::Refresh,
-    };
-
-    encode(
-        &Header::default(),
-        &claims,
-        &EncodingKey::from_secret(secret.as_ref()),
-    ).map_err(|e| JwtError::Encoding(e.to_string()))
-}
-
-pub async fn validate_token(
-    token: &str, 
-    expected_type: TokenType, 
-    secret: &str
-) -> Result<Claims, JwtError> {
-    // Decode and verify signature
-    let token_data = decode::<Claims>(
-        token,
-        &DecodingKey::from_secret(secret.as_ref()),
-        &Validation::default()
-    ).map_err(|e| JwtError::InvalidToken(e.to_string()))?;
-    
-    // Verify token type
-    if token_data.claims.token_type != expected_type {
-        return Err(JwtError::InvalidTokenType);
+        let header = Header::new(Algorithm::HS256);
+        encode(&header, &claims, &EncodingKey::from_secret(self.jwt_secret.as_bytes()))
+            .map_err(|_| AuthError::TokenCreation)
     }
     
-    // Check if token is revoked
-    if is_token_revoked(&token_data.claims.jti).await? {
-        return Err(JwtError::TokenRevoked);
+    pub async fn verify_token(&self, token: &str) -> Result<Claims, AuthError> {
+        // Decode and verify the token
+        let token_data = decode::<Claims>(
+            token,
+            &DecodingKey::from_secret(self.jwt_secret.as_bytes()),
+            &Validation::new(Algorithm::HS256),
+        ).map_err(|e| {
+            match e.kind() {
+                jsonwebtoken::errors::ErrorKind::ExpiredSignature => AuthError::TokenExpired,
+                jsonwebtoken::errors::ErrorKind::InvalidSignature => AuthError::InvalidToken,
+                _ => AuthError::TokenValidation,
+            }
+        })?;
+        
+        Ok(token_data.claims)
     }
-    
-    // Return claims if all checks pass
-    Ok(token_data.claims)
 }
 ```
 
-Features:
-1. Token generation with comprehensive claims
-2. Separate access and refresh tokens
-3. Token validation with signature verification
-4. Token type verification
-5. Token revocation checking
-6. Expiration handling
-7. Role-based claims
+JWT implementation details:
+
+1. **Token Structure**:
+   - Header: Specifies algorithm (HS256)
+   - Payload: Contains user ID, role, issued time, and expiration
+   - Signature: HMAC-SHA256 encrypted with server secret key
+
+2. **Token Security**:
+   - Secret key stored in environment variables, not in code
+   - Short expiration time to minimize attack window
+   - Token rotation on privilege changes
+   - Refresh token rotation on use
+
+3. **Token Validation**:
+   - Signature verification on every request
+   - Expiration time validation
+   - Token revocation checking
+   - Role verification for protected endpoints
 
 ### 3.2.2 Role-based Access Control
 
-RBAC is implemented through middleware and guards:
+The system implements a flexible role-based access control system:
 
 ```rust
-pub async fn jwt_auth_middleware(
-    req: ServiceRequest,
-    credentials: BearerAuth
-) -> Result<ServiceRequest, (Error, ServiceRequest)> {
-    let config = req.app_data::<web::Data<AppConfig>>()
-        .expect("AppConfig must be set");
-    
-    match validate_jwt(credentials.token(), &config.jwt_secret).await {
-        Ok(claims) => {
-            // Add authenticated user to request extensions
-            let user = AuthenticatedUser {
-                id: claims.sub,
-                role: claims.role,
-                token_jti: claims.jti,
-            };
-            
-            req.extensions_mut().insert(user);
-            Ok(req)
-        },
-        Err(e) => {
-            log::warn!("JWT validation failed: {:?}", e);
-            Err((AuthError::from(e).into(), req))
-        }
-    }
-}
-
+// Middleware to check user roles
 pub struct RoleGuard {
-    pub allowed_roles: Vec<String>,
+    required_roles: Vec<String>,
 }
 
 impl RoleGuard {
-    pub fn new(allowed_roles: Vec<&str>) -> Self {
-        Self {
-            allowed_roles: allowed_roles.iter().map(|r| r.to_string()).collect(),
-        }
+    pub fn new(roles: Vec<&str>) -> Self {
+        let required_roles = roles.into_iter().map(String::from).collect();
+        RoleGuard { required_roles }
     }
 }
 
-impl<S, B> Transform<S, ServiceRequest> for RoleGuard
-where
-    S: Service<ServiceRequest, Response = ServiceResponse<B>, Error = Error>,
-    S::Future: 'static,
-    B: 'static,
-{
-    type Response = ServiceResponse<B>;
-    type Error = Error;
-    type Transform = RoleGuardMiddleware<S>;
-    type InitError = ();
-    type Future = Ready<Result<Self::Transform, Self::InitError>>;
-
-    fn new_transform(&self, service: S) -> Self::Future {
-        ok(RoleGuardMiddleware {
-            service,
-            allowed_roles: self.allowed_roles.clone(),
-        })
-    }
-}
-
-impl<S, B> Service<ServiceRequest> for RoleGuardMiddleware<S>
+impl<S, B> Service<ServiceRequest> for RoleGuard
 where
     S: Service<ServiceRequest, Response = ServiceResponse<B>, Error = Error>,
     S::Future: 'static,
@@ -1385,371 +1321,106 @@ where
     type Error = Error;
     type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>>>>;
 
+    fn poll_ready(&self, ctx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        ctx.poll()
+    }
+
     fn call(&self, req: ServiceRequest) -> Self::Future {
-        let user = req.extensions().get::<AuthenticatedUser>().cloned();
-        
-        if let Some(user) = user {
-            if self.allowed_roles.contains(&user.role) {
-                let fut = self.service.call(req);
-                return Box::pin(async move {
-                    let res = fut.await?;
-                    Ok(res)
-                });
-            }
-        }
-        
+        let required_roles = self.required_roles.clone();
+        let fut = ctx.call(req);
+
         Box::pin(async move {
-            Err(AuthError::new(AuthErrorType::InsufficientPermissions).into())
+            let mut res = fut.await?;
+            
+            // Extract claims from request extensions
+            if let Some(claims) = res.request().extensions().get::<Claims>() {
+                // Check if user has any of the required roles
+                if required_roles.is_empty() || required_roles.contains(&claims.role) {
+                    Ok(res)
+                } else {
+                    Err(ErrorForbidden("Insufficient permissions"))
+                }
+            } else {
+                Err(ErrorUnauthorized("Authentication required"))
+            }
         })
     }
 }
 ```
 
-Features:
-1. JWT token validation middleware
-2. Role verification
-3. Permission checking
-4. Access control enforcement
-5. Authentication state management
-6. Comprehensive error handling
+Role-based access control features:
+
+1. **Role Hierarchy**:
+   - Guest: Unauthenticated users with minimal access
+   - User: Standard authenticated users
+   - Moderator: Enhanced privileges for content management
+   - Admin: Full system access with administrative capabilities
+
+2. **Permission System**:
+   - Granular permissions within roles
+   - Resource-specific access controls
+   - Action-based permissions (view, create, edit, delete)
+   - Dynamic permission evaluation
+
+3. **Implementation Details**:
+   - Role stored in JWT claims
+   - Role verification at endpoint level
+   - Role-based route guards
+   - Permission caching for performance
 
 ### 3.2.3 Security Mechanisms
 
-Various security mechanisms are implemented:
+The system implements multiple security mechanisms:
 
 ```rust
-// CORS Configuration
-let cors = Cors::default()
-    .allowed_origin(&allowed_origin)
-    .allowed_methods(vec!["GET", "POST", "PUT", "DELETE"])
-    .allowed_headers(vec![
-        header::AUTHORIZATION,
-        header::ACCEPT,
-        header::CONTENT_TYPE,
-    ])
-    .expose_headers(vec![header::CONTENT_DISPOSITION])
-    .max_age(3600);
-
-// Security Headers
-.wrap(
-    actix_web::middleware::DefaultHeaders::new()
-        .add(("X-XSS-Protection", "1; mode=block"))
-        .add(("X-Frame-Options", "DENY"))
-        .add(("X-Content-Type-Options", "nosniff"))
-        .add(("Referrer-Policy", "strict-origin-when-cross-origin"))
-        .add(("Permissions-Policy", "camera=(), microphone=(), geolocation=()"))
-)
-
-// Content Security Policy
-.wrap(
-    actix_web::middleware::DefaultHeaders::new()
-        .add((
-            "Content-Security-Policy",
-            "default-src 'self'; \
-             script-src 'self' 'wasm-unsafe-eval'; \
-             style-src 'self' 'unsafe-inline'; \
-             img-src 'self' data:; \
-             connect-src 'self'; \
-             font-src 'self'; \
-             object-src 'none'; \
-             base-uri 'self'; \
-             form-action 'self'; \
-             frame-ancestors 'none';"
-        ))
-)
-
-// Rate Limiting
-.wrap(
-    RateLimiter::new(
-        SimpleInputFunctionBuilder::new(Duration::from_secs(60), 100)
-            .real_ip_key()
-            .build(),
-        SimpleOutput
-    )
-)
-```
-
-Additional security mechanisms include:
-1. Token revocation system
-2. Password strength requirements
-3. Input validation and sanitization
-4. Secure password hashing
-5. Account lockout protection
-6. Audit logging
-7. HTTPS enforcement
-
-## 3.3 Security Features
-
-### 3.3.1 Password Management
-
-Password security implementation:
-
-```rust
-pub fn validate_password(password: &str) -> Result<(), ValidationError> {
-    if password.len() < 8 || password.len() > 100 {
-        return Err(ValidationError::new("Password must be between 8 and 100 characters"));
-    }
-    
-    if !PASSWORD_UPPERCASE.is_match(password) {
-        return Err(ValidationError::new("Password must contain at least one uppercase letter"));
-    }
-    
-    if !PASSWORD_LOWERCASE.is_match(password) {
-        return Err(ValidationError::new("Password must contain at least one lowercase letter"));
-    }
-    
-    if !PASSWORD_NUMBER.is_match(password) {
-        return Err(ValidationError::new("Password must contain at least one number"));
-    }
-    
-    if !PASSWORD_SPECIAL.is_match(password) {
-        return Err(ValidationError::new("Password must contain at least one special character"));
-    }
-    
-    Ok(())
-}
-
-pub fn hash_password(password: &str) -> Result<String, BcryptError> {
-    hash(password, DEFAULT_COST)
-}
-
-pub fn verify_password(password: &str, hash: &str) -> Result<(), AuthError> {
-    verify(password, hash)
-        .map_err(|_| AuthError::new(AuthErrorType::InvalidCredentials))
-}
-
-pub fn is_common_password(password: &str) -> bool {
-    COMMON_PASSWORDS.contains(&password.to_lowercase())
-}
-
-pub fn calculate_password_strength(password: &str) -> PasswordStrength {
-    let length_score = (password.len() as f32 / 20.0).min(1.0);
-    let uppercase_score = if PASSWORD_UPPERCASE.is_match(password) { 0.2 } else { 0.0 };
-    let lowercase_score = if PASSWORD_LOWERCASE.is_match(password) { 0.2 } else { 0.0 };
-    let number_score = if PASSWORD_NUMBER.is_match(password) { 0.2 } else { 0.0 };
-    let special_score = if PASSWORD_SPECIAL.is_match(password) { 0.2 } else { 0.0 };
-    
-    let unique_chars = password.chars().collect::<HashSet<_>>().len();
-    let unique_ratio = unique_chars as f32 / password.len() as f32;
-    let entropy_score = unique_ratio * 0.2;
-    
-    let total_score = length_score + uppercase_score + lowercase_score + 
-                      number_score + special_score + entropy_score;
-    
-    match total_score {
-        s if s >= 1.2 => PasswordStrength::Strong,
-        s if s >= 0.8 => PasswordStrength::Medium,
-        s if s >= 0.5 => PasswordStrength::Weak,
-        _ => PasswordStrength::VeryWeak,
-    }
-}
-```
-
-Features:
-1. Password complexity requirements
-2. Secure password hashing with bcrypt
-3. Password verification
-4. Common password checking
-5. Password strength calculation
-6. Comprehensive validation rules
-
-### 3.3.2 Input Validation
-
-Comprehensive input validation:
-
-```rust
-pub fn validate_and_sanitize_user_input(
-    input: UserInput
-) -> Result<ValidatedUserInput, ValidationError> {
-    // Validate username
-    if input.username.len() < 3 || input.username.len() > 50 {
-        return Err(ValidationError::new("Username must be between 3 and 50 characters"));
-    }
-    
-    if !USERNAME_REGEX.is_match(&input.username) {
-        return Err(ValidationError::new("Username can only contain letters, numbers, underscores, and hyphens"));
-    }
-    
-    // Validate email if provided
-    let sanitized_email = if let Some(email) = &input.email {
-        if !EMAIL_REGEX.is_match(email) {
-            return Err(ValidationError::new("Invalid email format"));
-        }
-        
-        Some(email.to_lowercase())
-    } else {
-        None
-    };
-    
-    // Validate password
-    if let Some(password) = &input.password {
-        validate_password(password)?;
-        
-        if is_common_password(password) {
-            return Err(ValidationError::new("Password is too common"));
-        }
-    } else {
-        return Err(ValidationError::new("Password is required"));
-    }
-    
-    // Sanitize input
-    Ok(ValidatedUserInput {
-        username: sanitize_input(&input.username),
-        email: sanitized_email.map(|e| sanitize_input(&e)),
-        password: input.password.unwrap(),
-    })
-}
-
-pub fn sanitize_input(input: &str) -> String {
-    // Remove potentially dangerous characters
-    let sanitized = input
-        .replace('<', "&lt;")
-        .replace('>', "&gt;")
-        .replace('&', "&amp;")
-        .replace('"', "&quot;")
-        .replace('\'', "&#x27;")
-        .replace('/', "&#x2F;");
-    
-    // Trim whitespace
-    sanitized.trim().to_string()
-}
-
-pub fn sanitize_html(html: &str) -> String {
-    let clean_html = ammonia::Builder::default()
-        .tags(hashset!["b", "i", "u", "p", "br", "a"])
-        .link_rel(Some("noopener noreferrer"))
-        .url_schemes(hashset!["http", "https"])
+// CSRF protection middleware configuration
+pub fn configure_security(cfg: &mut web::ServiceConfig) {
+    // Create CSRF token extractor
+    let csrf = CsrfTokenExtractor::new(CsrfConfigBuilder::new()
+        .cookie_name("csrf_token")
+        .cookie_secure(true)
+        .cookie_http_only(true)
+        .cookie_same_site(SameSiteCookiePolicy::Strict)
+        .http_allowed_methods(vec![Method::GET, Method::HEAD, Method::OPTIONS])
         .build()
-        .clean(html)
-        .to_string();
-    
-    clean_html
-}
-```
+        .unwrap());
 
-Features:
-1. Username validation
-2. Email validation
-3. Password validation
-4. Input sanitization
-5. HTML sanitization
-6. Regex-based validation
-7. Length constraints
+    cfg.service(
+        web::resource("/api/csrf-token")
+            .route(web::get().to(get_csrf_token))
+    );
 
-### 3.3.3 Rate Limiting
-
-Rate limiting implementation:
-
-```rust
-// Rate limiting configuration
-const RATE_LIMITS: &[RateLimit] = &[
-    RateLimit {
-        path: "/api/auth/login",
-        max_requests: 5,
-        window_seconds: 300, // 5 minutes
-        error_message: "Too many login attempts",
-    },
-    RateLimit {
-        path: "/api/users/register",
-        max_requests: 3,
-        window_seconds: 3600, // 1 hour
-        error_message: "Too many registration attempts",
-    },
-    RateLimit {
-        path: "/api/auth/password-reset",
-        max_requests: 3,
-        window_seconds: 3600, // 1 hour
-        error_message: "Too many password reset attempts",
-    },
-    RateLimit {
-        path: "/api/auth/refresh",
-        max_requests: 10,
-        window_seconds: 60, // 1 minute
-        error_message: "Too many token refresh attempts",
-    },
-];
-
-pub struct RateLimitMiddleware {
-    limits: HashMap<String, RateLimit>,
-    request_store: Arc<DashMap<String, Vec<Instant>>>,
-}
-
-impl RateLimitMiddleware {
-    pub fn new(limits: &[RateLimit]) -> Self {
-        let mut limits_map = HashMap::new();
-        for limit in limits {
-            limits_map.insert(limit.path.to_string(), limit.clone());
-        }
-        
-        Self {
-            limits: limits_map,
-            request_store: Arc::new(DashMap::new()),
-        }
-    }
-    
-    fn is_rate_limited(&self, path: &str, ip: &str) -> Option<(u32, u32)> {
-        let key = format!("{}:{}", path, ip);
-        let limit = self.limits.get(path)?;
-        
-        let now = Instant::now();
-        let window_duration = Duration::from_secs(limit.window_seconds as u64);
-        
-        let mut entry = self.request_store.entry(key).or_insert_with(Vec::new);
-        
-        // Remove expired timestamps
-        entry.retain(|&timestamp| now.duration_since(timestamp) < window_duration);
-        
-        // Check if rate limit exceeded
-        if entry.len() >= limit.max_requests as usize {
-            return Some((limit.max_requests, limit.window_seconds));
-        }
-        
-        // Add current timestamp
-        entry.push(now);
-        
-        None
-    }
-}
-
-impl<S, B> Transform<S, ServiceRequest> for RateLimitMiddleware
-where
-    S: Service<ServiceRequest, Response = ServiceResponse<B>, Error = Error>,
-    S::Future: 'static,
-    B: 'static,
-{
-    type Response = ServiceResponse<B>;
-    type Error = Error;
-    type Transform = RateLimitMiddlewareService<S>;
-    type InitError = ();
-    type Future = Ready<Result<Self::Transform, Self::InitError>>;
-
-    fn new_transform(&self, service: S) -> Self::Future {
-        ok(RateLimitMiddlewareService {
-            service,
-            limits: self.limits.clone(),
-            request_store: self.request_store.clone(),
-        })
-    }
-}
-```
-
-Features:
-1. Per-endpoint rate limiting
-2. Configurable request thresholds
-3. Configurable time windows
-4. IP-based tracking
-5. Custom error messages
-6. Automatic cleanup of expired entries
-7. Efficient implementation with concurrent access
-
-## 3.4 API Endpoints
-
-### 3.4.1 Public Endpoints
-
-```rust
-pub fn configure_public_routes(cfg: &mut web::ServiceConfig) {
+    // Apply CSRF protection to all POST/PUT/DELETE routes
     cfg.service(
         web::scope("/api")
+            .wrap(csrf)
             .service(
-                web::scope("/auth")
-                    .route("/login", web::post().to(login_handler))
+                web::resource("/users")
+                    .route(web::post().to(create_user))
+                    .route(web::put().to(update_user))
+                    .route(web::delete().to(delete_user))
+            )
+    );
+}
+```
+
+Key security mechanisms:
+
+1. **Cross-Site Request Forgery (CSRF) Protection**:
+   - Token-based CSRF protection for state-changing actions
+   - Secure cookie implementation
+   - Same-site cookie policy
+   - Referrer validation
+
+2. **Cross-Site Scripting (XSS) Protection**:
+   - Content Security Policy implementation
+   - Input sanitization
+   - Output encoding
+   - HTTPOnly cookies for sensitive data
+
+3. **SQL Injection Prevention**:
+   - Parameterized queries with SQLx
+   - Type-safe query building
+   - Input validation and sanitization
+   - Limited database user permissions
+
