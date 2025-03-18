@@ -47,6 +47,8 @@ pub struct UserDetailProps {
 pub enum Msg {
     FetchUserDetail,
     UserDetailFetched(Result<UserDetail, String>),
+    FetchCurrentUser,
+    CurrentUserFetched(Result<String, String>),
     UpdateField(String, String),
     SaveUser,
     UserSaved(Result<(), String>),
@@ -61,6 +63,7 @@ pub struct UserDetailComponent {
     success_message: Option<String>,
     is_loading: bool,
     edited_fields: std::collections::HashMap<String, String>,
+    current_user_id: Option<String>,
 }
 
 impl Component for UserDetailComponent {
@@ -70,6 +73,7 @@ impl Component for UserDetailComponent {
     fn create(ctx: &Context<Self>) -> Self {
         let user_id = ctx.props().user_id.clone();
         ctx.link().send_message(Msg::FetchUserDetail);
+        ctx.link().send_message(Msg::FetchCurrentUser);
         
         Self {
             user_id,
@@ -79,6 +83,7 @@ impl Component for UserDetailComponent {
             success_message: None,
             is_loading: true,
             edited_fields: std::collections::HashMap::new(),
+            current_user_id: None,
         }
     }
 
@@ -109,6 +114,31 @@ impl Component for UserDetailComponent {
                 }
                 true
             }
+            Msg::FetchCurrentUser => {
+                let link = ctx.link().clone();
+                spawn_local(async move {
+                    let result = fetch_current_user_id().await;
+                    link.send_message(Msg::CurrentUserFetched(result));
+                });
+                false
+            }
+            Msg::CurrentUserFetched(result) => {
+                match result {
+                    Ok(user_id) => {
+                        self.current_user_id = Some(user_id);
+                        
+                        // If this is the current user and we're in edit mode, show an error
+                        if self.mode == "edit" && Some(&self.user_id) == self.current_user_id.as_ref() {
+                            self.error = Some("You cannot edit your own account. This could lead to session inconsistency issues.".to_string());
+                        }
+                    }
+                    Err(error) => {
+                        log!("Failed to fetch current user ID: {}", error);
+                        // Don't set an error message for this, as it's not critical for the UI
+                    }
+                }
+                true
+            }
             Msg::UpdateField(field, value) => {
                 self.edited_fields.insert(field, value);
                 true
@@ -116,6 +146,12 @@ impl Component for UserDetailComponent {
             Msg::SaveUser => {
                 if self.mode != "edit" {
                     return false;
+                }
+                
+                // Check if user is trying to edit their own account
+                if Some(&self.user_id) == self.current_user_id.as_ref() {
+                    self.error = Some("You cannot edit your own account. This could lead to session inconsistency issues.".to_string());
+                    return true;
                 }
                 
                 self.is_loading = true;
@@ -148,8 +184,8 @@ impl Component for UserDetailComponent {
             }
             Msg::GoBack => {
                 // Create a CustomEvent with options to set detail
-                let mut options = web_sys::CustomEventInit::new();
-                options.detail(&JsValue::from_str("UserManagement"));
+                let options = web_sys::CustomEventInit::new();
+                options.set_detail(&JsValue::from_str("UserManagement"));
                 
                 log!("UserDetail: Creating GoBack event to return to UserManagement");
                 let event = CustomEvent::new_with_event_init_dict(
@@ -176,6 +212,11 @@ impl Component for UserDetailComponent {
     fn view(&self, ctx: &Context<Self>) -> Html {
         let is_edit_mode = self.mode == "edit";
         let mode_display = if is_edit_mode { "Edit" } else { "Inspect" };
+        
+        // Check if this is the current user
+        let is_current_user = self.current_user_id.as_ref()
+            .map(|current_id| current_id == &self.user_id)
+            .unwrap_or(false);
         
         html! {
             <div class="l-grid l-grid--dashboard c-user-detail-enter">
@@ -243,6 +284,23 @@ impl Component for UserDetailComponent {
                         }
                         
                         {
+                            if is_current_user && is_edit_mode {
+                                html! {
+                                    <div class="c-validation__warning--user-detail">
+                                        <svg class="c-validation__icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+                                            <line x1="12" y1="9" x2="12" y2="13"></line>
+                                            <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                                        </svg>
+                                        {"You cannot edit your own account. This could lead to session inconsistency issues."}
+                                    </div>
+                                }
+                            } else {
+                                html! { <></> }
+                            }
+                        }
+                        
+                        {
                             if self.is_loading {
                                 html! {
                                     <div class="c-loader--user-detail">
@@ -251,7 +309,7 @@ impl Component for UserDetailComponent {
                                     </div>
                                 }
                             } else if let Some(user) = &self.user_detail {
-                                self.render_user_form(ctx, user, is_edit_mode)
+                                self.render_user_form(ctx, user, is_edit_mode && !is_current_user)
                             } else {
                                 html! {
                                     <div class="c-table__empty">
@@ -559,11 +617,10 @@ async fn fetch_user_detail(user_id: &str) -> Result<UserDetail, String> {
     let request = RequestInterceptor::get(&url);
 
     log!("UserDetail: Fetching user details for ID: {}", user_id);
-    
-    
-    // Use send() for now, as we're having issues with send_with_retry()
     log!("UserDetail: Sending request to {}", url);
-    let response = request.send().await.map_err(|e| e.to_string())?;
+    
+    // Use send_with_retry() for proper token refresh handling
+    let response = request.send_with_retry().await.map_err(|e| e.to_string())?;
     
     if !response.ok() {
         let status = response.status();
@@ -589,38 +646,121 @@ async fn fetch_user_detail(user_id: &str) -> Result<UserDetail, String> {
 }
 
 async fn save_user(user_id: &str, edited_fields: &std::collections::HashMap<String, String>) -> Result<(), String> {
-    let url = format!("/api/cookie/admin/users/{}", user_id);
+    log!("UserDetail: Saving user changes for ID: {}", user_id);
     
-    // Create a JSON object with the edited fields
-    let mut json_data = serde_json::Map::new();
-    for (key, value) in edited_fields {
-        json_data.insert(key.clone(), serde_json::Value::String(value.clone()));
+    // First check if this is the current user
+    let current_user_result = fetch_current_user_id().await;
+    if let Ok(current_user_id) = current_user_result {
+        if current_user_id == user_id {
+            return Err("You cannot edit your own account. This could lead to session inconsistency issues.".to_string());
+        }
     }
     
-    let request = RequestInterceptor::put(&url)
-        .json(&serde_json::Value::Object(json_data))
-        .map_err(|e| format!("Failed to create request: {}", e))?;
-    log!("UserDetail: Sending save request to {}", url);
-    
-    // Use send() for now, as we're having issues with send_with_retry()
-    let response = request.send().await.map_err(|e| e.to_string())?;
+    // Log each field individually to avoid HashMap serialization issues
+    for (key, value) in edited_fields.iter() {
+        log!("UserDetail: Edited field - {} = {}", key, value);
+    }
 
-    if !response.ok() {
-        let status = response.status();
-        return Err(format!("Failed to update user: {}", status));
-    }
-    
-    let response_text = response.text().await
-        .map_err(|e| format!("Failed to get response text: {}", e))?;
-    
-    log!("UserDetail: Update response: {}", &response_text);
-    
-    let api_response: ApiResponse<()> = serde_json::from_str(&response_text)
-        .map_err(|e| format!("Failed to parse response: {}", e))?;
-    
-    if !api_response.success {
-        return Err(api_response.error.unwrap_or_else(|| "Unknown error occurred".to_string()));
+    // Process each edited field with the appropriate endpoint
+    for (field, value) in edited_fields.iter() {
+        let endpoint_url = match field.as_str() {
+            "username" => format!("/api/cookie/admin/users/{}/username", user_id),
+            "role" => format!("/api/cookie/admin/users/{}/role", user_id),
+            "status" => format!("/api/cookie/admin/users/{}/status", user_id),
+            _ => continue, // Skip unknown fields
+        };
+
+        // Create a JSON object with the field value
+        let mut json_data = serde_json::Map::new();
+        
+        // Insert the correct field name based on the endpoint
+        match field.as_str() {
+            "username" => { json_data.insert("username".to_string(), serde_json::Value::String(value.clone())); }
+            "role" => { json_data.insert("role".to_string(), serde_json::Value::String(value.clone())); }
+            "status" => { json_data.insert("is_active".to_string(), serde_json::Value::Bool(value == "true")); }
+            _ => continue,
+        }
+        
+        log!("UserDetail: Sending request to update {} to {}", field, &endpoint_url);
+        
+        let request = RequestInterceptor::put(&endpoint_url)
+            .json(&serde_json::Value::Object(json_data))
+            .map_err(|e| format!("Failed to create request for {}: {}", field, e))?;
+        
+        // Use send_with_retry() for proper token refresh handling
+        let response = request.send_with_retry().await.map_err(|e| e.to_string())?;
+        
+        if !response.ok() {
+            let status = response.status();
+            return Err(format!("Failed to update {}: {}", field, status));
+        }
+        
+        let response_text = response.text().await
+            .map_err(|e| format!("Failed to get response text for {}: {}", field, e))?;
+        
+        log!("UserDetail: Update response for {}: {}", field, &response_text);
+        
+        // Handle different response types based on the field
+        if field == "username" {
+            // For username updates, expect a UserDetail response
+            let api_response: ApiResponse<UserDetail> = serde_json::from_str(&response_text)
+                .map_err(|e| format!("Failed to parse response for {}: {}", field, e))?;
+                
+            if !api_response.success {
+                return Err(api_response.error.unwrap_or_else(|| format!("Unknown error occurred updating {}", field)));
+            }
+        } else {
+            // For other fields, expect a unit response
+            let api_response: ApiResponse<()> = serde_json::from_str(&response_text)
+                .map_err(|e| format!("Failed to parse response for {}: {}", field, e))?;
+                
+            if !api_response.success {
+                return Err(api_response.error.unwrap_or_else(|| format!("Unknown error occurred updating {}", field)));
+            }
+        }
     }
     
     Ok(())
+}
+
+// Function to fetch the current user's ID
+async fn fetch_current_user_id() -> Result<String, String> {
+    // Use the RequestInterceptor to handle token refresh automatically
+    let response = RequestInterceptor::get("/api/cookie/users/me")
+        .send_with_retry()
+        .await
+        .map_err(|e| e.to_string())?;
+    
+    let response_text = response.text().await.map_err(|e| e.to_string())?;
+    
+    // Parse the response
+    #[derive(Debug, Deserialize)]
+    struct UserResponse {
+        success: bool,
+        data: Option<UserData>,
+        error: Option<String>,
+    }
+    
+    #[derive(Debug, Deserialize)]
+    struct UserData {
+        user: User,
+    }
+    
+    #[derive(Debug, Deserialize)]
+    struct User {
+        id: String,
+    }
+    
+    let data: UserResponse = serde_json::from_str(&response_text)
+        .map_err(|e| format!("Failed to parse response: {}", e))?;
+    
+    if !data.success {
+        return Err(data.error.unwrap_or_else(|| "Unknown error occurred".to_string()));
+    }
+    
+    // Extract user ID from the response
+    match data.data {
+        Some(user_data) => Ok(user_data.user.id),
+        None => Err("No user data in response".into()),
+    }
 }

@@ -82,9 +82,74 @@ impl RequestInterceptor {
     }
 }
 
-/// Extension trait for RequestBuilder to add send_with_retry method
+/// Extension trait for RequestBuilder and Request to add send_with_retry method
 pub trait RequestBuilderExt {
     fn send_with_retry(self) -> Pin<Box<dyn Future<Output = Result<Response, String>>>>;
+}
+
+impl RequestBuilderExt for Request {
+    fn send_with_retry(self) -> Pin<Box<dyn Future<Output = Result<Response, String>>>> {
+        Box::pin(async move {
+            // First attempt
+            let response = self.send().await.map_err(|e| e.to_string())?;
+            
+            // If unauthorized, try to refresh token and retry
+            if response.status() == 401 || response.status() == 403 {
+                log!("Request failed with status: {}, attempting token refresh", response.status());
+                
+                // Try to refresh the token
+                match auth::refresh_access_token().await {
+                    Ok(()) => {
+                        log!("Token refreshed successfully, retrying request");
+                        
+                        // We need to recreate the request since we can't clone Request
+                        // Get the URL from the response
+                        let url = response.url().to_string();
+                        log!("Retrying request to URL: {}", &url);
+                        
+                        // Extract the HTTP method from the URL path
+                        let method = determine_http_method(&url);
+                        log!("Determined HTTP method: {}", method);
+                        
+                        // Create a new request with the determined method
+                        let mut new_request = match method {
+                            "GET" => Request::get(&url),
+                            "POST" => Request::post(&url),
+                            "PUT" => Request::put(&url),
+                            "DELETE" => Request::delete(&url),
+                            _ => {
+                                log!("Unknown method, defaulting to GET");
+                                Request::get(&url)
+                            }
+                        };
+                        
+                        // Add the new CSRF token
+                        if let Some(csrf_token) = auth::get_csrf_token() {
+                            new_request = new_request.header("X-CSRF-Token", &csrf_token);
+                        }
+                        
+                        // Send the new request
+                        let new_response = new_request.send().await.map_err(|e| e.to_string())?;
+                        
+                        // If still unauthorized after refresh, return error
+                        if new_response.status() == 401 || new_response.status() == 403 {
+                            return Err("Still unauthorized after token refresh".to_string());
+                        }
+                        
+                        Ok(new_response)
+                    },
+                    Err(e) => {
+                        // Token refresh failed, likely need to re-login
+                        auth::remove_tokens();
+                        Err(format!("Token refresh failed: {}", e))
+                    }
+                }
+            } else {
+                // Return the original response if not unauthorized
+                Ok(response)
+            }
+        })
+    }
 }
 
 impl RequestBuilderExt for RequestBuilder {
@@ -164,7 +229,7 @@ fn determine_http_method(url: &str) -> &'static str {
         "GET"
     } else if path.contains("/admin/users/") {
         // Admin user management endpoints
-        if path.contains("/role") || path.contains("/status") {
+        if path.contains("/role") || path.contains("/status") || path.contains("/username") {
             "PUT"
         } else if path.ends_with("/users") {
             // List users endpoint

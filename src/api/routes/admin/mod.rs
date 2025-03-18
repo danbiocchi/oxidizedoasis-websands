@@ -19,7 +19,9 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
                     .route("", web::get().to(user_management::list_users))
                     .route("/{id}", web::get().to(user_management::get_user))
                     .route("/{id}/role", web::put().to(user_management::update_user_role))
+                    .route("/{id}/username", web::put().to(user_management::update_user_username))
                     .route("/{id}/status", web::put().to(user_management::update_user_status))
+                    .route("/{id}", web::delete().to(user_management::delete_user))
             )
             .service(
                 web::scope("/logs")
@@ -48,7 +50,9 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
                     .route("", web::get().to(user_management::list_users))
                     .route("/{id}", web::get().to(user_management::get_user))
                     .route("/{id}/role", web::put().to(user_management::update_user_role))
+                    .route("/{id}/username", web::put().to(user_management::update_user_username))
                     .route("/{id}/status", web::put().to(user_management::update_user_status))
+                    .route("/{id}", web::delete().to(user_management::delete_user))
             )
             .service(
                 web::scope("/logs")

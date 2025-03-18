@@ -234,6 +234,36 @@ impl UserRepository {
         user
     }
 
+    pub async fn update_username(
+        &self,
+        user_id: Uuid,
+        new_username: &str,
+    ) -> Result<Option<User>, sqlx::Error> {
+        debug!("Updating username for user {}: {}", user_id, new_username);
+
+        let user = sqlx::query_as!(
+            User,
+            r#"
+            UPDATE users
+            SET username = $1,
+                updated_at = $2
+            WHERE id = $3
+            RETURNING *
+            "#,
+            new_username,
+            Utc::now(),
+            user_id
+        )
+        .fetch_optional(&self.pool)
+        .await;
+
+        if let Ok(Some(ref u)) = user {
+            info!("Successfully updated username for user: {}", u.id);
+        }
+
+        user
+    }
+
     pub async fn update_status(
         &self,
         user_id: Uuid,

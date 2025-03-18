@@ -46,6 +46,8 @@ impl UserAdminView {
 pub enum Msg {
     FetchUsers,
     UsersFetched(Result<Vec<UserAdminView>, String>),
+    FetchCurrentUser,
+    CurrentUserFetched(Result<String, String>),
     InspectUser(String),
     EditUser(String),
     DeleteUser(String),
@@ -64,6 +66,7 @@ pub struct UserManagement {
     show_delete_modal: bool,
     delete_confirmation_text: String,
     is_loading: bool,
+    current_user_id: Option<String>,
 }
 
 impl Component for UserManagement {
@@ -71,7 +74,10 @@ impl Component for UserManagement {
     type Properties = ();
 
     fn create(ctx: &Context<Self>) -> Self {
+        // Fetch users and current user ID
         ctx.link().send_message(Msg::FetchUsers);
+        ctx.link().send_message(Msg::FetchCurrentUser);
+        
         Self {
             users: Vec::new(),
             error: None,
@@ -81,6 +87,7 @@ impl Component for UserManagement {
             show_delete_modal: false,
             delete_confirmation_text: String::new(),
             is_loading: false,
+            current_user_id: None,
         }
     }
 
@@ -106,11 +113,31 @@ impl Component for UserManagement {
                 }
                 true
             }
+            Msg::FetchCurrentUser => {
+                let link = ctx.link().clone();
+                spawn_local(async move {
+                    let result = fetch_current_user_id().await;
+                    link.send_message(Msg::CurrentUserFetched(result));
+                });
+                false
+            }
+            Msg::CurrentUserFetched(result) => {
+                match result {
+                    Ok(user_id) => {
+                        self.current_user_id = Some(user_id);
+                    }
+                    Err(error) => {
+                        log!("Failed to fetch current user ID: {}", error);
+                        // Don't set an error message for this, as it's not critical for the UI
+                    }
+                }
+                true
+            }
             Msg::InspectUser(user_id) => {
                 // Emit a custom event to change the view to UserInspect
                 // Create a CustomEvent with options to set detail
                 let mut options = web_sys::CustomEventInit::new();
-                options.detail(&JsValue::from_str(&format!("UserInspect:{}", user_id)));
+                options.set_detail(&JsValue::from_str(&format!("UserInspect:{}", user_id)));
                 log!("UserManagement: Creating UserInspect event with ID: {}", user_id);
                 
                 let event = CustomEvent::new_with_event_init_dict(
@@ -134,7 +161,7 @@ impl Component for UserManagement {
                 // Emit a custom event to change the view to UserEdit
                 // Create a CustomEvent with options to set detail
                 let mut options = web_sys::CustomEventInit::new();
-                options.detail(&JsValue::from_str(&format!("UserEdit:{}", user_id)));
+                options.set_detail(&JsValue::from_str(&format!("UserEdit:{}", user_id)));
                 log!("UserManagement: Creating UserEdit event with ID: {}", user_id);
                 
                 let event = CustomEvent::new_with_event_init_dict(
@@ -254,6 +281,11 @@ impl Component for UserManagement {
                                             let user_id_edit = user.id.clone();
                                             let user_id_delete = user.id.clone();
                                             
+                                            // Check if this is the current user
+                                            let is_current_user = self.current_user_id.as_ref()
+                                                .map(|current_id| current_id == &user.id)
+                                                .unwrap_or(false);
+                                            
                                             html! {
                                                 <tr key={user.id.clone()}>
                                                     <td>{&user.username}</td>
@@ -279,15 +311,17 @@ impl Component for UserManagement {
                                                         </button>
                                                         <button 
                                                             class="c-button c-button--small c-button--warning" 
-                                                            title="Edit user"
+                                                            title={if is_current_user { "You cannot edit your own account" } else { "Edit user" }}
                                                             onclick={ctx.link().callback(move |_| Msg::EditUser(user_id_edit.clone()))}
+                                                            disabled={is_current_user}
                                                         >
                                                             {"Edit"}
                                                         </button>
                                                         <button 
                                                             class="c-button c-button--small c-button--danger" 
-                                                            title="Delete user"
+                                                            title={if is_current_user { "You cannot delete your own account" } else { "Delete user" }}
                                                             onclick={ctx.link().callback(move |_| Msg::DeleteUser(user_id_delete.clone()))}
+                                                            disabled={is_current_user}
                                                         >
                                                             {"Delete"}
                                                         </button>
@@ -383,6 +417,7 @@ impl Default for UserManagement {
             show_delete_modal: false,
             delete_confirmation_text: String::new(),
             is_loading: false,
+            current_user_id: None,
         }
     }
 }
@@ -445,4 +480,45 @@ async fn delete_user(user_id: &str) -> Result<(), String> {
     }
     
     Ok(())
+}
+
+// Function to fetch the current user's ID
+async fn fetch_current_user_id() -> Result<String, String> {
+    // Use the RequestInterceptor to handle token refresh automatically
+    let response = RequestInterceptor::get("/api/cookie/users/me")
+        .send_with_retry()
+        .await?;
+    
+    let response_text = response.text().await.map_err(|e| e.to_string())?;
+    
+    // Parse the response
+    #[derive(Debug, Deserialize)]
+    struct UserResponse {
+        success: bool,
+        data: Option<UserData>,
+        error: Option<String>,
+    }
+    
+    #[derive(Debug, Deserialize)]
+    struct UserData {
+        user: User,
+    }
+    
+    #[derive(Debug, Deserialize)]
+    struct User {
+        id: String,
+    }
+    
+    let data: UserResponse = serde_json::from_str(&response_text)
+        .map_err(|e| format!("Failed to parse response: {}", e))?;
+    
+    if !data.success {
+        return Err(data.error.unwrap_or_else(|| "Unknown error occurred".to_string()));
+    }
+    
+    // Extract user ID from the response
+    match data.data {
+        Some(user_data) => Ok(user_data.user.id),
+        None => Err("No user data in response".into()),
+    }
 }

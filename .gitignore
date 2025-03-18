@@ -22,3 +22,5 @@ cline_docs/
 .roomodes
 memory-bank/
 projectBrief.md
+.roo/*
+insert-variables.cmd
