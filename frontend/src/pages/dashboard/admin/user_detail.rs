@@ -701,8 +701,8 @@ async fn save_user(user_id: &str, edited_fields: &std::collections::HashMap<Stri
         log!("UserDetail: Update response for {}: {}", field, &response_text);
         
         // Handle different response types based on the field
-        if field == "username" {
-            // For username updates, expect a UserDetail response
+        if field == "username" || field == "role" {
+            // For username and role updates, expect a UserDetail response
             let api_response: ApiResponse<UserDetail> = serde_json::from_str(&response_text)
                 .map_err(|e| format!("Failed to parse response for {}: {}", field, e))?;
                 
