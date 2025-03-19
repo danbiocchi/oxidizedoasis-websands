@@ -32,6 +32,7 @@
 @import './pages/dashboard/system-logs.css'; /* System Logs Page Styles */
 @import './pages/dashboard/user-detail.css'; /* User Detail/Inspect Page Styles */
 @import './pages/dashboard/security-incidents.css'; /* Security Incidents Page Styles */
+@import './pages/dashboard/settings.css'; /* Settings Page Styles */
 
 /* Utility Classes */
 @import './utils/animations.css';   /* Animation utilities */

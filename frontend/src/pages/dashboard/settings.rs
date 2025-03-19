@@ -1,50 +1,103 @@
 use yew::prelude::*;
 
-pub struct Settings;
+mod tabs;
+
+#[derive(Clone, PartialEq)]
+pub enum SettingsTab {
+    Account,
+    Security,
+    Notifications,
+    Appearance,
+    Privacy,
+}
+
+pub struct Settings {
+    active_tab: SettingsTab,
+}
+
+pub enum Msg {
+    SwitchTab(SettingsTab),
+}
 
 impl Component for Settings {
-    type Message = ();
+    type Message = Msg;
     type Properties = ();
 
     fn create(_ctx: &Context<Self>) -> Self {
-        Self
+        Self {
+            active_tab: SettingsTab::Account,
+        }
     }
 
-    fn view(&self, _ctx: &Context<Self>) -> Html {
+    fn update(&mut self, _ctx: &Context<Self>, msg: Self::Message) -> bool {
+        match msg {
+            Msg::SwitchTab(tab) => {
+                self.active_tab = tab;
+                true
+            }
+        }
+    }
+
+    fn view(&self, ctx: &Context<Self>) -> Html {
+        let link = ctx.link();
+        
         html! {
             <div class="l-grid l-grid--dashboard">
                 <div class="c-card c-card--dashboard">
                     <h2 class="c-card__title">{"Settings"}</h2>
-                    <div class="l-grid l-grid--stats">
-                        <div class="c-card c-card--stat">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <path d="M22 17H2a3 3 0 0 0 3-3V9a7 7 0 0 1 14 0v5a3 3 0 0 0 3 3zm-8.27 4a2 2 0 0 1-3.46 0"></path>
-                            </svg>
-                            <div class="stat-content">
-                                <span class="c-card__label">{"Email Notifications"}</span>
-                                <span class="c-card__value">
-                                    <div class="c-form-check">
-                                        <input type="checkbox" class="c-form-check-input" checked=true />
-                                    </div>
-                                </span>
-                            </div>
+                    
+                    <div class="c-tabs">
+                        <div class="c-tabs__nav">
+                            <button 
+                                class={classes!("c-tabs__tab", (self.active_tab == SettingsTab::Account).then_some("c-tabs__tab--active"))}
+                                onclick={link.callback(|_| Msg::SwitchTab(SettingsTab::Account))}
+                            >
+                                {"Account"}
+                            </button>
+                            <button 
+                                class={classes!("c-tabs__tab", (self.active_tab == SettingsTab::Security).then_some("c-tabs__tab--active"))}
+                                onclick={link.callback(|_| Msg::SwitchTab(SettingsTab::Security))}
+                            >
+                                {"Security"}
+                            </button>
+                            <button 
+                                class={classes!("c-tabs__tab", (self.active_tab == SettingsTab::Notifications).then_some("c-tabs__tab--active"))}
+                                onclick={link.callback(|_| Msg::SwitchTab(SettingsTab::Notifications))}
+                            >
+                                {"Notifications"}
+                            </button>
+                            <button 
+                                class={classes!("c-tabs__tab", (self.active_tab == SettingsTab::Appearance).then_some("c-tabs__tab--active"))}
+                                onclick={link.callback(|_| Msg::SwitchTab(SettingsTab::Appearance))}
+                            >
+                                {"Appearance"}
+                            </button>
+                            <button 
+                                class={classes!("c-tabs__tab", (self.active_tab == SettingsTab::Privacy).then_some("c-tabs__tab--active"))}
+                                onclick={link.callback(|_| Msg::SwitchTab(SettingsTab::Privacy))}
+                            >
+                                {"Privacy"}
+                            </button>
                         </div>
-                        <div class="c-card c-card--stat">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
-                            </svg>
-                            <div class="stat-content">
-                                <span class="c-card__label">{"Two-Factor Authentication"}</span>
-                                <span class="c-card__value">
-                                    <div class="c-form-check">
-                                        <input type="checkbox" class="c-form-check-input" />
-                                    </div>
-                                </span>
-                            </div>
+                        
+                        <div class="c-tabs__content">
+                            {self.render_active_tab()}
                         </div>
                     </div>
                 </div>
             </div>
+        }
+    }
+}
+
+impl Settings {
+    fn render_active_tab(&self) -> Html {
+        match self.active_tab {
+            SettingsTab::Account => html! { <tabs::AccountSettings /> },
+            SettingsTab::Security => html! { <tabs::SecuritySettings /> },
+            SettingsTab::Notifications => html! { <tabs::NotificationSettings /> },
+            SettingsTab::Appearance => html! { <tabs::AppearanceSettings /> },
+            SettingsTab::Privacy => html! { <tabs::PrivacySettings /> },
         }
     }
 }

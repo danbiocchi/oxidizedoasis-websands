@@ -1,0 +1,216 @@
+/* Settings Page Styles */
+.settings-tab {
+  margin-bottom: 2rem;
+}
+
+.settings-tab__title {
+  font-size: 1.25rem;
+  margin-bottom: 1rem;
+  color: var(--color-text-primary);
+}
+
+.settings-tab__content {
+  display: grid;
+  gap: 1.5rem;
+}
+
+.c-tabs {
+  width: 100%;
+}
+
+.c-tabs__nav {
+  display: flex;
+  border-bottom: 1px solid var(--color-border);
+  margin-bottom: 1.5rem;
+  overflow-x: auto;
+}
+
+.c-tabs__tab {
+  padding: 0.75rem 1.25rem;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.c-tabs__tab:hover {
+  color: var(--color-primary);
+}
+
+.c-tabs__tab--active {
+  color: var(--color-primary);
+  border-bottom-color: var(--color-primary);
+}
+
+.c-form-group {
+  margin-bottom: 1.25rem;
+}
+
+.c-form-label {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-weight: 500;
+}
+
+.c-form-input,
+.c-form-select,
+.c-form-textarea {
+  width: 100%;
+  padding: 0.75rem;
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  background-color: var(--color-background-secondary);
+  color: var(--color-text-primary);
+  transition: border-color 0.2s ease;
+}
+
+.c-form-input:focus,
+.c-form-select:focus,
+.c-form-textarea:focus {
+  border-color: var(--color-primary);
+  outline: none;
+}
+
+.c-form-help {
+  display: block;
+  margin-top: 0.25rem;
+  font-size: 0.875rem;
+  color: var(--color-text-secondary);
+}
+
+.c-form-check {
+  display: flex;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.c-form-check-input {
+  margin-right: 0.5rem;
+}
+
+.c-form-check-label {
+  cursor: pointer;
+}
+
+.c-form-actions {
+  margin-top: 1.5rem;
+  display: flex;
+  gap: 0.75rem;
+}
+
+.c-alert {
+  padding: 0.75rem 1rem;
+  border-radius: 4px;
+  margin-bottom: 1rem;
+}
+
+.c-alert--success {
+  background-color: rgba(var(--color-success-rgb), 0.1);
+  border: 1px solid var(--color-success);
+  color: var(--color-success);
+}
+
+.c-alert--error {
+  background-color: rgba(var(--color-danger-rgb), 0.1);
+  border: 1px solid var(--color-danger);
+  color: var(--color-danger);
+}
+
+.c-list {
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.c-list-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.c-list-item:last-child {
+  border-bottom: none;
+}
+
+.c-list-item__content {
+  flex: 1;
+}
+
+.c-list-item__title {
+  font-weight: 500;
+  margin-bottom: 0.25rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.c-list-item__subtitle {
+  font-size: 0.875rem;
+  color: var(--color-text-secondary);
+}
+
+.c-list-item__actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.c-badge {
+  display: inline-block;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.c-badge--primary {
+  background-color: var(--color-primary);
+  color: white;
+}
+
+.c-card--danger {
+  border-color: var(--color-danger);
+}
+
+.c-button--danger {
+  background-color: var(--color-danger);
+  color: white;
+}
+
+.c-button--danger:hover {
+  background-color: var(--color-danger-dark);
+}
+
+.c-button--small {
+  padding: 0.25rem 0.5rem;
+  font-size: 0.875rem;
+}
+
+.c-loader {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 2rem;
+  color: var(--color-text-secondary);
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .c-tabs__nav {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+  }
+  
+  .c-form-actions {
+    flex-direction: column;
+  }
+  
+  .c-button {
+    width: 100%;
+  }
+}
