@@ -10,23 +10,33 @@
   --color-primary-dark: #1e40af;
   --color-primary-hover: #3b82f6;
   --color-primary-transparent: rgba(37, 99, 235, 0.1);
+  --color-primary-rgb: 37, 99, 235;
   
   --color-background: #f8fafc;
+  --color-background-secondary: #f1f5f9;
   --color-surface: #ffffff;
   --color-text: #1e293b;
+  --color-text-primary: #1e293b;
+  --color-text-secondary: #64748b;
   --color-text-light: #64748b;
   --color-text-dark: #0f172a;
+  --color-border: #e2e8f0;
   
   --color-error: #ef4444;
   --color-error-dark: #dc2626;
+  --color-error-rgb: 239, 68, 68;
   --color-success: #10b981;
   --color-success-dark: #059669;
+  --color-success-rgb: 16, 185, 129;
   --color-warning: #f59e0b;
   --color-warning-dark: #d97706;
+  --color-warning-rgb: 245, 158, 11;
   --color-info: #0ea5e9;
   --color-info-dark: #0284c7;
+  --color-info-rgb: 14, 165, 233;
   --color-danger: #ef4444;
   --color-danger-dark: #dc2626;
+  --color-danger-rgb: 239, 68, 68;
 
   /* Dark Theme Colors */
   --color-background-dark: #0f172a;
@@ -113,9 +123,13 @@
 @media (prefers-color-scheme: dark) {
   :root {
     --color-background: var(--color-background-dark);
+    --color-background-secondary: #1a2234;
     --color-surface: var(--color-surface-dark);
     --color-text: var(--color-text-dark-mode);
     --color-text-light: var(--color-text-light-dark-mode);
+    --color-text-primary: var(--color-text-dark-mode);
+    --color-text-secondary: var(--color-text-light-dark-mode);
+    --color-border: rgba(255, 255, 255, 0.1);
     
     --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.3);
     --shadow-base: 0 1px 3px 0 rgba(0, 0, 0, 0.4), 0 1px 2px -1px rgba(0, 0, 0, 0.4);
