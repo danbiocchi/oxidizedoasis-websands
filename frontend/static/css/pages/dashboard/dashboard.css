@@ -25,11 +25,10 @@
     padding: 1.5rem 0;
     height: calc(100vh - var(--header-height));
     overflow-y: auto;
-    position: fixed;
+    position: sticky;
     top: var(--header-height);
-    left: 0;
     width: 250px;
-    z-index: var(--z-index-fixed);
+    flex-shrink: 0;
 }
 
 .c-sidebar__nav {
@@ -204,7 +203,7 @@
 
 @media (min-width: 768px) {
     .l-container--dashboard__content {
-        margin-left: 250px; /* Add left margin to account for fixed sidebar */
+        margin-left: 0;
     }
 }
 
@@ -358,7 +357,6 @@
 @media (min-width: 1024px) {
     .l-container--dashboard__content {
         padding: 2.5rem;
-        margin-left: 250px; /* Add left margin to account for fixed sidebar */
     }
 
     .l-grid--stats {
