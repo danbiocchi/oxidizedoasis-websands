@@ -11,19 +11,19 @@ OxidizedOasis-WebSands is a robust, high-performance web application built with 
     <br></br>
     <img src="docs/images/verify.png" alt="Verify Email" width="600">
     <br></br>
-    <img src="docs/images/login_dashboard.png" alt="Login Page Screenshot" width="600">
+    <img src="docs/images/login_dashboard.png" alt="Dashboard Screenshot" width="600">
     <br></br>
-    <img src="docs/images/chat.png" alt="Login Page Screenshot" width="600">
+    <img src="docs/images/chat.png" alt="Chat Interface Screenshot" width="600">
     <br></br>
-    <img src="docs/images/data.png" alt="Login Page Screenshot" width="600">
+    <img src="docs/images/data.png" alt="Data Visualization Screenshot" width="600">
     <br></br>
-    <img src="docs/images/system_logs.png" alt="System log Screenshot" width="600">
+    <img src="docs/images/system_logs.png" alt="System Log Screenshot" width="600">
     <br></br>
-    <img src="docs/images/edit_user.png" alt="Edit User screenshot" width="600">
+    <img src="docs/images/edit_user.png" alt="Edit User Screenshot" width="600">
     <br></br>
-    <img src="docs/images/log_details.png" alt="Log details Screenshot" width="600">
+    <img src="docs/images/log_details.png" alt="Log Details Screenshot" width="600">
     <br></br>
-    <img src="docs/images/security_logs.png" alt="Log details Screenshot" width="600">
+    <img src="docs/images/security_logs.png" alt="Security Logs Screenshot" width="600">
     <br></br>
 </p>
 
@@ -32,17 +32,32 @@ OxidizedOasis-WebSands is a robust, high-performance web application built with 
 OxidizedOasis-WebSands is designed to provide a solid foundation for building scalable web applications with strong security features. Our goal is to showcase the capabilities of Rust in creating high-performance, secure web services while maintaining excellent developer ergonomics.
 This project demonstrates the power of Rust in full-stack web development, utilizing the Actix-web framework for the backend and Yew for a dynamic frontend.
 
+## 🏗️ Architecture Overview
+
+OxidizedOasis-WebSands follows a clean, modular architecture that separates concerns and promotes maintainability:
+
+- **Frontend**: Built with Yew framework, providing a reactive WebAssembly-powered UI
+- **Backend API**: Implemented with Actix-web, offering RESTful endpoints for all application features
+- **Core Domain**: Contains business logic and domain models independent of infrastructure concerns
+- **Infrastructure**: Handles database interactions, external services, and cross-cutting concerns
+- **Common**: Shared utilities, constants, and types used throughout the application
+
+This architecture enables independent development and testing of components while maintaining clear boundaries between different parts of the system.
+
 ## 📚 Documentation
 
 Comprehensive documentation for OxidizedOasis-WebSands is available to help developers, administrators, and users understand and work with the system effectively:
 
-- [Software Development Document](docs/Software_Development_Document.md): Detailed technical specifications, architecture overview, and development guidelines.
-- [Security Audit Report](docs/Security_Audit.md): In-depth analysis of the project's security measures and recommendations for improvement.
+- [Software Development Document](docs/Software%20Development%20Document/TABLE%20OF%20CONTENTS.md): Detailed technical specifications, architecture overview, and development guidelines.
+- [Security Audit Report](docs/Security_Audit_Report.md): In-depth analysis of the project's security measures and recommendations for improvement.
 - [Security Backlog](docs/Security_Backlog.md): Ongoing security tasks and improvements planned for the project.
-- [User Guide](docs/User_Guide.md): Guide for end-users on how to use the application.
 - [Project Structure](docs/Project_Structure.md): Overview of the project's directory structure and file organization.
-- [Logging Plan](docs/Logging_Plan.md): Detailed plan for implementing comprehensive logging in the project.
-- [Testing Backlog](docs/Testing_Backlog.md): List of tests to be implemented as part of the test-driven development approach.
+- [Architecture Review](docs/Architecture_Review.md): Analysis of the system architecture, design patterns, and technical decisions.
+
+*Note: The following documentation is planned but not yet available:*
+- User Guide: Guide for end-users on how to use the application.
+- Logging Plan: Detailed plan for implementing comprehensive logging in the project.
+- Testing Backlog: List of tests to be implemented as part of the test-driven development approach.
 
 ## ✨ Key Features
 
@@ -264,11 +279,17 @@ Before you begin, ensure you have the following installed:
 
 ## 🔧 Configuration
 
-Refer to the [Software Development Document](docs/Software_Development_Document.md) for detailed configuration instructions and environment variable descriptions.
+Refer to the [Software Development Document](docs/Software%20Development%20Document/TABLE%20OF%20CONTENTS.md) for detailed configuration instructions and environment variable descriptions.
 
-## 📚 Usage
+## 📋 Development Workflow
 
-Refer to the [User Guide](docs/User_Guide.md) for detailed information on how to use the application.
+The project follows a structured development workflow:
+
+1. **Feature Planning**: New features are first documented in the appropriate documentation files
+2. **Implementation**: Code is written following the project's architecture and coding standards
+3. **Testing**: Comprehensive tests are written for all new features
+4. **Review**: Code is reviewed for quality, security, and performance
+5. **Deployment**: Changes are deployed using the CI/CD pipeline
 
 ## 🧪 Testing
 
@@ -278,11 +299,58 @@ We follow a test-driven development (TDD) approach. To run the tests:
 cargo test
 ```
 
-For more information on our testing strategy and backlog, refer to the [Testing Backlog](docs/Testing_Backlog.md).
+The project includes various types of tests:
+- Unit tests for individual components
+- Integration tests for API endpoints
+- End-to-end tests for complete user flows
+- Performance tests for critical paths
+
+## 🔒 Security Features
+
+Security is a top priority for OxidizedOasis-WebSands:
+
+- **Authentication**: JWT-based with refresh tokens and revocation
+- **Authorization**: Role-based access control for all resources
+- **Data Protection**: All sensitive data is encrypted at rest and in transit
+- **Input Validation**: Comprehensive validation for all user inputs
+- **Output Encoding**: Proper encoding to prevent XSS attacks
+- **CSRF Protection**: Token-based protection for all state-changing operations
+- **Rate Limiting**: Protection against brute force and DoS attacks
+- **Security Headers**: Properly configured security headers for all responses
+- **Dependency Scanning**: Regular scanning for vulnerable dependencies
 
 ## 🚢 Deployment
 
-Refer to the [Software Development Document](docs/Software_Development_Document.md) for detailed deployment instructions.
+The project can be deployed in several ways:
+
+1. **Docker Deployment**:
+   ```sh
+   docker-compose up -d
+   ```
+
+2. **Manual Deployment**:
+   - Build the frontend: `cd frontend && trunk build --release`
+   - Build the backend: `cargo build --release`
+   - Configure your web server to serve the static files and proxy API requests
+
+3. **CI/CD Pipeline**:
+   The project includes GitHub Actions workflows for automated testing and deployment.
+
+Refer to the [Software Development Document](docs/Software%20Development%20Document/TABLE%20OF%20CONTENTS.md) for detailed deployment instructions.
+
+## 📈 Roadmap
+
+Future enhancements planned for OxidizedOasis-WebSands:
+
+- Two-factor authentication (2FA) support
+- OAuth2 integration for social login
+- Enhanced admin dashboard with analytics
+- Real-time notifications system
+- API rate limiting and throttling
+- Expanded user profile management
+- Advanced permission system
+- Audit logging for security events
+- Performance optimizations for high-traffic scenarios
 
 ## 🤝 Contributing
 
