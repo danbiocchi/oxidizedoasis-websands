@@ -1,10 +1,24 @@
 // src/core/user/repository.rs
+use async_trait::async_trait;
 use sqlx::PgPool;
 use uuid::Uuid;
 use chrono::{Utc, Duration};
 use super::model::{User, PasswordResetToken};
 use crate::common::validation::UserInput;
 use log::{error, info, debug};
+use mockall::automock; // Add this
+
+#[automock] // Add automock here
+#[async_trait]
+pub trait UserRepositoryTrait: Send + Sync {
+    async fn find_by_username(&self, username: &str) -> Result<Option<User>, sqlx::Error>;
+    async fn find_by_id(&self, id: Uuid) -> Result<Option<User>, sqlx::Error>;
+    // Add other methods used by AuthService or other services if they also adopt this trait
+    // For now, only methods used by AuthService are included.
+    // async fn create(&self, user_input: &UserInput, password_hash: String, verification_token: String) -> Result<User, sqlx::Error>;
+    // async fn verify_email(&self, token: &str) -> Result<Option<Uuid>, sqlx::Error>;
+    // etc.
+}
 
 pub struct UserRepository {
     pool: PgPool,
@@ -14,8 +28,59 @@ impl UserRepository {
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
+}
 
-    pub async fn find_all(&self) -> Result<Vec<User>, sqlx::Error> {
+#[async_trait]
+impl UserRepositoryTrait for UserRepository {
+    async fn find_by_username(&self, username: &str) -> Result<Option<User>, sqlx::Error> {
+        debug!("Looking up user by username: {}", username);
+
+        let user = sqlx::query_as!(
+            User,
+            r#"
+            SELECT *
+            FROM users
+            WHERE username = $1
+            "#,
+            username
+        )
+        .fetch_optional(&self.pool)
+        .await;
+
+        if let Ok(Some(ref u)) = user {
+            debug!("Found user: {}", &u.id);
+        }
+
+        user
+    }
+
+    async fn find_by_id(&self, id: Uuid) -> Result<Option<User>, sqlx::Error> {
+        debug!("Looking up user by id: {}", id);
+
+        let user = sqlx::query_as!(
+            User,
+            r#"
+            SELECT *
+            FROM users
+            WHERE id = $1
+            "#,
+            id
+        )
+        .fetch_optional(&self.pool)
+        .await;
+
+        if let Ok(Some(ref u)) = user {
+            debug!("Found user: {}", &u.username);
+        }
+
+        user
+    }
+}
+
+// Keep the original impl UserRepository block for other methods not in the trait yet
+impl UserRepository {
+    // find_all was here, move it or ensure it's not needed by AuthService through the trait
+     pub async fn find_all(&self) -> Result<Vec<User>, sqlx::Error> {
         debug!("Fetching all users");
         
         let users = sqlx::query_as!(

@@ -1,12 +1,14 @@
 use sqlx::{PgPool, Error as SqlxError};
 use uuid::Uuid;
 use chrono::{DateTime, Utc};
+use mockall::automock;
+use async_trait::async_trait; // For async trait methods
 use log::{debug, error, info, warn};
 use serde::{Serialize, Deserialize};
 use crate::core::auth::jwt::TokenType;
 
 /// Represents an active token in the database
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)] // Added Clone for potential use in mocks
 pub struct ActiveToken {
     pub id: Uuid,
     pub user_id: Uuid,
@@ -17,19 +19,40 @@ pub struct ActiveToken {
     pub device_info: Option<serde_json::Value>,
 }
 
+#[automock]
+#[async_trait]
+pub trait ActiveTokenServiceTrait: Send + Sync {
+    async fn record_token(
+        &self,
+        user_id: Uuid,
+        jti: &str,
+        token_type: TokenType,
+        expires_at: DateTime<Utc>,
+        device_info: Option<serde_json::Value>,
+    ) -> Result<(), SqlxError>;
+
+    async fn remove_token(&self, jti: &str) -> Result<bool, SqlxError>;
+    async fn get_active_token(&self, jti: &str) -> Result<ActiveToken, SqlxError>;
+    async fn get_user_tokens(&self, user_id: Uuid) -> Result<Vec<ActiveToken>, SqlxError>;
+    async fn remove_all_user_tokens(&self, user_id: Uuid) -> Result<u64, SqlxError>;
+    async fn cleanup_expired_tokens(&self) -> Result<u64, SqlxError>;
+}
+
 /// Service for managing active tokens
 pub struct ActiveTokenService {
     pool: PgPool,
 }
 
 impl ActiveTokenService {
-    /// Create a new ActiveTokenService
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
+}
 
+#[async_trait]
+impl ActiveTokenServiceTrait for ActiveTokenService {
     /// Record a new active token
-    pub async fn record_token(
+    async fn record_token( // Removed pub
         &self,
         user_id: Uuid,
         jti: &str,
@@ -64,7 +87,7 @@ impl ActiveTokenService {
     }
 
     /// Remove a token from active tokens (when used or expired)
-    pub async fn remove_token(&self, jti: &str) -> Result<bool, SqlxError> {
+    async fn remove_token(&self, jti: &str) -> Result<bool, SqlxError> { // Removed pub
         debug!("Removing active token: {}", jti);
         
         let result = sqlx::query!(
@@ -82,7 +105,7 @@ impl ActiveTokenService {
     }
 
     /// Get an active token by JTI
-    pub async fn get_active_token(&self, jti: &str) -> Result<ActiveToken, SqlxError> {
+    async fn get_active_token(&self, jti: &str) -> Result<ActiveToken, SqlxError> { // Removed pub
         debug!("Getting active token: {}", jti);
         
         let token = sqlx::query_as!(
@@ -108,7 +131,7 @@ impl ActiveTokenService {
     }
 
     /// Get all active tokens for a user
-    pub async fn get_user_tokens(&self, user_id: Uuid) -> Result<Vec<ActiveToken>, SqlxError> {
+    async fn get_user_tokens(&self, user_id: Uuid) -> Result<Vec<ActiveToken>, SqlxError> { // Removed pub
         debug!("Getting active tokens for user: {}", user_id);
         
         let tokens = sqlx::query_as!(
@@ -134,7 +157,7 @@ impl ActiveTokenService {
     }
 
     /// Remove all active tokens for a user
-    pub async fn remove_all_user_tokens(&self, user_id: Uuid) -> Result<u64, SqlxError> {
+    async fn remove_all_user_tokens(&self, user_id: Uuid) -> Result<u64, SqlxError> { // Removed pub
         info!("Removing all active tokens for user: {}", user_id);
         
         let result = sqlx::query!(
@@ -151,7 +174,7 @@ impl ActiveTokenService {
     }
 
     /// Clean up expired tokens
-    pub async fn cleanup_expired_tokens(&self) -> Result<u64, SqlxError> {
+    async fn cleanup_expired_tokens(&self) -> Result<u64, SqlxError> { // Removed pub
         debug!("Cleaning up expired active tokens");
         
         let result = sqlx::query!(

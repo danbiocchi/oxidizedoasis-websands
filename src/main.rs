@@ -31,8 +31,8 @@ use crate::api::routes::configure_routes;
 use crate::api::handlers::user_handler::create_handler as create_user_handler;
 use crate::core::email::EmailService;
 use crate::core::user::{User, UserRepository};
-use crate::core::auth::token_revocation::TokenRevocationService;
-use crate::core::auth::active_token::ActiveTokenService;
+use crate::core::auth::token_revocation::{TokenRevocationService, TokenRevocationServiceTrait};
+use crate::core::auth::active_token::{ActiveTokenService, ActiveTokenServiceTrait};
 use crate::infrastructure::{AppConfig, configure_cors, create_pool, RequestLogger, RateLimiter};
 
 mod api;

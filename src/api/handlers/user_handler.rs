@@ -29,7 +29,9 @@ impl UserHandler {
     pub fn new(pool: PgPool, email_service: Arc<dyn EmailServiceTrait>) -> Self {
         let user_repo = UserRepository::new(pool.clone());
         let user_service = Arc::new(UserService::new(user_repo, email_service));
-        let auth_service = Arc::new(AuthService::new(pool, std::env::var("JWT_SECRET").expect("JWT_SECRET must be set")));
+        // Correctly instantiate AuthService with Arc<dyn UserRepositoryTrait>
+        let user_repository_for_auth_service = Arc::new(UserRepository::new(pool.clone())); // Create another UserRepository instance for AuthService, wrapped in Arc
+        let auth_service = Arc::new(AuthService::new(user_repository_for_auth_service, std::env::var("JWT_SECRET").expect("JWT_SECRET must be set")));
 
         Self {
             user_service,

@@ -1,13 +1,15 @@
 use sqlx::{PgPool, Error as SqlxError};
 use uuid::Uuid;
-use chrono::{DateTime, Utc, Duration};
+use chrono::{DateTime, Utc}; // Duration might not be needed by the trait itself
 use log::{debug, error, info, warn};
 use crate::core::auth::jwt::TokenType;
-use crate::core::auth::active_token::ActiveTokenService;
+use crate::core::auth::active_token::ActiveTokenServiceTrait; // Use the trait
+use mockall::automock;
+use async_trait::async_trait;
 use std::sync::Arc;
 
 /// Represents a revoked token in the database
-#[derive(Debug)]
+#[derive(Debug, Clone)] // Added Clone
 pub struct RevokedToken {
     pub id: Uuid,
     pub jti: String,
@@ -18,10 +20,38 @@ pub struct RevokedToken {
     pub reason: Option<String>,
 }
 
+#[automock]
+#[async_trait]
+pub trait TokenRevocationServiceTrait: Send + Sync {
+    // Method to set active_token_service, if needed by the trait.
+    // Or, ActiveTokenServiceTrait could be a parameter to new/constructor.
+    // For now, let's assume the concrete type handles its own dependencies.
+    // The trait will only expose the public contract.
+    // fn set_active_token_service(&mut self, service: Arc<dyn ActiveTokenServiceTrait>);
+
+    async fn is_token_revoked(&self, jti: &str) -> Result<bool, SqlxError>;
+    async fn revoke_token<'a>( // Added lifetime 'a
+        &self,
+        jti: &'a str, // Added lifetime 'a
+        user_id: Uuid,
+        token_type: TokenType,
+        expires_at: DateTime<Utc>,
+        reason: Option<&'a str>, // Added lifetime 'a
+    ) -> Result<(), SqlxError>;
+    async fn revoke_all_user_tokens<'a>( // Added lifetime 'a
+        &self,
+        user_id: Uuid,
+        reason: Option<&'a str>, // Added lifetime 'a
+    ) -> Result<u64, SqlxError>;
+    async fn cleanup_expired_tokens(&self) -> Result<u64, SqlxError>;
+}
+
+
 /// Service for managing token revocation
 pub struct TokenRevocationService {
     pool: PgPool,
-    active_token_service: Option<Arc<ActiveTokenService>>,
+    // Changed to use the trait for active_token_service
+    active_token_service: Option<Arc<dyn ActiveTokenServiceTrait>>,
 }
 
 impl TokenRevocationService {
@@ -31,12 +61,16 @@ impl TokenRevocationService {
     }
     
     /// Set the active token service
-    pub fn set_active_token_service(&mut self, service: Arc<ActiveTokenService>) {
+    pub fn set_active_token_service(&mut self, service: Arc<dyn ActiveTokenServiceTrait>) {
         self.active_token_service = Some(service);
     }
+}
 
+#[async_trait]
+impl TokenRevocationServiceTrait for TokenRevocationService {
     /// Check if a token is revoked
-    pub async fn is_token_revoked(&self, jti: &str) -> Result<bool, SqlxError> {
+    // pub removed from trait impl methods
+    async fn is_token_revoked(&self, jti: &str) -> Result<bool, SqlxError> {
         debug!("Checking if token is revoked: {}", jti);
         
         let result = sqlx::query!(
@@ -52,13 +86,13 @@ impl TokenRevocationService {
     }
 
     /// Revoke a token
-    pub async fn revoke_token(
+    async fn revoke_token<'a>( // Removed pub, added lifetime 'a
         &self,
-        jti: &str,
+        jti: &'a str, // Added lifetime 'a
         user_id: Uuid,
         token_type: TokenType,
         expires_at: DateTime<Utc>,
-        reason: Option<&str>,
+        reason: Option<&'a str>, // Added lifetime 'a
     ) -> Result<(), SqlxError> {
         info!("Revoking token for user {}: {}", user_id, jti);
         
@@ -87,10 +121,10 @@ impl TokenRevocationService {
     }
 
     /// Revoke all tokens for a user
-    pub async fn revoke_all_user_tokens(
+    async fn revoke_all_user_tokens<'a>( // Removed pub, added lifetime 'a
         &self,
         user_id: Uuid,
-        reason: Option<&str>,
+        reason: Option<&'a str>, // Added lifetime 'a
     ) -> Result<u64, SqlxError> {
         warn!("Revoking all tokens for user: {}", user_id);
         
@@ -144,7 +178,7 @@ impl TokenRevocationService {
     }
 
     /// Clean up expired revoked tokens
-    pub async fn cleanup_expired_tokens(&self) -> Result<u64, SqlxError> {
+    async fn cleanup_expired_tokens(&self) -> Result<u64, SqlxError> { // Removed pub
         debug!("Cleaning up expired revoked tokens");
         
         let result = sqlx::query!(
