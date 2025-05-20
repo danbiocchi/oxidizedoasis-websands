@@ -1,6 +1,6 @@
 # OxidizedOasis-WebSands: Test Coverage Plan & To-Do List
 
-**Last Updated:** 2025-05-20 (DI for UserRepository & Full Test Suite Pass)
+**Last Updated:** 2025-05-20 (All backend unit tests passing after validation layer fixes)
 
 ## 1. Introduction
 
@@ -43,12 +43,18 @@ Based on the project structure, the following test files exist:
         *   Resolved numerous compilation errors across `core/user/repository.rs`, `api/routes/admin/user_management.rs`, `core/email/service.rs`, `api/handlers/user_handler.rs`, and `main.rs` related to the `UserRepositoryTrait` DI and other issues (e.g., `lettre` email builder).
         *   Fixed failing unit tests in `core/auth/jwt.rs` (`test_get_token_expiration_uses_env_vars_or_defaults`) by adjusting assertion leeway to account for test parallelism effects on environment variables.
         *   Fixed failing unit test in `core/user/service.rs` (`test_update_user_not_found`) by correcting the expected error type.
-    *   **Overall `cargo test` Status:** All unit tests for the library (`src/lib.rs` and its modules) and `src/main.rs` are now passing (74 tests). Numerous warnings about unused code exist and can be addressed later.
+    *   **Overall `cargo test` Status (as of 2025-05-20):**
+        *   Previously, 74 backend unit tests were passing, with 30 known failures.
+        *   Fixes for `JWT_SECRET` issues in `admin.rs` and `auth.rs` middleware tests were successful.
+        *   Fixes for `Option::unwrap()` and assertion logic in `common::validation::password.rs` were successful.
+        *   **`common::validation::user.rs` Fixes:**
+            *   Resolved compilation errors by implementing a robust recursive helper (`collect_errors_recursive`) to correctly flatten `ValidationErrors` and `ValidationErrorsKind`.
+            *   Fixed 4 failing unit tests related to username regex validation (error code changed from "USERNAME_REGEX" to "regex") and input sanitization (test logic adjusted for aggressive sanitization leading to valid errors).
+        *   **All 157 backend unit tests are now passing.**
 
 **Key Gaps (Updated):**
 *   Comprehensive integration testing for the authentication system (`core/auth`) now that DI is in place.
 *   Thorough middleware testing (`infrastructure/middleware`) for all functionalities (auth, admin, CSRF, rate limiting, CORS, logger).
-*   Frontend component and service testing.
 *   Frontend component and service testing.
 *   E2E tests for major user flows.
 *   Tests for upcoming drone data and RAG features.

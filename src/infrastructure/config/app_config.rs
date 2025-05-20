@@ -32,3 +32,136 @@ impl AppConfig {
         })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::env;
+    use std::sync::Mutex;
+
+    // Mutex to ensure serial execution of tests modifying environment variables
+    static ENV_MUTEX: Mutex<()> = Mutex::new(());
+
+    // Helper to temporarily set an environment variable
+    fn with_env_var<F, R>(key: &str, value: Option<&str>, func: F) -> R
+    where
+        F: FnOnce() -> R,
+    {
+        let _lock = ENV_MUTEX.lock().unwrap();
+        let original_value = env::var(key).ok();
+        
+        if let Some(v) = value {
+            env::set_var(key, v);
+        } else {
+            env::remove_var(key);
+        }
+
+        let result = func();
+
+        if let Some(orig_val) = original_value {
+            env::set_var(key, orig_val);
+        } else {
+            env::remove_var(key);
+        }
+        result
+    }
+    
+    // Helper to run a test with multiple env vars set
+    fn with_env_vars<F, R>(vars: Vec<(&str, Option<&str>)>, func: F) -> R
+    where
+        F: FnOnce() -> R,
+    {
+        let _lock = ENV_MUTEX.lock().unwrap();
+        let mut original_values = Vec::new();
+
+        for (key, _) in &vars {
+            original_values.push((key.to_string(), env::var(key).ok()));
+        }
+
+        for (key, value) in vars {
+            if let Some(v) = value {
+                env::set_var(key, v);
+            } else {
+                env::remove_var(key);
+            }
+        }
+
+        let result = func();
+
+        for (key, original_value) in original_values {
+            if let Some(orig_val) = original_value {
+                env::set_var(key, orig_val);
+            } else {
+                env::remove_var(&key);
+            }
+        }
+        result
+    }
+
+    #[test]
+    fn test_from_env_all_vars_set() {
+        let vars = vec![
+            ("SERVER_HOST", Some("0.0.0.0")),
+            ("SERVER_PORT", Some("9000")),
+            ("DATABASE_URL", Some("postgres://test:test@localhost/testdb")),
+            ("DB_MAX_CONNECTIONS", Some("10")),
+        ];
+        with_env_vars(vars, || {
+            let config_result = AppConfig::from_env();
+            assert!(config_result.is_ok());
+            let config = config_result.unwrap();
+            assert_eq!(config.server.host, "0.0.0.0");
+            assert_eq!(config.server.port, "9000");
+            assert_eq!(config.database.url, "postgres://test:test@localhost/testdb");
+            assert_eq!(config.database.max_connections, 10);
+        });
+    }
+
+    #[test]
+    fn test_from_env_defaults_used() {
+         let vars = vec![
+            ("SERVER_HOST", None), // Will use default
+            ("SERVER_PORT", None), // Will use default
+            ("DATABASE_URL", Some("postgres://default:default@localhost/defaultdb")),
+            ("DB_MAX_CONNECTIONS", None), // Will use default
+        ];
+        with_env_vars(vars, || {
+            let config_result = AppConfig::from_env();
+            assert!(config_result.is_ok());
+            let config = config_result.unwrap();
+            assert_eq!(config.server.host, "127.0.0.1");
+            assert_eq!(config.server.port, "8080");
+            assert_eq!(config.database.url, "postgres://default:default@localhost/defaultdb");
+            assert_eq!(config.database.max_connections, 5);
+        });
+    }
+
+    #[test]
+    fn test_from_env_database_url_missing() {
+        let vars = vec![
+            ("DATABASE_URL", None),
+        ];
+       with_env_vars(vars, || {
+            let config_result = AppConfig::from_env();
+            assert!(config_result.is_err());
+            let error_msg = config_result.err().unwrap().to_string();
+            // std::env::VarError is "environment variable not found"
+            assert!(error_msg.contains("environment variable not found") || error_msg.contains("DATABASE_URL"));
+        });
+    }
+
+    #[test]
+    fn test_from_env_db_max_connections_invalid_format() {
+         let vars = vec![
+            ("DATABASE_URL", Some("postgres://test:test@localhost/testdb")),
+            ("DB_MAX_CONNECTIONS", Some("not_a_number")),
+        ];
+        with_env_vars(vars, || {
+            let config_result = AppConfig::from_env();
+            assert!(config_result.is_err());
+            let error_msg = config_result.err().unwrap().to_string();
+            // This will be a ParseIntError
+            assert!(error_msg.contains("invalid digit"));
+        });
+    }
+}
