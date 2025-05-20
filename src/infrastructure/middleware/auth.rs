@@ -1,25 +1,24 @@
 use actix_web::{
     dev::{Service, ServiceRequest, ServiceResponse, Transform},
-    cookie::Cookie,
-    web::{self, Data}, 
+    web::{self}, 
     Error, HttpMessage, HttpResponse,
 };
 use actix_web::error::ResponseError;
 use actix_web::http::StatusCode;
-use actix_web_httpauth::extractors::{bearer::BearerAuth, AuthenticationError};
+use actix_web_httpauth::extractors::bearer::BearerAuth;
 use futures_util::future::{ready, Ready, LocalBoxFuture};
 use log::{debug, error, info, warn};
 use serde_json::json;
 use std::fmt;
 // Note: std::future::Future, std::pin::Pin, std::rc::Rc, std::task::{Context, Poll} are often implicitly used by LocalBoxFuture and other types.
 // Explicit imports are kept if they were there, but might not be strictly necessary if types are fully qualified or brought in by other `use` statements.
-use std::future::Future; 
-use std::pin::Pin; 
+ 
+ 
 use std::rc::Rc;
 use std::sync::Arc; 
 use std::task::{Context, Poll};
 
-use crate::core::auth::jwt::{validate_jwt, Claims, TokenType};
+use crate::core::auth::jwt::{validate_jwt, TokenType};
 use crate::core::auth::token_revocation::TokenRevocationServiceTrait;
 
 #[derive(Debug)]

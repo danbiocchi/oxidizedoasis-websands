@@ -8,14 +8,19 @@ use env_logger::Env;
 use log::{debug, error, info, warn};
 use sqlx::postgres::Postgres;
 
-use crate::api::routes::configure_routes;
-use crate::api::handlers::user_handler::create_handler as create_user_handler_factory; // Renamed for clarity
-use crate::core::email::EmailService;
-use crate::core::user::UserRepository;
+// Corrected imports based on typical project structure and previous cargo fix hints
+// Removed: use crate::api::routes::route_config::configure_all as configure_routes; 
+use crate::api::handlers::user_handler::create_handler as create_user_handler_factory;
+use crate::core::email::service::EmailService; 
+use crate::core::user::{UserRepository, UserRepositoryTrait};
 use crate::core::auth::AuthService;
 use crate::core::auth::token_revocation::{TokenRevocationService, TokenRevocationServiceTrait};
 use crate::core::auth::active_token::{ActiveTokenService, ActiveTokenServiceTrait};
-use crate::infrastructure::{AppConfig, configure_cors, create_pool, RequestLogger, RateLimiter};
+use crate::infrastructure::config::AppConfig; 
+use crate::infrastructure::middleware::cors::configure_cors; 
+use crate::infrastructure::database::create_pool; // Use re-exported path
+use crate::infrastructure::middleware::logger::RequestLogger; 
+use crate::infrastructure::middleware::rate_limit::RateLimiter; 
 
 mod api;
 mod common;
@@ -38,7 +43,7 @@ fn validate_critical_env_vars() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 async fn setup_database(config: &AppConfig, run_migrations: bool) -> Result<sqlx::Pool<Postgres>, Box<dyn std::error::Error>> {
-    let pool = create_pool(config).await?;
+    let pool = create_pool(config).await?; // create_pool is now in scope
     if run_migrations {
         info!("Running database migrations");
         match sqlx::migrate!("./migrations").run(&pool).await {
@@ -113,10 +118,13 @@ async fn main() -> std::io::Result<()> {
     let mut token_revocation_service_mut = TokenRevocationService::new(pool.clone());
     token_revocation_service_mut.set_active_token_service(active_token_service_arc.clone());
     let token_revocation_service_arc: Arc<dyn TokenRevocationServiceTrait> = Arc::new(token_revocation_service_mut);
+
+    // Create the UserRepositoryTrait instance
+    let user_repository_arc: Arc<dyn UserRepositoryTrait> = Arc::new(UserRepository::new(pool.clone()));
     
     let jwt_secret_main = env::var("JWT_SECRET").expect("JWT_SECRET must be set for main");
     let auth_service_arc = Arc::new(AuthService::new(
-        Arc::new(UserRepository::new(pool.clone())),
+        user_repository_arc.clone(), // Use the Arc<dyn Trait>
         jwt_secret_main,
         token_revocation_service_arc.clone(),
         active_token_service_arc.clone()
@@ -164,8 +172,8 @@ async fn main() -> std::io::Result<()> {
     HttpServer::new(move || {
         let app_config_clone = config_clone.clone(); 
         App::new()
-            .wrap(RateLimiter::new())
-            .wrap(configure_cors())
+            .wrap(RateLimiter::new()) // Assuming RateLimiter is correctly in scope via use statement
+            .wrap(configure_cors()) // Assuming configure_cors is correctly in scope via use statement
             .wrap(
                 middleware::DefaultHeaders::new()
                     .add(("X-XSS-Protection", "1; mode=block"))
@@ -178,7 +186,7 @@ async fn main() -> std::io::Result<()> {
                     .add(("Cross-Origin-Resource-Policy", "same-origin"))
                     .add(("Content-Security-Policy", "default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; img-src 'self' data:; connect-src 'self' ws://127.0.0.1:* wss://127.0.0.1:*; font-src 'self' https://cdnjs.cloudflare.com; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; worker-src 'self' blob:; upgrade-insecure-requests;"))
             )
-            .wrap(RequestLogger::new())
+            .wrap(RequestLogger::new()) // Assuming RequestLogger is correctly in scope via use statement
             .wrap(middleware::Compress::default())
             .app_data(web::Data::new(pool.clone()))
             .app_data(web::Data::new(email_service_arc.clone()))
@@ -187,7 +195,7 @@ async fn main() -> std::io::Result<()> {
             .app_data(web::Data::new(token_revocation_service_arc.clone())) // Make TRS available
             .app_data(web::Data::new(active_token_service_arc.clone()))   // Make ATS available
             .app_data(web::Data::new(app_config_clone.clone())) 
-            .app_data(web::Data::new(UserRepository::new(pool.clone())))
+            .app_data(web::Data::new(user_repository_arc.clone())) // Provide Arc<dyn UserRepositoryTrait>
             .app_data(web::JsonConfig::default()
                 .limit(4096)
                 .error_handler(|err, _| {
@@ -199,7 +207,7 @@ async fn main() -> std::io::Result<()> {
                     ).into()
                 }))
             .service(fs::Files::new("/static/css", "./frontend/static/css").prefer_utf8(true).use_last_modified(true))
-            .configure(configure_routes)
+            .configure(crate::api::routes::route_config::configure_all) // Use full path
             .service(fs::Files::new("/", "./frontend/dist").index_file("index.html").prefer_utf8(true).use_last_modified(true))
             .default_service(web::route().to(|| async {
                 match std::fs::read_to_string("./frontend/dist/index.html") {

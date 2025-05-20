@@ -14,7 +14,7 @@ use crate::core::auth::active_token::ActiveTokenServiceTrait; // Added
 use crate::common::validation::{UserInput, LoginInput, TokenQuery};
 use crate::core::user::model::{PasswordResetRequest, PasswordResetSubmit};
 use time;
-use crate::infrastructure::middleware::csrf::{CsrfToken, generate_csrf_token};
+use crate::infrastructure::middleware::csrf::generate_csrf_token;
 use serde::{Serialize, Deserialize};
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -35,7 +35,7 @@ impl UserHandler {
         token_revocation_service: Arc<dyn TokenRevocationServiceTrait>, // Added
         active_token_service: Arc<dyn ActiveTokenServiceTrait> // Renamed from _active_token_service as it's used by AuthService
     ) -> Self {
-        let user_repo = UserRepository::new(pool.clone());
+        let user_repo: Arc<dyn crate::core::user::UserRepositoryTrait> = Arc::new(UserRepository::new(pool.clone())); // Explicitly type as Arc<dyn Trait>
         // UserService now needs TokenRevocationService
         let user_service = Arc::new(UserService::new(user_repo, email_service, token_revocation_service.clone())); // Pass the correct service
         

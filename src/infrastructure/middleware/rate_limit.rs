@@ -1,7 +1,6 @@
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::{SystemTime, UNIX_EPOCH};
 use actix_web::{
     dev::{Service, ServiceRequest, ServiceResponse, Transform},
-    http::StatusCode,
     Error, HttpResponse,
     body::EitherBody,
 };

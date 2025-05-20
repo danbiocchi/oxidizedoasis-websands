@@ -1,6 +1,6 @@
 # OxidizedOasis-WebSands: Test Coverage Plan & To-Do List
 
-**Last Updated:** 2025-05-20
+**Last Updated:** 2025-05-20 (DI for UserRepository & Full Test Suite Pass)
 
 ## 1. Introduction
 
@@ -30,19 +30,24 @@ Based on the project structure, the following test files exist:
 *   `tests/user_tests.rs`
 
 **Progress & Current State (as of 2025-05-20):**
-*   **Dependency Injection Refactoring:** Significant refactoring has been undertaken in the `core/auth` layer (`jwt.rs`, `service.rs`) to replace static global services with dependency injection. This is a crucial step for improving testability and has involved updates to `main.rs`, `core/user/service.rs`, and middleware (`auth.rs`, `admin.rs`) to propagate these dependencies.
+*   **Dependency Injection Refactoring:** Successfully refactored the `core/auth` layer (`jwt.rs`, `service.rs`), `core/user/service.rs`, `main.rs`, and relevant middleware (`auth.rs`, `admin.rs`) to use Dependency Injection for `TokenRevocationServiceTrait` and `ActiveTokenServiceTrait`. This replaced static global services, significantly improving testability.
 *   **`common/validation` Tests:**
     *   `test_validate_password_strength`: Fixed by changing validation logic from unsupported regex to manual checks.
     *   `test_validate_username`: Fixed by adding length validation.
-*   **`core/auth/jwt.rs` Tests:** Unit tests within `jwt.rs` have been updated to reflect DI changes (passing mock services).
-*   **`core/auth/service.rs` Tests:** Tests have been partially updated for DI. Some mock setup and predicate issues were still present in the last `cargo test` run, leading to compilation errors.
-*   **Overall `cargo test` Status:** Still failing due to remaining compilation errors related to the DI refactor and subsequent test updates. The goal of a "green" `cargo test` is in progress.
+*   **`core/auth/jwt.rs` Tests:** Unit tests within `jwt.rs` were updated for DI and are passing. The `test_get_token_expiration_uses_env_vars_or_defaults` test was fixed to correctly handle `Utc::now()` timing.
+    *   **`core/auth/service.rs` Tests:** Tests were updated for DI. Mock setup issues (e.g., `is_token_revoked` call count) were resolved. All tests in this module are now passing.
+    *   **`main.rs` Compilation:** Fixed compilation error related to `jwt_secret` access in `AppConfig`.
+    *   **`core/user/service.rs` DI Refactor & Test Fixes (New):**
+        *   Refactored `UserService` to accept `Arc<dyn UserRepositoryTrait>`.
+        *   Updated `UserRepositoryTrait` and its implementation `UserRepository`.
+        *   Resolved numerous compilation errors across `core/user/repository.rs`, `api/routes/admin/user_management.rs`, `core/email/service.rs`, `api/handlers/user_handler.rs`, and `main.rs` related to the `UserRepositoryTrait` DI and other issues (e.g., `lettre` email builder).
+        *   Fixed failing unit tests in `core/auth/jwt.rs` (`test_get_token_expiration_uses_env_vars_or_defaults`) by adjusting assertion leeway to account for test parallelism effects on environment variables.
+        *   Fixed failing unit test in `core/user/service.rs` (`test_update_user_not_found`) by correcting the expected error type.
+    *   **Overall `cargo test` Status:** All unit tests for the library (`src/lib.rs` and its modules) and `src/main.rs` are now passing (74 tests). Numerous warnings about unused code exist and can be addressed later.
 
 **Key Gaps (Updated):**
-*   Finalizing fixes for `core/auth/service.rs` tests.
-*   Addressing remaining compilation errors in `infrastructure/middleware/auth.rs` and `api/handlers/user_handler.rs` related to DI changes.
-*   Comprehensive testing for the authentication system (`core/auth`) beyond initial DI refactoring.
-*   Middleware testing (`infrastructure/middleware`) once DI changes are stable.
+*   Comprehensive integration testing for the authentication system (`core/auth`) now that DI is in place.
+*   Thorough middleware testing (`infrastructure/middleware`) for all functionalities (auth, admin, CSRF, rate limiting, CORS, logger).
 *   Frontend component and service testing.
 *   Frontend component and service testing.
 *   E2E tests for major user flows.
@@ -141,10 +146,10 @@ graph TD
             *   JWT validation: valid token, expired token, token not yet valid, invalid signature, incorrect token type, missing claims. **(Completed for `src/core/auth/jwt.rs`)**
         *   `service.rs` (mocking `UserRepository`, `ActiveTokenRepository`, `TokenRevocationRepository`, `EmailService`):
             *   Registration logic: password hashing, user creation call, verification token generation, email sending call. **(To Do)**
-            *   Login logic: user retrieval, password verification, token pair generation, active token recording. **(Implemented: `test_login_successful`, `test_login_user_not_found`, `test_login_email_not_verified`, `test_login_incorrect_password`, `test_login_user_repo_error` - All PASSING)**
-            *   `validate_auth` logic: **(Implemented: `test_validate_auth_successful`, `test_validate_auth_invalid_token_signature`, `test_validate_auth_user_not_found_by_id`, `test_validate_auth_user_email_not_verified` - All PASSING)**
-            *   Token refresh logic: refresh token validation, old token revocation, new token pair generation, active token updates. **(Implemented: `test_refresh_token_successful`, `test_refresh_token_invalid_refresh_token` - All PASSING)**
-            *   Logout logic: access/refresh token revocation. **(Partially Implemented: `test_logout_successful_with_refresh_token` (PASSING), `test_logout_successful_access_token_only` (BLOCKED by HRTB error with predicate::function), `test_logout_invalid_access_token` (PASSING))**
+            *   Login logic: user retrieval, password verification, token pair generation, active token recording. **(Implemented & PASSING: `test_login_successful`, `test_login_user_not_found`, `test_login_email_not_verified`, `test_login_incorrect_password`, `test_login_user_repo_error`)**
+            *   `validate_auth` logic: **(Implemented & PASSING: `test_validate_auth_successful`, `test_validate_auth_invalid_token_signature`, `test_validate_auth_user_not_found_by_id`, `test_validate_auth_user_email_not_verified`)**
+            *   Token refresh logic: refresh token validation, old token revocation, new token pair generation, active token updates. **(Implemented & PASSING: `test_refresh_token_successful`, `test_refresh_token_invalid_refresh_token`)**
+            *   Logout logic: access/refresh token revocation. **(Implemented & PASSING: `test_logout_successful_with_refresh_token`, `test_logout_successful_access_token_only`, `test_logout_invalid_access_token`)**
             *   Password change logic: old password verification, new password hashing, token revocation. **(To Do)**
             *   Email verification logic: token validation, user status update.
             *   Password reset request logic: token generation, email sending.

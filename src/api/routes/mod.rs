@@ -1,5 +1,3 @@
-use actix_web::web;
-use log::debug;
 
 pub mod user_routes;
 pub mod admin;
@@ -32,4 +30,3 @@ pub mod route_config {
     }
 }
 
-pub use route_config::configure_all as configure_routes;

@@ -3,7 +3,7 @@ use uuid::Uuid;
 use chrono::{DateTime, Utc};
 use mockall::automock;
 use async_trait::async_trait; // For async trait methods
-use log::{debug, error, info, warn};
+use log::{debug, info};
 use serde::{Serialize, Deserialize};
 use crate::core::auth::jwt::TokenType;
 

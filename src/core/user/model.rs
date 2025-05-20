@@ -3,7 +3,7 @@ use sqlx::FromRow;
 use uuid::Uuid;
 use chrono::{DateTime, Utc};
 
-#[derive(Debug, Serialize, Deserialize, FromRow)]
+#[derive(Debug, Serialize, Deserialize, FromRow, Clone)] // Added Clone
 pub struct PasswordResetToken {
     pub id: Uuid,
     pub user_id: Uuid,

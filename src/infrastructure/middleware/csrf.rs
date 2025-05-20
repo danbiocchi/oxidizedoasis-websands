@@ -2,20 +2,13 @@ use actix_web::{
     dev::{forward_ready, Service, ServiceRequest, ServiceResponse, Transform},
     error::ErrorForbidden,
     FromRequest,
-    http::{header, Method},
-    web, Error, HttpMessage, HttpRequest,
+    http::Method, Error, HttpMessage, HttpRequest,
 };
 use futures_util::future::{ok, ready, LocalBoxFuture, Ready};
-use log::{debug, error, warn};
+use log::warn;
 use rand::{distributions::Alphanumeric, Rng};
 use serde::{Deserialize, Serialize};
-use std::{
- 
-    future::Future,
-    pin::Pin,
-    rc::Rc,
-    task::{Context, Poll},
-};
+use std::rc::Rc;
 
 // CSRF token structure
 #[derive(Debug, Serialize, Deserialize, Clone)]

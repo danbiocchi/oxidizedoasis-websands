@@ -12,7 +12,7 @@ pub struct ApiError {
     pub status_code: StatusCode,
 }
 
-#[derive(Debug, Display, Serialize)]
+#[derive(Debug, Display, Serialize, PartialEq)] // Added PartialEq
 pub enum ApiErrorType {
     #[display("Validation error")]
     Validation,

@@ -5,7 +5,7 @@ use serde_json::json;
 use std::fmt;
 use std::sync::Arc; // For Arc
 use log::{error, debug, warn};
-use crate::core::auth::jwt::{validate_jwt, Claims, TokenType};
+use crate::core::auth::jwt::{validate_jwt, TokenType};
 use crate::core::auth::token_revocation::TokenRevocationServiceTrait; // Import the trait
 
 #[derive(Debug)]
