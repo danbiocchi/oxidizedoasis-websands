@@ -547,7 +547,7 @@ mod tests {
 
 
         let mut mock_trs_concrete = MockTokenRevocationServiceTrait::new(); 
-        mock_trs_concrete.expect_is_token_revoked().returning(|_| Ok(false)).times(3); 
+        mock_trs_concrete.expect_is_token_revoked().returning(|_| Ok(false)).times(4); // Adjusted from 3 to 4
         mock_trs_concrete.expect_revoke_token().times(1).returning(|_,_,_,_,_| Ok(())); 
         let mock_trs: Arc<dyn TokenRevocationServiceTrait> = Arc::new(mock_trs_concrete);
 

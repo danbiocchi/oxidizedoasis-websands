@@ -437,26 +437,33 @@ mod tests {
         let original_access_exp = env::var("JWT_ACCESS_TOKEN_EXPIRATION_MINUTES").ok();
         let original_refresh_exp = env::var("JWT_REFRESH_TOKEN_EXPIRATION_DAYS").ok();
 
+        // Test default access token expiration
         env::remove_var("JWT_ACCESS_TOKEN_EXPIRATION_MINUTES");
-        let now = Utc::now();
+        let now_access_default = Utc::now();
         let default_access_exp_timestamp = get_token_expiration(&TokenType::Access);
-        let expected_default_access_exp = now.checked_add_signed(Duration::minutes(30)).unwrap().timestamp();
-        assert!(default_access_exp_timestamp >= expected_default_access_exp - 5 && default_access_exp_timestamp <= expected_default_access_exp + 5);
+        let expected_default_access_exp = now_access_default.checked_add_signed(Duration::minutes(30)).unwrap().timestamp();
+        assert!(default_access_exp_timestamp >= expected_default_access_exp - 5 && default_access_exp_timestamp <= expected_default_access_exp + 5, "Default access exp mismatch. Expected around {}, got {}", expected_default_access_exp, default_access_exp_timestamp);
 
+        // Test configured access token expiration
         env::set_var("JWT_ACCESS_TOKEN_EXPIRATION_MINUTES", "60");
+        let now_access_configured = Utc::now();
         let configured_access_exp_timestamp = get_token_expiration(&TokenType::Access);
-        let expected_configured_access_exp = now.checked_add_signed(Duration::minutes(60)).unwrap().timestamp();
-        assert!(configured_access_exp_timestamp >= expected_configured_access_exp - 5 && configured_access_exp_timestamp <= expected_configured_access_exp + 5);
+        let expected_configured_access_exp = now_access_configured.checked_add_signed(Duration::minutes(60)).unwrap().timestamp();
+        assert!(configured_access_exp_timestamp >= expected_configured_access_exp - 5 && configured_access_exp_timestamp <= expected_configured_access_exp + 5, "Configured access exp mismatch. Expected around {}, got {}", expected_configured_access_exp, configured_access_exp_timestamp);
 
+        // Test default refresh token expiration
         env::remove_var("JWT_REFRESH_TOKEN_EXPIRATION_DAYS");
+        let now_refresh_default = Utc::now();
         let default_refresh_exp_timestamp = get_token_expiration(&TokenType::Refresh);
-        let expected_default_refresh_exp = now.checked_add_signed(Duration::days(7)).unwrap().timestamp();
-        assert!(default_refresh_exp_timestamp >= expected_default_refresh_exp - 5 && default_refresh_exp_timestamp <= expected_default_refresh_exp + 5);
+        let expected_default_refresh_exp = now_refresh_default.checked_add_signed(Duration::days(7)).unwrap().timestamp();
+        assert!(default_refresh_exp_timestamp >= expected_default_refresh_exp - 5 && default_refresh_exp_timestamp <= expected_default_refresh_exp + 5, "Default refresh exp mismatch. Expected around {}, got {}", expected_default_refresh_exp, default_refresh_exp_timestamp);
 
+        // Test configured refresh token expiration
         env::set_var("JWT_REFRESH_TOKEN_EXPIRATION_DAYS", "30");
+        let now_refresh_configured = Utc::now();
         let configured_refresh_exp_timestamp = get_token_expiration(&TokenType::Refresh);
-        let expected_configured_refresh_exp = now.checked_add_signed(Duration::days(30)).unwrap().timestamp();
-        assert!(configured_refresh_exp_timestamp >= expected_configured_refresh_exp - 5 && configured_refresh_exp_timestamp <= expected_configured_refresh_exp + 5);
+        let expected_configured_refresh_exp = now_refresh_configured.checked_add_signed(Duration::days(30)).unwrap().timestamp();
+        assert!(configured_refresh_exp_timestamp >= expected_configured_refresh_exp - 5 && configured_refresh_exp_timestamp <= expected_configured_refresh_exp + 5, "Configured refresh exp mismatch. Expected around {}, got {}", expected_configured_refresh_exp, configured_refresh_exp_timestamp);
 
         if let Some(val) = original_access_exp {
             env::set_var("JWT_ACCESS_TOKEN_EXPIRATION_MINUTES", val);
