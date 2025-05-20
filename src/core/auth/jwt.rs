@@ -366,9 +366,25 @@ mod tests {
             .unwrap()
             .timestamp();
         
-        assert!(claims.iat <= now + 2 && claims.iat >= now - 2); 
-        assert!(claims.nbf <= now + 2 && claims.nbf >= now - 2); 
-        assert!(claims.exp <= expected_exp_min + 2 && claims.exp >= expected_exp_min - 2, "Access token exp mismatch. Now: {}, Expected: {}, Actual: {}", now, expected_exp_min, claims.exp);
+        assert!(claims.iat <= now + 2 && claims.iat >= now - 2, "iat mismatch"); 
+        assert!(claims.nbf <= now + 2 && claims.nbf >= now - 2, "nbf mismatch"); 
+
+        let configured_minutes = env::var("JWT_ACCESS_TOKEN_EXPIRATION_MINUTES")
+            .unwrap_or_else(|_| "30".to_string()) // Default if not set, though test sets it to 1
+            .parse::<i64>()
+            .unwrap_or(30);
+
+        let expected_duration_seconds = Duration::minutes(configured_minutes).num_seconds();
+        let actual_duration_seconds = claims.exp - claims.iat;
+
+        const DURATION_LEEWAY: i64 = 10; // Allow 10 seconds leeway for duration
+
+        assert!(
+            actual_duration_seconds >= expected_duration_seconds - DURATION_LEEWAY &&
+            actual_duration_seconds <= expected_duration_seconds + DURATION_LEEWAY,
+            "Access token duration mismatch. Expected duration: {}s ({} mins), Actual duration: {}s. iat: {}, exp: {}, now: {}",
+            expected_duration_seconds, configured_minutes, actual_duration_seconds, claims.iat, claims.exp, now
+        );
         assert_eq!(metadata.expires_at, timestamp_to_datetime(claims.exp));
     }
 
@@ -400,9 +416,25 @@ mod tests {
             .unwrap()
             .timestamp();
         
-        assert!(claims.iat <= now + 2 && claims.iat >= now - 2);
-        assert!(claims.nbf <= now + 2 && claims.nbf >= now - 2);
-        assert!(claims.exp <= expected_exp_days + 2 && claims.exp >= expected_exp_days - 2, "Refresh token exp mismatch. Now: {}, Expected: {}, Actual: {}", now, expected_exp_days, claims.exp);
+        assert!(claims.iat <= now + 2 && claims.iat >= now - 2, "iat mismatch");
+        assert!(claims.nbf <= now + 2 && claims.nbf >= now - 2, "nbf mismatch");
+
+        let configured_days = env::var("JWT_REFRESH_TOKEN_EXPIRATION_DAYS")
+            .unwrap_or_else(|_| "7".to_string()) // Default if not set, though test sets it to 1
+            .parse::<i64>()
+            .unwrap_or(7);
+        
+        let expected_duration_seconds = Duration::days(configured_days).num_seconds();
+        let actual_duration_seconds = claims.exp - claims.iat;
+        
+        const DURATION_LEEWAY: i64 = 10; // Allow 10 seconds leeway for duration
+
+        assert!(
+            actual_duration_seconds >= expected_duration_seconds - DURATION_LEEWAY &&
+            actual_duration_seconds <= expected_duration_seconds + DURATION_LEEWAY,
+            "Refresh token duration mismatch. Expected duration: {}s ({} days), Actual duration: {}s. iat: {}, exp: {}, now: {}",
+            expected_duration_seconds, configured_days, actual_duration_seconds, claims.iat, claims.exp, now
+        );
         assert_eq!(metadata.expires_at, timestamp_to_datetime(claims.exp));
     }
 

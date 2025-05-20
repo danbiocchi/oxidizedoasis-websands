@@ -3,15 +3,16 @@ use async_trait::async_trait;
 use sqlx::PgPool;
 use uuid::Uuid;
 use chrono::{Utc, Duration};
-use super::model::{User, PasswordResetToken};
+use super::model::{User, PasswordResetToken, NewUser}; // Added NewUser
 use crate::common::validation::UserInput;
 use log::{error, info, debug};
-use mockall::automock; // Add this
+use mockall::automock;
 
 #[automock]
 #[async_trait]
 pub trait UserRepositoryTrait: Send + Sync {
-    async fn create(&self, user_input: &UserInput, password_hash: String, verification_token: String) -> Result<User, sqlx::Error>;
+    async fn create_user_with_details(&self, user_input: &UserInput, password_hash: String, verification_token: String) -> Result<User, sqlx::Error>;
+    async fn create_user(&self, new_user: NewUser) -> Result<User, sqlx::Error>;
     async fn find_by_username(&self, username: &str) -> Result<Option<User>, sqlx::Error>;
     async fn find_by_id(&self, id: Uuid) -> Result<Option<User>, sqlx::Error>;
     async fn find_user_by_email(&self, email: &str) -> Result<Option<User>, sqlx::Error>;
@@ -27,9 +28,9 @@ pub trait UserRepositoryTrait: Send + Sync {
     async fn create_password_reset_token(&self, user_id: Uuid) -> Result<PasswordResetToken, sqlx::Error>;
     async fn verify_reset_token(&self, token: &str) -> Result<Option<PasswordResetToken>, sqlx::Error>;
     async fn mark_reset_token_used(&self, token: &str) -> Result<bool, sqlx::Error>;
-    async fn find_all(&self) -> Result<Vec<User>, sqlx::Error>; // Added for completeness, though not directly used by UserService
+    async fn find_all(&self) -> Result<Vec<User>, sqlx::Error>;
     #[cfg(test)]
-    async fn clear_all(&self) -> Result<(), sqlx::Error>; // For test utilities
+    async fn clear_all(&self) -> Result<(), sqlx::Error>;
 }
 
 pub struct UserRepository {
@@ -44,13 +45,13 @@ impl UserRepository {
 
 #[async_trait]
 impl UserRepositoryTrait for UserRepository {
-    async fn create(
+    async fn create_user_with_details(
         &self,
         user_input: &UserInput,
         password_hash: String,
         verification_token: String,
     ) -> Result<User, sqlx::Error> {
-        debug!("Creating new user with username: {}", user_input.username);
+        debug!("Creating new user with details for username: {}", user_input.username);
 
         let verification_token_expires_at = Utc::now() + Duration::hours(24);
         let now = Utc::now();
@@ -78,11 +79,11 @@ impl UserRepositoryTrait for UserRepository {
             user_input.username,
             user_input.email,
             password_hash,
-            false,
+            false, // is_email_verified
             Some(verification_token),
             Some(verification_token_expires_at),
-            now,
-            now,
+            now, // created_at
+            now, // updated_at
             "user", // Default role
             true    // Default is_active
         )
@@ -90,10 +91,54 @@ impl UserRepositoryTrait for UserRepository {
         .await;
 
         match &user {
-            Ok(u) => info!("Successfully created user with id: {}", &u.id),
-            Err(e) => error!("Failed to create user: {}", e),
+            Ok(u) => info!("Successfully created user with details, id: {}", &u.id),
+            Err(e) => error!("Failed to create user with details: {}", e),
         }
+        user
+    }
 
+    async fn create_user(&self, new_user: NewUser) -> Result<User, sqlx::Error> {
+        debug!("Creating new user from NewUser struct for username: {}", new_user.username);
+        let now = Utc::now();
+
+        let user = sqlx::query_as!(
+            User,
+            r#"
+            INSERT INTO users (
+                id,
+                username,
+                email,
+                password_hash,
+                is_email_verified,
+                verification_token,
+                verification_token_expires_at,
+                created_at,
+                updated_at,
+                role,
+                is_active
+            )
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+            RETURNING *
+            "#,
+            Uuid::new_v4(),
+            new_user.username,
+            new_user.email,
+            new_user.password_hash,
+            new_user.is_email_verified,
+            new_user.verification_token,
+            new_user.verification_token_expires_at,
+            now, // created_at
+            now, // updated_at
+            new_user.role,
+            true // Default is_active to true for new users
+        )
+        .fetch_one(&self.pool)
+        .await;
+
+        match &user {
+            Ok(u) => info!("Successfully created user from NewUser, id: {}", &u.id),
+            Err(e) => error!("Failed to create user from NewUser: {}", e),
+        }
         user
     }
 
@@ -115,7 +160,6 @@ impl UserRepositoryTrait for UserRepository {
         if let Ok(Some(ref u)) = user {
             debug!("Found user: {}", &u.id);
         }
-
         user
     }
 
@@ -137,7 +181,6 @@ impl UserRepositoryTrait for UserRepository {
         if let Ok(Some(ref u)) = user {
             debug!("Found user: {}", &u.username);
         }
-
         user
     }
 
@@ -151,7 +194,10 @@ impl UserRepositoryTrait for UserRepository {
             FROM users
             WHERE email = $1
             "#,
-            Some(email)
+            Some(email) // Ensure email is passed as Option<String> if the DB column is nullable, or String if not.
+                        // Assuming email in users table is nullable based on UserInput.email being Option<String>
+                        // and NewUser.email being Option<String>.
+                        // If the DB column is NOT NULL, this should be just `email`.
         )
         .fetch_optional(&self.pool)
         .await;
@@ -159,7 +205,6 @@ impl UserRepositoryTrait for UserRepository {
         if let Ok(Some(ref u)) = user {
             debug!("Found user: {}", &u.id);
         }
-
         user
     }
     
@@ -188,7 +233,6 @@ impl UserRepositoryTrait for UserRepository {
         } else {
             debug!("No user found with the provided verification token or token expired");
         }
-
         Ok(result.map(|r| r.id))
     }
 
@@ -208,11 +252,8 @@ impl UserRepositoryTrait for UserRepository {
             })?;
 
         let final_password_hash = password_hash.unwrap_or_else(|| current_user.password_hash.clone());
-        // UserInput.username is String, not Option<String>, so it's always provided for update.
         let final_username = user_input.username.clone(); 
-        // UserInput.email is Option<String>. Update if Some, else keep current.
         let final_email = user_input.email.clone().or_else(|| current_user.email.clone());
-
 
         let user = sqlx::query_as!(
             User,
@@ -222,8 +263,6 @@ impl UserRepositoryTrait for UserRepository {
                 email = $2,
                 password_hash = $3,
                 updated_at = $4
-            -- Role and is_active are not updated via this UserInput struct
-            -- If they need to be updatable, UserInput or a different mechanism is needed.
             WHERE id = $5
             RETURNING *
             "#,
@@ -231,8 +270,6 @@ impl UserRepositoryTrait for UserRepository {
             final_email, 
             final_password_hash,
             Utc::now(),
-            // user_input.role.as_deref().unwrap_or(&current_user.role), // Removed
-            // user_input.is_active.unwrap_or(current_user.is_active), // Removed
             id
         )
         .fetch_one(&self.pool)
@@ -243,7 +280,6 @@ impl UserRepositoryTrait for UserRepository {
         } else if let Err(ref e) = user {
             error!("Failed to update user {}: {}", id, e);
         }
-
         user
     }
 
@@ -273,7 +309,6 @@ impl UserRepositoryTrait for UserRepository {
         if let Ok(Some(ref u)) = user {
             info!("Successfully updated role for user: {}", u.id);
         }
-
         user
     }
 
@@ -303,7 +338,6 @@ impl UserRepositoryTrait for UserRepository {
         if let Ok(Some(ref u)) = user {
             info!("Successfully updated username for user: {}", u.id);
         }
-
         user
     }
 
@@ -333,7 +367,6 @@ impl UserRepositoryTrait for UserRepository {
         if let Ok(Some(ref u)) = user {
             info!("Successfully updated status for user: {}", u.id);
         }
-
         user
     }
     
@@ -364,7 +397,6 @@ impl UserRepositoryTrait for UserRepository {
         token: &str,
     ) -> Result<(), sqlx::Error> {
         debug!("Updating verification token for user: {}", user_id);
-
         let expires_at = Utc::now() + Duration::hours(24);
 
         sqlx::query!(
@@ -401,13 +433,11 @@ impl UserRepositoryTrait for UserRepository {
         .await?;
 
         let deleted = result.rows_affected() > 0;
-
         if deleted {
             info!("Successfully deleted user: {}", id);
         } else {
             debug!("No user found to delete with id: {}", id);
         }
-
         Ok(deleted)
     }
 
@@ -424,15 +454,13 @@ impl UserRepositoryTrait for UserRepository {
         )
         .fetch_optional(&self.pool)
         .await?;
-
         Ok(result.map_or(false, |r| r.is_email_verified))
     }
 
     async fn create_password_reset_token(&self, user_id: Uuid) -> Result<PasswordResetToken, sqlx::Error> {
         debug!("Creating password reset token for user: {}", user_id);
-
         let token = Uuid::new_v4().to_string();
-        let expires_at = Utc::now() + Duration::hours(1); // 1 hour expiration
+        let expires_at = Utc::now() + Duration::hours(1);
         let now = Utc::now();
 
         let reset_token = sqlx::query_as!(
@@ -459,7 +487,6 @@ impl UserRepositoryTrait for UserRepository {
             Ok(_t) => info!("Created password reset token for user: {}", user_id),
             Err(e) => error!("Failed to create password reset token: {}", e),
         }
-
         reset_token
     }
 
@@ -483,13 +510,11 @@ impl UserRepositoryTrait for UserRepository {
         if let Ok(Some(ref t)) = reset_token {
             debug!("Found valid reset token for user: {}", t.user_id);
         }
-
         reset_token
     }
 
     async fn mark_reset_token_used(&self, token: &str) -> Result<bool, sqlx::Error> {
         debug!("Marking reset token as used");
-
         let result = sqlx::query!(
             r#"
             UPDATE password_reset_tokens
@@ -511,7 +536,6 @@ impl UserRepositoryTrait for UserRepository {
         } else {
             debug!("No valid reset token found to mark as used");
         }
-
         Ok(marked)
     }
     
@@ -528,7 +552,6 @@ impl UserRepositoryTrait for UserRepository {
         )
         .fetch_all(&self.pool)
         .await?;
-
         Ok(users)
     }
 
@@ -539,8 +562,3 @@ impl UserRepositoryTrait for UserRepository {
         Ok(())
     }
 }
-
-// Remove the separate impl UserRepository block as all methods are now in the trait impl
-// impl UserRepository {
-// ... (methods that were here are now part of `impl UserRepositoryTrait for UserRepository`)
-// }

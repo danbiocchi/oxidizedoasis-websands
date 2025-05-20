@@ -127,7 +127,8 @@ async fn main() -> std::io::Result<()> {
         user_repository_arc.clone(), // Use the Arc<dyn Trait>
         jwt_secret_main,
         token_revocation_service_arc.clone(),
-        active_token_service_arc.clone()
+        active_token_service_arc.clone(),
+        email_service_arc.clone() // Added email_service_arc
     ));
     
     let cleanup_revoked_service = token_revocation_service_arc.clone();

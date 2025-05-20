@@ -46,6 +46,19 @@ pub struct User {
     pub is_active: bool,
 }
 
+// Struct for creating a new user
+#[derive(Debug, Deserialize, Serialize, Clone)] // Added Clone, Serialize, Deserialize for flexibility
+pub struct NewUser {
+    pub username: String,
+    pub email: Option<String>,
+    pub password_hash: String,
+    pub is_email_verified: bool,
+    pub role: String,
+    pub verification_token: Option<String>,
+    pub verification_token_expires_at: Option<DateTime<Utc>>,
+    // is_active is typically true by default, can be omitted or set by repository
+}
+
 #[derive(Serialize)]
 pub struct UserResponse {
     pub id: Uuid,

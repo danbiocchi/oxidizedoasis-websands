@@ -53,7 +53,7 @@ impl UserService {
         let token_for_email = verification_token.clone();
         let token_for_return = verification_token.clone();
 
-        let user = self.repository.create(
+        let user = self.repository.create_user_with_details( // Already updated in previous step, ensuring it's correct
             &validated_input,
             password_hash.unwrap(),
             verification_token
@@ -369,9 +369,9 @@ mod tests {
         let cloned_expected_user_for_repo = create_test_user(user_id, input_username, input_email, false);
 
 
-        mock_repo.expect_create()
+        mock_repo.expect_create_user_with_details() // Updated mock expectation
             .withf(move |input_arg, _password_hash, verification_token_arg| {
-                input_arg.username == input_username && // Corrected: direct comparison for String
+                input_arg.username == input_username &&
                 input_arg.email.as_deref() == Some(input_email) &&
                 !verification_token_arg.is_empty() // Ensure a token is passed
             })
@@ -475,9 +475,9 @@ mod tests {
         let input_password = "Password123!";
         let user_input = basic_user_input(input_username, input_email, input_password);
 
-        mock_repo.expect_create()
+        mock_repo.expect_create_user_with_details() // Updated mock expectation
             .times(1)
-            .returning(|_, _, _| Err(sqlx::Error::PoolClosed)); // Ensuring this change is applied
+            .returning(|_, _, _| Err(sqlx::Error::PoolClosed));
 
         let user_service = UserService::new(
             Arc::new(mock_repo),
@@ -506,7 +506,7 @@ mod tests {
         
         let cloned_user_for_repo = create_test_user(user_id, input_username, input_email, false);
 
-        mock_repo.expect_create()
+        mock_repo.expect_create_user_with_details() // Updated mock expectation
             .times(1)
             .returning(move |_, _, vt_arg| {
                 let mut user_to_return = cloned_user_for_repo.clone();
