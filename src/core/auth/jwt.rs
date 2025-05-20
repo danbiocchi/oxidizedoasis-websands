@@ -9,6 +9,8 @@ use std::sync::Arc;
 use crate::core::auth::token_revocation::TokenRevocationServiceTrait;
 use crate::core::auth::active_token::ActiveTokenServiceTrait;
 
+// Static variables removed, services will be passed as arguments.
+
 /// JWT Claims structure with enhanced security
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Claims {
@@ -138,32 +140,32 @@ pub fn create_token_pair(
 }
 
 /// Record a token in the active tokens table
-pub async fn record_active_token(user_id: Uuid, metadata: &TokenMetadata, token_type: TokenType) {
-    unsafe {
-        if let Some(service) = &ACTIVE_TOKEN_SERVICE {
-            if let Err(e) = service.record_token(
-                user_id,
-                &metadata.jti,
-                token_type,
-                metadata.expires_at,
-                None,
-            ).await {
-                error!("Failed to record active token: {:?}", e);
-            }
-        } else {
-            warn!("Active token service not initialized, token will not be tracked");
-        }
+pub async fn record_active_token(
+    active_token_service: &Arc<dyn ActiveTokenServiceTrait>,
+    user_id: Uuid,
+    metadata: &TokenMetadata,
+    token_type: TokenType
+) {
+    if let Err(e) = active_token_service.record_token(
+        user_id,
+        &metadata.jti,
+        token_type,
+        metadata.expires_at,
+        None, // device_info is Option<serde_json::Value>
+    ).await {
+        error!("Failed to record active token: {:?}", e);
     }
 }
 
 /// Validate a JWT token
 pub async fn validate_jwt(
+    token_revocation_service: &Arc<dyn TokenRevocationServiceTrait>,
     token: &str,
     secret: &str,
     expected_type: Option<TokenType>
 ) -> Result<Claims, jsonwebtoken::errors::Error> {
     debug!("Attempting to validate JWT");
-    
+
     let mut validation = Validation::default();
     validation.leeway = 60; 
     validation.validate_nbf = true; // Enable NBF (Not Before) claim validation
@@ -180,14 +182,14 @@ pub async fn validate_jwt(
                     ));
                 }
             }
-            
-            if is_token_revoked(&claims.jti).await {
+
+            if is_token_revoked(token_revocation_service, &claims.jti).await {
                 error!("Token has been revoked: {}", claims.jti);
                 return Err(jsonwebtoken::errors::Error::from(
                     jsonwebtoken::errors::ErrorKind::InvalidToken
                 ));
             }
-            
+
             debug!("JWT validated successfully for user: {}", claims.sub);
             Ok(claims)
         },
@@ -198,98 +200,82 @@ pub async fn validate_jwt(
     }
 }
 
-// Update static variables to use trait objects
-pub static mut TOKEN_REVOCATION_SERVICE: Option<Arc<dyn TokenRevocationServiceTrait>> = None;
-pub static mut ACTIVE_TOKEN_SERVICE: Option<Arc<dyn ActiveTokenServiceTrait>> = None;
+// init_token_revocation and init_active_token_service are removed as services will be injected.
 
-// Update init functions to accept trait objects
-pub fn init_token_revocation(service: Arc<dyn TokenRevocationServiceTrait>) {
-    unsafe {
-        TOKEN_REVOCATION_SERVICE = Some(service);
-    }
-}
-
-pub fn init_active_token_service(service: Arc<dyn ActiveTokenServiceTrait>) {
-    unsafe {
-        ACTIVE_TOKEN_SERVICE = Some(service);
-    }
-}
-
-pub async fn is_token_revoked(jti: &str) -> bool {
-    unsafe {
-        if let Some(service) = &TOKEN_REVOCATION_SERVICE {
-            match service.is_token_revoked(jti).await {
-                Ok(is_revoked) => is_revoked,
-                Err(e) => {
-                    error!("Error checking token revocation: {:?}", e);
-                    false 
-                }
-            }
-        } else {
-            warn!("Token revocation service not initialized");
-            false
+pub async fn is_token_revoked(
+    token_revocation_service: &Arc<dyn TokenRevocationServiceTrait>,
+    jti: &str
+) -> bool {
+    match token_revocation_service.is_token_revoked(jti).await {
+        Ok(is_revoked) => is_revoked,
+        Err(e) => {
+            error!("Error checking token revocation: {:?}", e);
+            true // Default to revoked on error for security
         }
     }
 }
 
 pub async fn refresh_token_pair(
-    refresh_token_str: &str, 
+    token_revocation_service: Arc<dyn TokenRevocationServiceTrait>,
+    active_token_service: Arc<dyn ActiveTokenServiceTrait>,
+    refresh_token_str: &str,
     secret: &str
 ) -> Result<TokenPair, jsonwebtoken::errors::Error> {
-    let refresh_claims = match validate_jwt(refresh_token_str, secret, Some(TokenType::Refresh)).await {
+    let refresh_claims = match validate_jwt(&token_revocation_service, refresh_token_str, secret, Some(TokenType::Refresh)).await {
         Ok(claims) => claims,
         Err(e) => return Err(e),
     };
-    
+
     let (access_token, access_metadata) = create_jwt(refresh_claims.sub, refresh_claims.role.clone(), secret, TokenType::Access)?;
     let (new_refresh_token, refresh_metadata) = create_jwt(refresh_claims.sub, refresh_claims.role.clone(), secret, TokenType::Refresh)?;
-    
-    let sub_clone = refresh_claims.sub; 
-    let access_meta_clone = access_metadata.clone(); 
+
+    let sub_clone = refresh_claims.sub;
+    let access_meta_clone = access_metadata.clone();
     let refresh_meta_clone = refresh_metadata.clone();
+    let active_token_service_clone_for_record = active_token_service.clone();
 
     tokio::spawn(async move {
-        record_active_token(sub_clone, &access_meta_clone, TokenType::Access).await;
-        record_active_token(sub_clone, &refresh_meta_clone, TokenType::Refresh).await;
+        record_active_token(&active_token_service_clone_for_record, sub_clone, &access_meta_clone, TokenType::Access).await;
+        record_active_token(&active_token_service_clone_for_record, sub_clone, &refresh_meta_clone, TokenType::Refresh).await;
     });
-    
-    let jti_clone = refresh_claims.jti.clone(); 
-    let sub_clone_revoke = refresh_claims.sub; 
-    tokio::spawn(async move { 
-        revoke_token(&jti_clone, sub_clone_revoke, TokenType::Refresh, "Refresh token rotation").await;
+
+    let jti_clone = refresh_claims.jti.clone();
+    let sub_clone_revoke = refresh_claims.sub;
+    let token_revocation_service_clone_for_revoke = token_revocation_service.clone();
+    let active_token_service_clone_for_revoke = active_token_service.clone(); 
+
+    tokio::spawn(async move {
+        revoke_token(&token_revocation_service_clone_for_revoke, &active_token_service_clone_for_revoke, &jti_clone, sub_clone_revoke, TokenType::Refresh, "Refresh token rotation").await;
     });
-    
+
     Ok(TokenPair {
         access_token,
         refresh_token: new_refresh_token,
     })
 }
 
-pub(crate) async fn revoke_token(jti: &str, user_id: Uuid, token_type: TokenType, reason: &str) { // Made pub(crate)
-    unsafe {
-        if let Some(revocation_service) = &TOKEN_REVOCATION_SERVICE {
-            if let Some(active_token_service) = &ACTIVE_TOKEN_SERVICE {
-                match active_token_service.get_active_token(jti).await {
-                    Ok(active_token_details) => {
-                        if let Err(e) = revocation_service.revoke_token(
-                            jti,
-                            user_id,
-                            token_type,
-                            active_token_details.expires_at,
-                            Some(reason),
-                        ).await {
-                            error!("Failed to revoke token {}: {:?}", jti, e);
-                        }
-                    }
-                    Err(e) => {
-                        error!("Failed to get active token details for JTI {} during revocation attempt: {:?}", jti, e);
-                    }
-                }
-            } else {
-                warn!("Active token service not initialized, cannot get token info for revocation of JTI {}", jti);
+pub(crate) async fn revoke_token(
+    token_revocation_service: &Arc<dyn TokenRevocationServiceTrait>,
+    active_token_service: &Arc<dyn ActiveTokenServiceTrait>,
+    jti: &str,
+    user_id: Uuid,
+    token_type: TokenType,
+    reason: &str
+) {
+    match active_token_service.get_active_token(jti).await {
+        Ok(active_token_details) => {
+            if let Err(e) = token_revocation_service.revoke_token(
+                jti,
+                user_id,
+                token_type,
+                active_token_details.expires_at,
+                Some(reason), // Pass reason as &str
+            ).await {
+                error!("Failed to revoke token {}: {:?}", jti, e);
             }
-        } else {
-             warn!("Token revocation service not initialized, cannot revoke token JTI {}", jti);
+        }
+        Err(e) => {
+            error!("Failed to get active token details for JTI {} during revocation attempt: {:?}", jti, e);
         }
     }
 }
@@ -301,8 +287,51 @@ mod tests {
     use uuid::Uuid;
     use jsonwebtoken::{decode, DecodingKey, Validation, errors::ErrorKind};
     use std::env;
+    use async_trait::async_trait; // For mocking traits
+    use sqlx::Error as SqlxError; // For mock trait signatures
+    use crate::core::auth::active_token::ActiveToken; // For MockActiveTokenService if needed
 
     const TEST_SECRET: &str = "test_secret_key_for_jwt_testing_longer_than_16_bytes";
+
+    // Mock implementation for TokenRevocationServiceTrait
+    struct MockTokenRevocationService;
+    #[async_trait]
+    impl TokenRevocationServiceTrait for MockTokenRevocationService {
+        async fn revoke_token<'a>(&self, _jti: &'a str, _user_id: Uuid, _token_type: TokenType, _expires_at: DateTime<Utc>, _reason: Option<&'a str>) -> Result<(), SqlxError> {
+            Ok(())
+        }
+        async fn is_token_revoked(&self, _jti: &str) -> Result<bool, SqlxError> {
+            Ok(false)
+        }
+        async fn cleanup_expired_tokens(&self) -> Result<u64, SqlxError> {
+            Ok(0)
+        }
+        async fn revoke_all_user_tokens<'a>(&self, _user_id: Uuid, _reason: Option<&'a str>) -> Result<u64, SqlxError> {
+            Ok(0)
+        }
+    }
+
+    // Mock implementation for ActiveTokenServiceTrait
+    struct MockActiveTokenService;
+    #[async_trait]
+    impl ActiveTokenServiceTrait for MockActiveTokenService {
+        async fn record_token(&self, _user_id: Uuid, _jti: &str, _token_type: TokenType, _expires_at: DateTime<Utc>, _device_info: Option<serde_json::Value>) -> Result<(), SqlxError> { Ok(()) }
+        async fn get_active_token(&self, jti: &str) -> Result<ActiveToken, SqlxError> {
+            Ok(ActiveToken {
+                id: Uuid::new_v4(),
+                user_id: Uuid::new_v4(),
+                jti: jti.to_string(),
+                token_type: "Access".to_string(), 
+                expires_at: Utc::now() + Duration::hours(1),
+                created_at: Utc::now(),
+                device_info: None,
+            })
+        }
+        async fn remove_token(&self, _jti: &str) -> Result<bool, SqlxError> { Ok(false) }
+        async fn get_user_tokens(&self, _user_id: Uuid) -> Result<Vec<ActiveToken>, SqlxError> { Ok(vec![]) }
+        async fn cleanup_expired_tokens(&self) -> Result<u64, SqlxError> { Ok(0) }
+        async fn remove_all_user_tokens(&self, _user_id: Uuid) -> Result<u64, SqlxError> { Ok(0) }
+    }
 
     fn setup_test_environment() {
         env::set_var("JWT_ACCESS_TOKEN_EXPIRATION_MINUTES", "1"); 
@@ -449,12 +478,9 @@ mod tests {
         let (token_str, _metadata) =
             create_jwt(user_id, role.clone(), TEST_SECRET, TokenType::Access).unwrap();
 
-        unsafe {
-            TOKEN_REVOCATION_SERVICE = None;
-            ACTIVE_TOKEN_SERVICE = None;
-        }
+        let mock_revocation_service: Arc<dyn TokenRevocationServiceTrait> = Arc::new(MockTokenRevocationService);
 
-        let claims_result = validate_jwt(&token_str, TEST_SECRET, Some(TokenType::Access)).await;
+        let claims_result = validate_jwt(&mock_revocation_service, &token_str, TEST_SECRET, Some(TokenType::Access)).await;
         assert!(claims_result.is_ok());
         let claims = claims_result.unwrap();
         assert_eq!(claims.sub, user_id);
@@ -469,7 +495,7 @@ mod tests {
         let role = "test_role".to_string();
         
         let expired_iat = Utc::now().checked_sub_signed(Duration::minutes(10)).unwrap().timestamp();
-        let expired_exp = Utc::now().checked_sub_signed(Duration::minutes(5)).unwrap().timestamp(); 
+        let expired_exp = Utc::now().checked_sub_signed(Duration::minutes(5)).unwrap().timestamp();
         let expired_claims = Claims {
             sub: user_id,
             exp: expired_exp,
@@ -485,12 +511,9 @@ mod tests {
             &EncodingKey::from_secret(TEST_SECRET.as_ref()),
         ).unwrap();
 
-        unsafe {
-            TOKEN_REVOCATION_SERVICE = None;
-            ACTIVE_TOKEN_SERVICE = None;
-        }
+        let mock_revocation_service: Arc<dyn TokenRevocationServiceTrait> = Arc::new(MockTokenRevocationService);
 
-        let claims_result = validate_jwt(&token_str, TEST_SECRET, Some(TokenType::Access)).await;
+        let claims_result = validate_jwt(&mock_revocation_service, &token_str, TEST_SECRET, Some(TokenType::Access)).await;
         assert!(claims_result.is_err());
         assert!(matches!(
             claims_result.unwrap_err().kind(),
@@ -498,13 +521,37 @@ mod tests {
         ));
     }
 
+    // Helper struct for testing revoked tokens
+    struct MockRevokedTokenRevocationService;
+    #[async_trait]
+    impl TokenRevocationServiceTrait for MockRevokedTokenRevocationService {
+        async fn revoke_token<'a>(&self, _jti: &'a str, _user_id: Uuid, _token_type: TokenType, _expires_at: DateTime<Utc>, _reason: Option<&'a str>) -> Result<(), SqlxError> { Ok(()) }
+        async fn is_token_revoked(&self, _jti: &str) -> Result<bool, SqlxError> { Ok(true) } // Always returns true
+        async fn cleanup_expired_tokens(&self) -> Result<u64, SqlxError> { Ok(0) }
+        async fn revoke_all_user_tokens<'a>(&self, _user_id: Uuid, _reason: Option<&'a str>) -> Result<u64, SqlxError> { Ok(0) }
+    }
+
+    #[tokio::test]
+    async fn test_validate_jwt_revoked_token() {
+        setup_test_environment();
+        let user_id = Uuid::new_v4();
+        let role = "test_role".to_string();
+        let (token_str, _metadata) = create_jwt(user_id, role.clone(), TEST_SECRET, TokenType::Access).unwrap();
+
+        let mock_revoked_service: Arc<dyn TokenRevocationServiceTrait> = Arc::new(MockRevokedTokenRevocationService);
+        let claims_result = validate_jwt(&mock_revoked_service, &token_str, TEST_SECRET, Some(TokenType::Access)).await;
+        assert!(claims_result.is_err());
+        assert!(matches!(claims_result.unwrap_err().kind(), jsonwebtoken::errors::ErrorKind::InvalidToken), "Expected InvalidToken for revoked token");
+    }
+
+
     #[tokio::test]
     async fn test_validate_jwt_token_not_yet_valid() {
         setup_test_environment();
         let user_id = Uuid::new_v4();
         let role = "test_role".to_string();
 
-        let future_nbf = Utc::now().checked_add_signed(Duration::minutes(5)).unwrap().timestamp(); 
+        let future_nbf = Utc::now().checked_add_signed(Duration::minutes(5)).unwrap().timestamp();
         let future_exp = Utc::now().checked_add_signed(Duration::minutes(10)).unwrap().timestamp();
         let future_claims = Claims {
             sub: user_id,
@@ -521,16 +568,13 @@ mod tests {
             &EncodingKey::from_secret(TEST_SECRET.as_ref()),
         ).unwrap();
         
-        unsafe {
-            TOKEN_REVOCATION_SERVICE = None;
-            ACTIVE_TOKEN_SERVICE = None;
-        }
+        let mock_revocation_service: Arc<dyn TokenRevocationServiceTrait> = Arc::new(MockTokenRevocationService);
 
-        let claims_result = validate_jwt(&token_str, TEST_SECRET, Some(TokenType::Access)).await;
+        let claims_result = validate_jwt(&mock_revocation_service, &token_str, TEST_SECRET, Some(TokenType::Access)).await;
         assert!(claims_result.is_err());
         assert!(matches!(
             claims_result.unwrap_err().kind(),
-            jsonwebtoken::errors::ErrorKind::ImmatureSignature 
+            jsonwebtoken::errors::ErrorKind::ImmatureSignature
         ));
     }
 
@@ -542,12 +586,9 @@ mod tests {
         let (token_str, _metadata) =
             create_jwt(user_id, role.clone(), TEST_SECRET, TokenType::Access).unwrap();
 
-        unsafe {
-            TOKEN_REVOCATION_SERVICE = None;
-            ACTIVE_TOKEN_SERVICE = None;
-        }
+        let mock_revocation_service: Arc<dyn TokenRevocationServiceTrait> = Arc::new(MockTokenRevocationService);
         
-        let claims_result = validate_jwt(&token_str, "wrong_secret_shhh", Some(TokenType::Access)).await;
+        let claims_result = validate_jwt(&mock_revocation_service, &token_str, "wrong_secret_shhh", Some(TokenType::Access)).await;
         assert!(claims_result.is_err());
         assert!(matches!(
             claims_result.unwrap_err().kind(),
@@ -563,12 +604,9 @@ mod tests {
         let (token_str, _metadata) =
             create_jwt(user_id, role.clone(), TEST_SECRET, TokenType::Refresh).unwrap();
 
-        unsafe {
-            TOKEN_REVOCATION_SERVICE = None;
-            ACTIVE_TOKEN_SERVICE = None;
-        }
+        let mock_revocation_service: Arc<dyn TokenRevocationServiceTrait> = Arc::new(MockTokenRevocationService);
 
-        let claims_result = validate_jwt(&token_str, TEST_SECRET, Some(TokenType::Access)).await;
+        let claims_result = validate_jwt(&mock_revocation_service, &token_str, TEST_SECRET, Some(TokenType::Access)).await;
         assert!(claims_result.is_err());
         assert!(matches!(
             claims_result.unwrap_err().kind(),
@@ -584,12 +622,9 @@ mod tests {
         let (token_str, _metadata) =
             create_jwt(user_id, role.clone(), TEST_SECRET, TokenType::Access).unwrap();
 
-        unsafe {
-            TOKEN_REVOCATION_SERVICE = None;
-            ACTIVE_TOKEN_SERVICE = None;
-        }
+        let mock_revocation_service: Arc<dyn TokenRevocationServiceTrait> = Arc::new(MockTokenRevocationService);
 
-        let claims_result = validate_jwt(&token_str, TEST_SECRET, None).await;
+        let claims_result = validate_jwt(&mock_revocation_service, &token_str, TEST_SECRET, None).await;
         assert!(claims_result.is_ok());
         let claims = claims_result.unwrap();
         assert_eq!(claims.sub, user_id);

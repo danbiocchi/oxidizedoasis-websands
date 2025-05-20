@@ -9,9 +9,7 @@ lazy_static! {
 
     pub static ref USERNAME_REGEX: Regex = Regex::new(r"^[a-zA-Z0-9_-]+$").unwrap();
 
-    static ref PASSWORD_REGEX: Regex = Regex::new(
-        r"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$"
-    ).unwrap();
+    // PASSWORD_REGEX removed as we will implement checks manually
 }
 
 pub fn validate_length(value: &str, min: usize, max: usize) -> Result<(), ValidationError> {
@@ -34,20 +32,39 @@ pub fn validate_email(email: &str) -> Result<(), ValidationError> {
 }
 
 pub fn validate_username(username: &str) -> Result<(), ValidationError> {
+    // Length check (e.g., 3-50 characters)
+    if username.len() < 3 || username.len() > 50 {
+        return Err(ValidationError {
+            code: "length".into(),
+            message: Some("Username must be between 3 and 50 characters".into()),
+            params: Default::default(),
+        });
+    }
     if !USERNAME_REGEX.is_match(username) {
-        return Err(ValidationError::new(
-            "Username must be 3-50 characters long and contain only letters, numbers, underscores, and hyphens"
-        ));
+        return Err(ValidationError {
+            code: "format".into(),
+            message: Some("Username can only contain letters, numbers, underscores, and hyphens".into()),
+            params: Default::default(),
+        });
     }
     Ok(())
 }
 
 pub fn validate_password_strength(password: &str) -> Result<(), ValidationError> {
-    if !PASSWORD_REGEX.is_match(password) {
-        return Err(ValidationError::new(
-            "Password must be at least 8 characters long and contain at least one uppercase letter, \
-             one lowercase letter, one number, and one special character"
-        ));
+    if password.len() < 8 {
+        return Err(ValidationError::new("Password must be at least 8 characters long."));
+    }
+    if !password.chars().any(|c| c.is_ascii_lowercase()) {
+        return Err(ValidationError::new("Password must contain at least one lowercase letter."));
+    }
+    if !password.chars().any(|c| c.is_ascii_uppercase()) {
+        return Err(ValidationError::new("Password must contain at least one uppercase letter."));
+    }
+    if !password.chars().any(|c| c.is_ascii_digit()) {
+        return Err(ValidationError::new("Password must contain at least one number."));
+    }
+    if !password.chars().any(|c| "@$!%*?&".contains(c)) {
+        return Err(ValidationError::new("Password must contain at least one special character (@$!%*?&)."));
     }
     Ok(())
 }

@@ -1,10 +1,12 @@
 use actix_web::error::ResponseError;
-use actix_web::{dev::ServiceRequest, Error, HttpMessage, HttpResponse};
+use actix_web::{dev::ServiceRequest, Error, HttpMessage, HttpResponse, web}; // Added web for app_data
 use actix_web_httpauth::extractors::bearer::BearerAuth;
 use serde_json::json;
 use std::fmt;
+use std::sync::Arc; // For Arc
 use log::{error, debug, warn};
 use crate::core::auth::jwt::{validate_jwt, Claims, TokenType};
+use crate::core::auth::token_revocation::TokenRevocationServiceTrait; // Import the trait
 
 #[derive(Debug)]
 pub struct AdminError {
@@ -31,10 +33,20 @@ pub async fn admin_validator(req: ServiceRequest, credentials: BearerAuth) -> Re
     let jwt_secret = std::env::var("JWT_SECRET").expect("JWT_SECRET must be set");
     let token = credentials.token();
 
+    // Extract TokenRevocationService from app_data
+    let token_revocation_service = req.app_data::<web::Data<Arc<dyn TokenRevocationServiceTrait>>>().cloned();
+    if token_revocation_service.is_none() {
+        error!("TokenRevocationService not found in app_data for admin_validator");
+        return Err((AdminError {
+            message: "Internal server configuration error".to_string()
+        }.into(), req));
+    }
+    let token_revocation_service = token_revocation_service.unwrap().into_inner(); // Get Arc<dyn Trait>
+
     debug!("Attempting to validate token for admin access");
 
     // Validate as an access token - we don't accept refresh tokens for API access
-    let validation_result = validate_jwt(token, &jwt_secret, Some(TokenType::Access)).await;
+    let validation_result = validate_jwt(&token_revocation_service, token, &jwt_secret, Some(TokenType::Access)).await;
     
     match validation_result {
         Ok(claims) => {

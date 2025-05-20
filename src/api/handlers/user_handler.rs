@@ -9,6 +9,8 @@ use crate::core::auth::jwt::Claims;
 use crate::core::user::{UserRepository, UserService};
 use crate::core::auth::AuthService;
 use crate::core::email::EmailServiceTrait;
+use crate::core::auth::token_revocation::TokenRevocationServiceTrait; // Added
+use crate::core::auth::active_token::ActiveTokenServiceTrait; // Added
 use crate::common::validation::{UserInput, LoginInput, TokenQuery};
 use crate::core::user::model::{PasswordResetRequest, PasswordResetSubmit};
 use time;
@@ -26,16 +28,20 @@ pub struct UserHandler {
 }
 
 impl UserHandler {
-    pub fn new(pool: PgPool, email_service: Arc<dyn EmailServiceTrait>) -> Self {
+    pub fn new(
+        pool: PgPool,
+        email_service: Arc<dyn EmailServiceTrait>,
+        auth_service: Arc<AuthService>, // Changed: Receive AuthService
+        token_revocation_service: Arc<dyn TokenRevocationServiceTrait>, // Added
+        active_token_service: Arc<dyn ActiveTokenServiceTrait> // Renamed from _active_token_service as it's used by AuthService
+    ) -> Self {
         let user_repo = UserRepository::new(pool.clone());
-        let user_service = Arc::new(UserService::new(user_repo, email_service));
-        // Correctly instantiate AuthService with Arc<dyn UserRepositoryTrait>
-        let user_repository_for_auth_service = Arc::new(UserRepository::new(pool.clone())); // Create another UserRepository instance for AuthService, wrapped in Arc
-        let auth_service = Arc::new(AuthService::new(user_repository_for_auth_service, std::env::var("JWT_SECRET").expect("JWT_SECRET must be set")));
-
+        // UserService now needs TokenRevocationService
+        let user_service = Arc::new(UserService::new(user_repo, email_service, token_revocation_service.clone())); // Pass the correct service
+        
         Self {
             user_service,
-            auth_service,
+            auth_service, // Use received AuthService
         }
     }
 
@@ -759,8 +765,14 @@ impl UserHandler {
 }
 
 // Factory function to create handler instance
-pub fn create_handler(pool: PgPool, email_service: Arc<dyn EmailServiceTrait>) -> UserHandler {
-    UserHandler::new(pool, email_service)
+pub fn create_handler(
+    pool: PgPool,
+    email_service: Arc<dyn EmailServiceTrait>,
+    auth_service: Arc<AuthService>,
+    token_revocation_service: Arc<dyn TokenRevocationServiceTrait>,
+    active_token_service: Arc<dyn ActiveTokenServiceTrait>
+) -> UserHandler {
+    UserHandler::new(pool, email_service, auth_service, token_revocation_service, active_token_service)
 }
 
 // Route handler functions

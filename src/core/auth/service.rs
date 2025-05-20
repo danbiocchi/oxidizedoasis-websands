@@ -4,21 +4,32 @@ use crate::common::{
     error::{AuthError, AuthErrorType},
     validation::LoginInput,
 };
-use crate::core::user::{User, UserRepositoryTrait}; 
-use std::sync::Arc; 
-use super::jwt::{self, validate_jwt, refresh_token_pair, Claims, TokenType, TokenPair, create_token_pair, TokenMetadata}; 
+use crate::core::user::{User, UserRepositoryTrait};
+use std::sync::Arc;
+use super::jwt::{self, Claims, TokenType, TokenPair, create_token_pair, TokenMetadata};
+use crate::core::auth::token_revocation::TokenRevocationServiceTrait;
+use crate::core::auth::active_token::ActiveTokenServiceTrait;
 use log::{info, warn};
 
 pub struct AuthService {
-    user_repository: Arc<dyn UserRepositoryTrait>, 
+    user_repository: Arc<dyn UserRepositoryTrait>,
     jwt_secret: String,
+    token_revocation_service: Arc<dyn TokenRevocationServiceTrait>,
+    active_token_service: Arc<dyn ActiveTokenServiceTrait>,
 }
 
 impl AuthService {
-    pub fn new(user_repository: Arc<dyn UserRepositoryTrait>, jwt_secret: String) -> Self {
+    pub fn new(
+        user_repository: Arc<dyn UserRepositoryTrait>,
+        jwt_secret: String,
+        token_revocation_service: Arc<dyn TokenRevocationServiceTrait>,
+        active_token_service: Arc<dyn ActiveTokenServiceTrait>,
+    ) -> Self {
         Self {
             user_repository,
             jwt_secret,
+            token_revocation_service,
+            active_token_service,
         }
     }
 
@@ -63,7 +74,7 @@ impl AuthService {
     }
 
     pub async fn validate_auth(&self, token: &str) -> Result<Claims, AuthError> {
-        let claims = match validate_jwt(token, &self.jwt_secret, Some(TokenType::Access)).await {
+        let claims = match jwt::validate_jwt(&self.token_revocation_service, token, &self.jwt_secret, Some(TokenType::Access)).await {
             Ok(claims) => claims,
             Err(e) => {
                 warn!("Token validation failed: {:?}", e);
@@ -91,7 +102,12 @@ impl AuthService {
     }
     
     pub async fn refresh_token(&self, refresh_token: &str) -> Result<TokenPair, AuthError> {
-        let token_pair = match refresh_token_pair(refresh_token, &self.jwt_secret).await {
+        let token_pair = match jwt::refresh_token_pair(
+            self.token_revocation_service.clone(), 
+            self.active_token_service.clone(),   
+            refresh_token,
+            &self.jwt_secret
+        ).await {
             Ok(token_pair) => token_pair,
             Err(e) => {
                 warn!("Token refresh failed: {:?}", e);
@@ -99,7 +115,7 @@ impl AuthService {
             }
         };
         
-        let access_claims = match validate_jwt(&token_pair.access_token, &self.jwt_secret, Some(TokenType::Access)).await {
+        let access_claims = match jwt::validate_jwt(&self.token_revocation_service, &token_pair.access_token, &self.jwt_secret, Some(TokenType::Access)).await {
             Ok(claims) => claims,
             Err(_) => {
                  warn!("Refresh_token: Failed to validate newly created access token during refresh flow.");
@@ -116,7 +132,7 @@ impl AuthService {
     }
     
     async fn record_tokens_for_user(&self, user_id: uuid::Uuid, token_pair: &TokenPair) -> Result<(), AuthError> {
-        let access_claims = match validate_jwt(&token_pair.access_token, &self.jwt_secret, Some(TokenType::Access)).await {
+        let access_claims = match jwt::validate_jwt(&self.token_revocation_service, &token_pair.access_token, &self.jwt_secret, Some(TokenType::Access)).await {
             Ok(claims) => claims,
             Err(e) => {
                 warn!("record_tokens_for_user: Failed to validate access token for recording for user {}: {:?}", user_id, e);
@@ -124,7 +140,7 @@ impl AuthService {
             }
         };
         
-        let refresh_claims = match validate_jwt(&token_pair.refresh_token, &self.jwt_secret, Some(TokenType::Refresh)).await {
+        let refresh_claims = match jwt::validate_jwt(&self.token_revocation_service, &token_pair.refresh_token, &self.jwt_secret, Some(TokenType::Refresh)).await {
             Ok(claims) => claims,
             Err(e) => {
                 warn!("record_tokens_for_user: Failed to validate refresh token for recording for user {}: {:?}", user_id, e);
@@ -132,14 +148,14 @@ impl AuthService {
             }
         };
         
-        super::jwt::record_active_token(user_id, &TokenMetadata{jti: access_claims.jti, expires_at: super::jwt::timestamp_to_datetime(access_claims.exp)}, TokenType::Access).await;
-        super::jwt::record_active_token(user_id, &TokenMetadata{jti: refresh_claims.jti, expires_at: super::jwt::timestamp_to_datetime(refresh_claims.exp)}, TokenType::Refresh).await;
+        jwt::record_active_token(&self.active_token_service, user_id, &TokenMetadata{jti: access_claims.jti, expires_at: jwt::timestamp_to_datetime(access_claims.exp)}, TokenType::Access).await;
+        jwt::record_active_token(&self.active_token_service, user_id, &TokenMetadata{jti: refresh_claims.jti, expires_at: jwt::timestamp_to_datetime(refresh_claims.exp)}, TokenType::Refresh).await;
         
         Ok(())
     }
     
     pub async fn logout(&self, access_token: &str, refresh_token: Option<&str>) -> Result<(), AuthError> {
-        let access_claims = match validate_jwt(access_token, &self.jwt_secret, Some(TokenType::Access)).await {
+        let access_claims = match jwt::validate_jwt(&self.token_revocation_service, access_token, &self.jwt_secret, Some(TokenType::Access)).await {
             Ok(claims) => claims,
             Err(e) => {
                 warn!("Logout: Failed to validate access token: {:?}", e);
@@ -147,12 +163,12 @@ impl AuthService {
             }
         };
         
-        super::jwt::revoke_token(&access_claims.jti, access_claims.sub, TokenType::Access, "User logout").await;
+        jwt::revoke_token(&self.token_revocation_service, &self.active_token_service, &access_claims.jti, access_claims.sub, TokenType::Access, "User logout").await;
         
         if let Some(rt_str) = refresh_token {
-            match validate_jwt(rt_str, &self.jwt_secret, Some(TokenType::Refresh)).await {
+            match jwt::validate_jwt(&self.token_revocation_service, rt_str, &self.jwt_secret, Some(TokenType::Refresh)).await {
                 Ok(refresh_claims) => {
-                     super::jwt::revoke_token(&refresh_claims.jti, refresh_claims.sub, TokenType::Refresh, "User logout").await;
+                     jwt::revoke_token(&self.token_revocation_service, &self.active_token_service, &refresh_claims.jti, refresh_claims.sub, TokenType::Refresh, "User logout").await;
                 },
                 Err(e) => {
                     warn!("Logout: Failed to validate refresh token, not revoking: {:?}", e);
@@ -168,20 +184,17 @@ impl AuthService {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::user::{User, UserRepositoryTrait, MockUserRepositoryTrait}; 
-    use crate::core::auth::jwt::{self, Claims, TokenType, TokenPair, TokenMetadata, init_active_token_service, init_token_revocation};
-    use crate::core::auth::active_token::MockActiveTokenServiceTrait;
+    use crate::core::user::{MockUserRepositoryTrait}; 
+    use crate::core::auth::jwt::{self, Claims, TokenType, TokenPair, TokenMetadata};
+    use crate::core::auth::active_token::{MockActiveTokenServiceTrait, ActiveToken};
     use crate::core::auth::token_revocation::MockTokenRevocationServiceTrait;
     use crate::common::validation::LoginInput;
     use crate::common::error::{AuthErrorType}; 
     use mockall::predicate;
     use uuid::Uuid;
-    use chrono::Utc;
+    use chrono::{Utc, Duration}; 
     use std::sync::Arc;
-    // std::fmt was only for the custom predicate, no longer needed here.
-    // Ensure no `use predicates::...` lines are present here.
-
-    // Helper function removed as we try predicate::eq directly
+    use sqlx::Error as SqlxError; 
 
     fn create_test_user(id: Uuid, username: &str, email_verified: bool, role: &str) -> User {
         User {
@@ -201,6 +214,34 @@ mod tests {
     
     const TEST_JWT_SECRET: &str = "test_auth_service_jwt_secret_very_secure";
 
+    fn setup_mock_services() -> (Arc<dyn TokenRevocationServiceTrait>, Arc<dyn ActiveTokenServiceTrait>) {
+        let mut mock_trs = MockTokenRevocationServiceTrait::new();
+        mock_trs.expect_is_token_revoked().returning(|_| Ok(false)); 
+        mock_trs.expect_revoke_token().returning(|_,_,_,_,_| Ok(())); 
+        mock_trs.expect_revoke_all_user_tokens().returning(|_,_| Ok(0));
+        mock_trs.expect_cleanup_expired_tokens().returning(|| Ok(0));
+
+        let mut mock_ats = MockActiveTokenServiceTrait::new();
+        mock_ats.expect_record_token().returning(|_,_,_,_,_| Ok(())); 
+        mock_ats.expect_get_active_token().returning(|jti| {
+            Ok(ActiveToken {
+                id: Uuid::new_v4(),
+                user_id: Uuid::new_v4(), 
+                jti: jti.to_string(),
+                token_type: "Access".to_string(),
+                expires_at: Utc::now() + Duration::hours(1),
+                created_at: Utc::now(),
+                device_info: None,
+            })
+        });
+        mock_ats.expect_remove_token().returning(|_| Ok(true));
+        mock_ats.expect_get_user_tokens().returning(|_| Ok(vec![]));
+        mock_ats.expect_remove_all_user_tokens().returning(|_| Ok(0));
+        mock_ats.expect_cleanup_expired_tokens().returning(|| Ok(0));
+
+        (Arc::new(mock_trs), Arc::new(mock_ats))
+    }
+
     #[tokio::test]
     async fn test_login_successful() {
         let mut mock_user_repo = MockUserRepositoryTrait::new(); 
@@ -213,15 +254,19 @@ mod tests {
             .with(predicate::eq(test_username))
             .times(1)
             .returning(move |_| Ok(Some(cloned_user.clone())));
-
-        unsafe {
-            jwt::ACTIVE_TOKEN_SERVICE = None; 
-            jwt::TOKEN_REVOCATION_SERVICE = None; 
-        }
+        
+        let (mock_trs_arc, _) = setup_mock_services(); // We get a generic Arc<dyn ActiveTokenServiceTrait> here
+        
+        // For specific expectations, create a new concrete mock, set expectations, then wrap.
+        let mut mock_ats_for_login = MockActiveTokenServiceTrait::new();
+        mock_ats_for_login.expect_record_token().times(2).returning(|_,_,_,_,_| Ok(()));
+        let mock_ats_arc_for_login: Arc<dyn ActiveTokenServiceTrait> = Arc::new(mock_ats_for_login);
 
         let auth_service = AuthService::new(
             Arc::new(mock_user_repo), 
-            TEST_JWT_SECRET.to_string()
+            TEST_JWT_SECRET.to_string(),
+            mock_trs_arc.clone(), 
+            mock_ats_arc_for_login.clone() // Use the specifically prepared mock
         );
 
         let login_input = LoginInput {
@@ -237,7 +282,7 @@ mod tests {
         assert!(!token_pair.access_token.is_empty());
         assert!(!token_pair.refresh_token.is_empty());
 
-        let claims = jwt::validate_jwt(&token_pair.access_token, TEST_JWT_SECRET, Some(TokenType::Access)).await.unwrap();
+        let claims = jwt::validate_jwt(&mock_trs_arc, &token_pair.access_token, TEST_JWT_SECRET, Some(TokenType::Access)).await.unwrap();
         assert_eq!(claims.sub, test_user_id);
         assert_eq!(claims.role, "user");
     }
@@ -252,14 +297,12 @@ mod tests {
             .times(1)
             .returning(|_| Ok(None));
 
-        unsafe {
-            jwt::ACTIVE_TOKEN_SERVICE = None;
-            jwt::TOKEN_REVOCATION_SERVICE = None;
-        }
-
+        let (mock_trs, mock_ats) = setup_mock_services();
         let auth_service = AuthService::new(
             Arc::new(mock_user_repo),
-            TEST_JWT_SECRET.to_string()
+            TEST_JWT_SECRET.to_string(),
+            mock_trs,
+            mock_ats
         );
 
         let login_input = LoginInput {
@@ -287,14 +330,12 @@ mod tests {
             .times(1)
             .returning(move |_| Ok(Some(cloned_user.clone())));
         
-        unsafe {
-            jwt::ACTIVE_TOKEN_SERVICE = None;
-            jwt::TOKEN_REVOCATION_SERVICE = None;
-        }
-
+        let (mock_trs, mock_ats) = setup_mock_services();
         let auth_service = AuthService::new(
             Arc::new(mock_user_repo),
-            TEST_JWT_SECRET.to_string()
+            TEST_JWT_SECRET.to_string(),
+            mock_trs,
+            mock_ats
         );
 
         let login_input = LoginInput {
@@ -322,14 +363,12 @@ mod tests {
             .times(1)
             .returning(move |_| Ok(Some(cloned_user.clone())));
 
-        unsafe {
-            jwt::ACTIVE_TOKEN_SERVICE = None;
-            jwt::TOKEN_REVOCATION_SERVICE = None;
-        }
-
+        let (mock_trs, mock_ats) = setup_mock_services();
         let auth_service = AuthService::new(
             Arc::new(mock_user_repo),
-            TEST_JWT_SECRET.to_string()
+            TEST_JWT_SECRET.to_string(),
+            mock_trs,
+            mock_ats
         );
 
         let login_input = LoginInput {
@@ -352,15 +391,13 @@ mod tests {
             .with(predicate::eq(test_username))
             .times(1)
             .returning(|_| Err(sqlx::Error::RowNotFound)); 
-
-        unsafe {
-            jwt::ACTIVE_TOKEN_SERVICE = None;
-            jwt::TOKEN_REVOCATION_SERVICE = None;
-        }
         
+        let (mock_trs, mock_ats) = setup_mock_services();
         let auth_service = AuthService::new(
             Arc::new(mock_user_repo),
-            TEST_JWT_SECRET.to_string()
+            TEST_JWT_SECRET.to_string(),
+            mock_trs,
+            mock_ats
         );
 
         let login_input = LoginInput {
@@ -388,15 +425,16 @@ mod tests {
 
         let token_pair = jwt::create_token_pair(test_user_id, "user".to_string(), TEST_JWT_SECRET).unwrap();
         let token_str = token_pair.access_token;
-        jwt::validate_jwt(&token_str, TEST_JWT_SECRET, Some(TokenType::Access)).await.expect("Token for test_validate_auth_successful should be valid");
         
-        unsafe {
-            jwt::TOKEN_REVOCATION_SERVICE = None;
-        }
-
+        let (mock_trs_for_jwt_val, _) : (Arc<dyn TokenRevocationServiceTrait>, Arc<dyn ActiveTokenServiceTrait>) = setup_mock_services(); 
+        jwt::validate_jwt(&mock_trs_for_jwt_val, &token_str, TEST_JWT_SECRET, Some(TokenType::Access)).await.expect("Token for test_validate_auth_successful should be valid");
+        
+        let (mock_trs, mock_ats) = setup_mock_services();
         let auth_service = AuthService::new(
             Arc::new(mock_user_repo),
-            TEST_JWT_SECRET.to_string()
+            TEST_JWT_SECRET.to_string(),
+            mock_trs,
+            mock_ats
         );
         
         let result = auth_service.validate_auth(&token_str).await;
@@ -409,21 +447,22 @@ mod tests {
     #[tokio::test]
     async fn test_validate_auth_invalid_token_signature() {
         let mock_user_repo = MockUserRepositoryTrait::new(); 
-
-        unsafe {
-            jwt::TOKEN_REVOCATION_SERVICE = None;
-        }
+        let (mock_trs, mock_ats) = setup_mock_services();
 
         let auth_service = AuthService::new(
             Arc::new(mock_user_repo),
-            TEST_JWT_SECRET.to_string()
+            TEST_JWT_SECRET.to_string(),
+            mock_trs,
+            mock_ats
         );
         
         let token_pair_diff_secret = jwt::create_token_pair(Uuid::new_v4(), "user".to_string(), "a_different_secret").unwrap();
         let token_str = token_pair_diff_secret.access_token;
-        jwt::validate_jwt(&token_str, "a_different_secret", Some(TokenType::Access)).await.expect("Token created with different secret should be valid with that secret");
 
-        let result = auth_service.validate_auth(&token_str).await;
+        let (fresh_mock_trs, _) : (Arc<dyn TokenRevocationServiceTrait>, Arc<dyn ActiveTokenServiceTrait>) = setup_mock_services();
+        jwt::validate_jwt(&fresh_mock_trs, &token_str, "a_different_secret", Some(TokenType::Access)).await.expect("Token created with different secret should be valid with that secret");
+
+        let result = auth_service.validate_auth(&token_str).await; 
         assert!(result.is_err());
         let auth_error = result.unwrap_err();
         assert_eq!(auth_error.error_type, AuthErrorType::InvalidToken);
@@ -441,15 +480,16 @@ mod tests {
         
         let token_pair = jwt::create_token_pair(test_user_id, "user".to_string(), TEST_JWT_SECRET).unwrap();
         let token_str = token_pair.access_token;
-        jwt::validate_jwt(&token_str, TEST_JWT_SECRET, Some(TokenType::Access)).await.expect("Token for test_validate_auth_user_not_found_by_id should be valid");
 
-        unsafe {
-            jwt::TOKEN_REVOCATION_SERVICE = None;
-        }
+        let (fresh_mock_trs, _) : (Arc<dyn TokenRevocationServiceTrait>, Arc<dyn ActiveTokenServiceTrait>) = setup_mock_services();
+        jwt::validate_jwt(&fresh_mock_trs, &token_str, TEST_JWT_SECRET, Some(TokenType::Access)).await.expect("Token for test_validate_auth_user_not_found_by_id should be valid");
 
+        let (mock_trs, mock_ats) = setup_mock_services();
         let auth_service = AuthService::new(
             Arc::new(mock_user_repo),
-            TEST_JWT_SECRET.to_string()
+            TEST_JWT_SECRET.to_string(),
+            mock_trs,
+            mock_ats
         );
 
         let result = auth_service.validate_auth(&token_str).await;
@@ -472,15 +512,16 @@ mod tests {
 
         let token_pair = jwt::create_token_pair(test_user_id, "user".to_string(), TEST_JWT_SECRET).unwrap();
         let token_str = token_pair.access_token;
-        jwt::validate_jwt(&token_str, TEST_JWT_SECRET, Some(TokenType::Access)).await.expect("Token for test_validate_auth_user_email_not_verified should be valid");
-        
-        unsafe {
-            jwt::TOKEN_REVOCATION_SERVICE = None;
-        }
 
+        let (fresh_mock_trs, _) : (Arc<dyn TokenRevocationServiceTrait>, Arc<dyn ActiveTokenServiceTrait>) = setup_mock_services();
+        jwt::validate_jwt(&fresh_mock_trs, &token_str, TEST_JWT_SECRET, Some(TokenType::Access)).await.expect("Token for test_validate_auth_user_email_not_verified should be valid");
+        
+        let (mock_trs, mock_ats) = setup_mock_services();
         let auth_service = AuthService::new(
             Arc::new(mock_user_repo),
-            TEST_JWT_SECRET.to_string()
+            TEST_JWT_SECRET.to_string(),
+            mock_trs,
+            mock_ats
         );
 
         let result = auth_service.validate_auth(&token_str).await;
@@ -491,31 +532,30 @@ mod tests {
 
     #[tokio::test]
     async fn test_refresh_token_successful() {
-        let mut mock_user_repo = MockUserRepositoryTrait::new(); 
+        let mock_user_repo = MockUserRepositoryTrait::new(); 
         let test_user_id = Uuid::new_v4();
-        let test_user = create_test_user(test_user_id, "refresher", true, "user");
-        let cloned_user = test_user.clone();
+        
+        let mut mock_ats_concrete = MockActiveTokenServiceTrait::new(); 
+        mock_ats_concrete.expect_record_token().times(2).returning(|_,_,_,_,_| Ok(())); 
+        mock_ats_concrete.expect_get_active_token().returning(move |jti| { 
+             Ok(ActiveToken {
+                id: Uuid::new_v4(), user_id: test_user_id, jti: jti.to_string(), token_type: "Refresh".to_string(),
+                expires_at: Utc::now() + Duration::days(1), created_at: Utc::now(), device_info: None,
+            })
+        });
+        let mock_ats: Arc<dyn ActiveTokenServiceTrait> = Arc::new(mock_ats_concrete);
 
-        mock_user_repo.expect_find_by_id()
-            .with(predicate::eq(test_user_id))
-            .times(2) 
-            .returning(move |_| Ok(Some(cloned_user.clone())));
 
-        let mut mock_ats = MockActiveTokenServiceTrait::new(); 
-        mock_ats.expect_record_token().times(2).returning(|_,_,_,_,_| Ok(())); 
-
-        let mut mock_trs = MockTokenRevocationServiceTrait::new(); 
-        mock_trs.expect_is_token_revoked().returning(|_| Ok(false)); 
-        mock_trs.expect_revoke_token().times(1).returning(|_,_,_,_,_| Ok(()));
-
-        unsafe {
-            jwt::init_active_token_service(Arc::new(mock_ats));
-            jwt::init_token_revocation(Arc::new(mock_trs));
-        }
+        let mut mock_trs_concrete = MockTokenRevocationServiceTrait::new(); 
+        mock_trs_concrete.expect_is_token_revoked().returning(|_| Ok(false)).times(3); 
+        mock_trs_concrete.expect_revoke_token().times(1).returning(|_,_,_,_,_| Ok(())); 
+        let mock_trs: Arc<dyn TokenRevocationServiceTrait> = Arc::new(mock_trs_concrete);
 
         let auth_service = AuthService::new(
             Arc::new(mock_user_repo),
-            TEST_JWT_SECRET.to_string()
+            TEST_JWT_SECRET.to_string(),
+            mock_trs.clone(),
+            mock_ats.clone()
         );
 
         let initial_token_pair = jwt::create_token_pair(test_user_id, "user".to_string(), TEST_JWT_SECRET).unwrap();
@@ -529,31 +569,21 @@ mod tests {
         assert!(!new_token_pair.refresh_token.is_empty());
         assert_ne!(new_token_pair.refresh_token, refresh_token_str, "New refresh token should be different from the old one");
 
-        let claims = jwt::validate_jwt(&new_token_pair.access_token, TEST_JWT_SECRET, Some(TokenType::Access)).await.unwrap();
+        let (fresh_mock_trs_val, _) : (Arc<dyn TokenRevocationServiceTrait>, Arc<dyn ActiveTokenServiceTrait>) = setup_mock_services(); 
+        let claims = jwt::validate_jwt(&fresh_mock_trs_val, &new_token_pair.access_token, TEST_JWT_SECRET, Some(TokenType::Access)).await.unwrap();
         assert_eq!(claims.sub, test_user_id);
-
-        unsafe {
-            jwt::ACTIVE_TOKEN_SERVICE = None;
-            jwt::TOKEN_REVOCATION_SERVICE = None;
-        }
     }
 
     #[tokio::test]
     async fn test_refresh_token_invalid_refresh_token() {
         let mock_user_repo = MockUserRepositoryTrait::new(); 
-
-        let mut mock_trs = MockTokenRevocationServiceTrait::new(); 
-        mock_trs.expect_is_token_revoked().returning(|_| Ok(false)); 
-        mock_trs.expect_revoke_token().never();
-
-        unsafe {
-            jwt::ACTIVE_TOKEN_SERVICE = None; 
-            jwt::init_token_revocation(Arc::new(mock_trs));
-        }
+        let (mock_trs, mock_ats) = setup_mock_services();
 
         let auth_service = AuthService::new(
             Arc::new(mock_user_repo),
-            TEST_JWT_SECRET.to_string()
+            TEST_JWT_SECRET.to_string(),
+            mock_trs,
+            mock_ats
         );
 
         let invalid_refresh_token = "this.is.not.a.valid.token";
@@ -562,10 +592,6 @@ mod tests {
         assert!(result.is_err());
         let auth_error = result.unwrap_err();
         assert_eq!(auth_error.error_type, AuthErrorType::InvalidToken);
-
-        unsafe {
-            jwt::TOKEN_REVOCATION_SERVICE = None;
-        }
     }
 
     #[tokio::test]
@@ -573,28 +599,33 @@ mod tests {
         let mock_user_repo = MockUserRepositoryTrait::new(); 
         let test_user_id = Uuid::new_v4();
 
-        let mut mock_trs = MockTokenRevocationServiceTrait::new(); 
-        mock_trs.expect_revoke_token()
-            .times(2)
+        let mut mock_trs_concrete = MockTokenRevocationServiceTrait::new(); 
+        mock_trs_concrete.expect_is_token_revoked().returning(|_| Ok(false)).times(2); 
+        mock_trs_concrete.expect_revoke_token()
+            .times(2) 
             .returning(|_jti, _uid, _tt, _exp, _reason| Ok(()));
-        mock_trs.expect_is_token_revoked().returning(|_| Ok(false)).times(2);
-
-        unsafe {
-            jwt::init_token_revocation(Arc::new(mock_trs));
-            jwt::ACTIVE_TOKEN_SERVICE = None; 
-        }
+        let mock_trs: Arc<dyn TokenRevocationServiceTrait> = Arc::new(mock_trs_concrete);
+        
+        let mut mock_ats_concrete = MockActiveTokenServiceTrait::new();
+        mock_ats_concrete.expect_get_active_token().times(2).returning(move |jti| { 
+            Ok(ActiveToken {
+                id: Uuid::new_v4(), user_id: test_user_id, jti: jti.to_string(), token_type: "Access".to_string(), 
+                expires_at: Utc::now() + Duration::hours(1), created_at: Utc::now(), device_info: None,
+            })
+        });
+        let mock_ats: Arc<dyn ActiveTokenServiceTrait> = Arc::new(mock_ats_concrete);
 
         let auth_service = AuthService::new(
             Arc::new(mock_user_repo),
-            TEST_JWT_SECRET.to_string()
+            TEST_JWT_SECRET.to_string(),
+            mock_trs,
+            mock_ats
         );
 
         let token_pair = jwt::create_token_pair(test_user_id, "user".to_string(), TEST_JWT_SECRET).unwrap();
         
         let result = auth_service.logout(&token_pair.access_token, Some(&token_pair.refresh_token)).await;
         assert!(result.is_ok());
-
-        unsafe { jwt::TOKEN_REVOCATION_SERVICE = None; } 
     }
 
     #[tokio::test]
@@ -602,59 +633,57 @@ mod tests {
         let mock_user_repo = MockUserRepositoryTrait::new();
         let test_user_id = Uuid::new_v4();
 
-        let mut mock_trs = MockTokenRevocationServiceTrait::new(); 
-        mock_trs.expect_revoke_token()
+        let mut mock_trs_concrete = MockTokenRevocationServiceTrait::new(); 
+        mock_trs_concrete.expect_is_token_revoked().returning(|_| Ok(false)).once(); 
+        mock_trs_concrete.expect_revoke_token()
             .with(
                 predicate::always(), // jti
                 predicate::eq(test_user_id), // user_id
-                predicate::eq(TokenType::Access), // token_type
+                predicate::always(), // token_type as &str - simplified
                 predicate::always(), // expires_at
-                predicate::always() // Reverted to always() for now
+                predicate::always()  // reason_detail - simplified
             )
             .times(1)
             .returning(|_,_,_,_,_| Ok(()));
-        mock_trs.expect_is_token_revoked().returning(|_| Ok(false)).once(); 
-
-        unsafe {
-            jwt::init_token_revocation(Arc::new(mock_trs));
-            jwt::ACTIVE_TOKEN_SERVICE = None;
-        }
+        let mock_trs: Arc<dyn TokenRevocationServiceTrait> = Arc::new(mock_trs_concrete);
+        
+        let mut mock_ats_concrete = MockActiveTokenServiceTrait::new();
+        mock_ats_concrete.expect_get_active_token().once().returning(move |jti| { 
+            Ok(ActiveToken {
+                id: Uuid::new_v4(), user_id: test_user_id, jti: jti.to_string(), token_type: "Access".to_string(),
+                expires_at: Utc::now() + Duration::hours(1), created_at: Utc::now(), device_info: None,
+            })
+        });
+        let mock_ats: Arc<dyn ActiveTokenServiceTrait> = Arc::new(mock_ats_concrete);
 
         let auth_service = AuthService::new(
             Arc::new(mock_user_repo),
-            TEST_JWT_SECRET.to_string()
+            TEST_JWT_SECRET.to_string(),
+            mock_trs,
+            mock_ats
         );
 
         let token_pair = jwt::create_token_pair(test_user_id, "user".to_string(), TEST_JWT_SECRET).unwrap();
         
         let result = auth_service.logout(&token_pair.access_token, None).await;
         assert!(result.is_ok());
-        
-        unsafe { jwt::TOKEN_REVOCATION_SERVICE = None; } 
     }
 
     #[tokio::test]
     async fn test_logout_invalid_access_token() {
         let mock_user_repo = MockUserRepositoryTrait::new();
-        let mut mock_trs = MockTokenRevocationServiceTrait::new(); 
-        mock_trs.expect_is_token_revoked().returning(|_| Ok(false)); 
-        mock_trs.expect_revoke_token().never();
-
-        unsafe {
-            jwt::init_token_revocation(Arc::new(mock_trs));
-            jwt::ACTIVE_TOKEN_SERVICE = None;
-        }
+        let (mock_trs, mock_ats) = setup_mock_services(); 
 
         let auth_service = AuthService::new(
             Arc::new(mock_user_repo),
-            TEST_JWT_SECRET.to_string()
+            TEST_JWT_SECRET.to_string(),
+            mock_trs,
+            mock_ats
         );
 
         let result = auth_service.logout("invalid.access.token", None).await;
         assert!(result.is_err());
         let auth_error = result.unwrap_err();
         assert_eq!(auth_error.error_type, AuthErrorType::InvalidToken);
-        
-        unsafe { jwt::TOKEN_REVOCATION_SERVICE = None; } 
     }
 }

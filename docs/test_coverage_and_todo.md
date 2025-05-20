@@ -1,6 +1,6 @@
 # OxidizedOasis-WebSands: Test Coverage Plan & To-Do List
 
-**Last Updated:** 2025-05-19
+**Last Updated:** 2025-05-20
 
 ## 1. Introduction
 
@@ -29,12 +29,21 @@ Based on the project structure, the following test files exist:
 *   `tests/user_crud_tests.rs`
 *   `tests/user_tests.rs`
 
-A detailed review of these files is needed to ascertain the exact coverage they provide for user management and CRUD operations. However, it's anticipated that significant portions of the application, especially newer features and other modules beyond basic user CRUD, currently lack test coverage.
+**Progress & Current State (as of 2025-05-20):**
+*   **Dependency Injection Refactoring:** Significant refactoring has been undertaken in the `core/auth` layer (`jwt.rs`, `service.rs`) to replace static global services with dependency injection. This is a crucial step for improving testability and has involved updates to `main.rs`, `core/user/service.rs`, and middleware (`auth.rs`, `admin.rs`) to propagate these dependencies.
+*   **`common/validation` Tests:**
+    *   `test_validate_password_strength`: Fixed by changing validation logic from unsupported regex to manual checks.
+    *   `test_validate_username`: Fixed by adding length validation.
+*   **`core/auth/jwt.rs` Tests:** Unit tests within `jwt.rs` have been updated to reflect DI changes (passing mock services).
+*   **`core/auth/service.rs` Tests:** Tests have been partially updated for DI. Some mock setup and predicate issues were still present in the last `cargo test` run, leading to compilation errors.
+*   **Overall `cargo test` Status:** Still failing due to remaining compilation errors related to the DI refactor and subsequent test updates. The goal of a "green" `cargo test` is in progress.
 
-**Key Gaps (Anticipated):**
-*   Comprehensive testing for the authentication system (`core/auth`).
-*   Middleware testing (`infrastructure/middleware`).
-*   Validation logic testing (`common/validation`).
+**Key Gaps (Updated):**
+*   Finalizing fixes for `core/auth/service.rs` tests.
+*   Addressing remaining compilation errors in `infrastructure/middleware/auth.rs` and `api/handlers/user_handler.rs` related to DI changes.
+*   Comprehensive testing for the authentication system (`core/auth`) beyond initial DI refactoring.
+*   Middleware testing (`infrastructure/middleware`) once DI changes are stable.
+*   Frontend component and service testing.
 *   Frontend component and service testing.
 *   E2E tests for major user flows.
 *   Tests for upcoming drone data and RAG features.
