@@ -18,6 +18,12 @@ pub enum AuthErrorType {
     TokenCreationError,
     #[display("User already exists")] // Added
     UserAlreadyExists,
+    #[display("User not found")] // Added for password change
+    UserNotFound,
+    #[display("Invalid verification token")] // Added for email verification
+    InvalidVerificationToken,
+    #[display("Verification token expired")] // Added for email verification
+    VerificationTokenExpired,
 }
 
 #[derive(Debug, Display)]

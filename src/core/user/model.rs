@@ -46,6 +46,20 @@ pub struct User {
     pub is_active: bool,
 }
 
+// Struct for updating an existing user
+#[derive(Debug, Deserialize, Serialize, Clone, Default)] // Added Default for easier test setup
+pub struct UserUpdate {
+    pub username: Option<String>,
+    pub email: Option<String>,
+    pub password_hash: Option<String>,
+    pub is_email_verified: Option<bool>,
+    pub verification_token: Option<Option<String>>, // Use Option<Option<String>> to allow setting to Some(None) to clear the token
+    pub verification_token_expires_at: Option<Option<DateTime<Utc>>>, // Use Option<Option<DateTime<Utc>>> to allow setting to Some(None) to clear the expiration
+    pub role: Option<String>,
+    pub is_active: Option<bool>,
+}
+
+
 // Struct for creating a new user
 #[derive(Debug, Deserialize, Serialize, Clone)] // Added Clone, Serialize, Deserialize for flexibility
 pub struct NewUser {

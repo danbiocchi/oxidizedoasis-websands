@@ -245,7 +245,7 @@ pub async fn refresh_token_pair(
     let active_token_service_clone_for_revoke = active_token_service.clone(); 
 
     tokio::spawn(async move {
-        revoke_token(&token_revocation_service_clone_for_revoke, &active_token_service_clone_for_revoke, &jti_clone, sub_clone_revoke, TokenType::Refresh, "Refresh token rotation").await;
+        revoke_token(&token_revocation_service_clone_for_revoke, &active_token_service_clone_for_revoke, &jti_clone, sub_clone_revoke, TokenType::Refresh, Some("Refresh token rotation")).await;
     });
 
     Ok(TokenPair {
@@ -260,18 +260,22 @@ pub(crate) async fn revoke_token(
     jti: &str,
     user_id: Uuid,
     token_type: TokenType,
-    reason: &str
+    reason: Option<&str> // Changed to Option<&str>
 ) {
     match active_token_service.get_active_token(jti).await {
         Ok(active_token_details) => {
             if let Err(e) = token_revocation_service.revoke_token(
                 jti,
                 user_id,
-                token_type,
+                token_type.clone(), // Clone token_type if it's used again (it is for remove_token)
                 active_token_details.expires_at,
-                Some(reason), // Pass reason as &str
+                reason,
             ).await {
                 error!("Failed to revoke token {}: {:?}", jti, e);
+            }
+            // Also remove the token from the active_tokens table
+            if let Err(e) = active_token_service.remove_token(jti).await {
+                error!("Failed to remove active token {}: {:?}", jti, e);
             }
         }
         Err(e) => {

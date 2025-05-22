@@ -17,6 +17,7 @@ pub trait UserRepositoryTrait: Send + Sync {
     async fn find_by_id(&self, id: Uuid) -> Result<Option<User>, sqlx::Error>;
     async fn find_user_by_email(&self, email: &str) -> Result<Option<User>, sqlx::Error>;
     async fn verify_email(&self, token: &str) -> Result<Option<Uuid>, sqlx::Error>;
+    async fn find_by_verification_token(&self, token: &str) -> Result<Option<User>, sqlx::Error>;
     async fn update(&self, id: Uuid, user_input: &UserInput, password_hash: Option<String>) -> Result<User, sqlx::Error>;
     async fn update_role(&self, user_id: Uuid, new_role: &str) -> Result<Option<User>, sqlx::Error>;
     async fn update_username(&self, user_id: Uuid, new_username: &str) -> Result<Option<User>, sqlx::Error>;
@@ -204,6 +205,27 @@ impl UserRepositoryTrait for UserRepository {
 
         if let Ok(Some(ref u)) = user {
             debug!("Found user: {}", &u.id);
+        }
+        user
+    }
+
+    async fn find_by_verification_token(&self, token: &str) -> Result<Option<User>, sqlx::Error> {
+        debug!("Looking up user by verification token");
+
+        let user = sqlx::query_as!(
+            User,
+            r#"
+            SELECT *
+            FROM users
+            WHERE verification_token = $1
+            "#,
+            token
+        )
+        .fetch_optional(&self.pool)
+        .await;
+
+        if let Ok(Some(ref u)) = user {
+            debug!("Found user by verification token: {}", &u.id);
         }
         user
     }
