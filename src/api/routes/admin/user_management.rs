@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use actix_web::{web, HttpResponse};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
@@ -55,7 +57,7 @@ impl From<User> for UserAdminView {
 }
 
 pub async fn list_users(
-    repo: web::Data<UserRepository>,
+    repo: web::Data<std::sync::Arc<dyn UserRepositoryTrait>>,
 ) -> Result<HttpResponse, ApiError> {
     debug!("Handling GET /api/admin/users -> list_users");
     let users = repo.find_all()
@@ -76,7 +78,7 @@ pub async fn list_users(
 
 pub async fn get_user(
     id: web::Path<Uuid>,
-    repo: web::Data<UserRepository>,
+    repo: web::Data<Arc<dyn UserRepositoryTrait>>,
 ) -> Result<HttpResponse, ApiError> {
     debug!("Handling GET /api/admin/users/{} -> get_user", id);
     let user = repo.find_by_id(*id)
@@ -99,7 +101,7 @@ pub async fn get_user(
 pub async fn update_user_role(
     id: web::Path<Uuid>,
     req: web::Json<UpdateRoleRequest>,
-    repo: web::Data<UserRepository>,
+    repo: web::Data<Arc<dyn UserRepositoryTrait>>,
     claims: Option<web::ReqData<Claims>>,
 ) -> Result<HttpResponse, ApiError> {
     debug!("Handling PUT /api/admin/users/{}/role -> update_user_role with role: {}",
@@ -143,7 +145,7 @@ pub async fn update_user_role(
 pub async fn update_user_username(
     id: web::Path<Uuid>,
     req: web::Json<UpdateUsernameRequest>,
-    repo: web::Data<UserRepository>,
+    repo: web::Data<Arc<dyn UserRepositoryTrait>>,
     claims: Option<web::ReqData<Claims>>,
 ) -> Result<HttpResponse, ApiError> {
     debug!("Handling PUT /api/admin/users/{}/username -> update_user_username with username: {}",
@@ -200,7 +202,7 @@ pub async fn update_user_username(
 pub async fn update_user_status(
     id: web::Path<Uuid>,
     req: web::Json<UpdateStatusRequest>,
-    repo: web::Data<UserRepository>,
+    repo: web::Data<Arc<dyn UserRepositoryTrait>>,
     claims: Option<web::ReqData<Claims>>,
 ) -> Result<HttpResponse, ApiError> {
     debug!("Handling PUT /api/admin/users/{}/status -> update_user_status with is_active: {}",
@@ -237,7 +239,7 @@ pub async fn update_user_status(
 
 pub async fn delete_user(
     id: web::Path<Uuid>,
-    repo: web::Data<UserRepository>,
+    repo: web::Data<Arc<dyn UserRepositoryTrait>>,
     claims: Option<web::ReqData<Claims>>,
 ) -> Result<HttpResponse, ApiError> {
     debug!("Handling DELETE /api/admin/users/{} -> delete_user", id);
