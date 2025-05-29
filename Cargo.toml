@@ -5,10 +5,10 @@ edition = "2021"
 
 [dependencies]
 mime = "0.3.17"
-actix-web = { version = "4.9"}
+actix-web = { version = "=4.9.0"}
 actix-files = "0.6"
 actix-cors = "0.7"
-sqlx = { version = "0.8.2", features = ["runtime-tokio-rustls", "postgres", "uuid", "chrono"] }
+sqlx = { version = "=0.8.2", features = ["runtime-tokio-rustls", "postgres", "uuid", "chrono"] }
 tokio = { version = "1", features = ["full"] }
 serde = { version = "1.0", features = ["derive"] }
 dotenv = "0.15"
@@ -23,15 +23,15 @@ serde_json = "1.0.127"
 actix-web-httpauth = "0.8"
 futures = "0.3.30"
 futures-util = "0.3.30"
-lettre = "0.11.7"
+lettre = { version = "=0.11.7", default-features = false, features = ["builder", "smtp-transport", "rustls-tls"] }
 rand = "0.8.5"
 chrono = { version = "0.4", features = ["serde"] }
 validator = { version = "0.16", features = ["derive"] }
 regex = "1.5"
 lazy_static = "1.4"
-ammonia = "4.0.0"
+ammonia = "=4.0.0"
 actix-rt = "2.2"
-url = "2.5.2"
+url = "=2.5.2"
 derive_more = { version = "1.0.0", features = ["display", "error", "from", "debug"] }
 num_cpus = "1.16.0"
 dashmap = "5.5.3"
@@ -50,6 +50,9 @@ chrono = { version = "0.4", features = ["serde"] }
 serde = { version = "1.0", features = ["derive"] }
 sqlformat = "=0.2.6"
 predicates = "2.1.1" # For predicates::option::lift_option
+
+[target.'cfg(not(target_env = "msvc"))'.dependencies]
+openssl = { version = "0.10", features = ["vendored"] }
 
 [workspace]
 members = [
