@@ -18,6 +18,7 @@ pub trait UserRepositoryTrait: Send + Sync {
     async fn find_user_by_email(&self, email: &str) -> Result<Option<User>, sqlx::Error>;
     async fn verify_email(&self, token: &str) -> Result<Option<Uuid>, sqlx::Error>;
     async fn find_by_verification_token(&self, token: &str) -> Result<Option<User>, sqlx::Error>;
+    async fn update_email_and_set_unverified(&self, user_id: Uuid, new_email: &str, verification_token: &str) -> Result<User, sqlx::Error>;
     async fn update(&self, id: Uuid, user_input: &UserInput, password_hash: Option<String>) -> Result<User, sqlx::Error>;
     async fn update_role(&self, user_id: Uuid, new_role: &str) -> Result<Option<User>, sqlx::Error>;
     async fn update_username(&self, user_id: Uuid, new_username: &str) -> Result<Option<User>, sqlx::Error>;
@@ -30,6 +31,7 @@ pub trait UserRepositoryTrait: Send + Sync {
     async fn verify_reset_token(&self, token: &str) -> Result<Option<PasswordResetToken>, sqlx::Error>;
     async fn mark_reset_token_used(&self, token: &str) -> Result<bool, sqlx::Error>;
     async fn find_all(&self) -> Result<Vec<User>, sqlx::Error>;
+    async fn find_by_email_and_verified(&self, email: &str) -> Result<Option<User>, sqlx::Error>;
     #[cfg(test)]
     async fn clear_all(&self) -> Result<(), sqlx::Error>;
 }
@@ -582,5 +584,215 @@ impl UserRepositoryTrait for UserRepository {
         sqlx::query!("DELETE FROM password_reset_tokens").execute(&self.pool).await?;
         sqlx::query!("DELETE FROM users").execute(&self.pool).await?;
         Ok(())
+    }
+
+    async fn update_email_and_set_unverified(
+        &self,
+        user_id: Uuid,
+        new_email: &str,
+        verification_token: &str,
+    ) -> Result<User, sqlx::Error> {
+        debug!(
+            "Updating email for user {} to {} and setting as unverified",
+            user_id, new_email
+        );
+        let verification_token_expires_at = Utc::now() + Duration::hours(24);
+        let now = Utc::now();
+
+        let user = sqlx::query_as!(
+            User,
+            r#"
+            UPDATE users
+            SET email = $1,
+                is_email_verified = $2,
+                verification_token = $3,
+                verification_token_expires_at = $4,
+                updated_at = $5
+            WHERE id = $6
+            RETURNING *
+            "#,
+            new_email,
+            false, // is_email_verified
+            Some(verification_token.to_string()),
+            Some(verification_token_expires_at),
+            now, // updated_at
+            user_id
+        )
+        .fetch_one(&self.pool)
+        .await;
+
+        match &user {
+            Ok(u) => info!("Successfully updated email for user: {}", u.id),
+            Err(e) => error!("Failed to update email for user {}: {}", user_id, e),
+        }
+        user
+    }
+
+    async fn find_by_email_and_verified(
+        &self,
+        email: &str,
+    ) -> Result<Option<User>, sqlx::Error> {
+        debug!(
+            "Looking up user by email {} and verified status",
+            email
+        );
+
+        let user = sqlx::query_as!(
+            User,
+            r#"
+            SELECT *
+            FROM users
+            WHERE email = $1 AND is_email_verified = TRUE
+            "#,
+            email
+        )
+        .fetch_optional(&self.pool)
+        .await;
+
+        if let Ok(Some(ref u)) = user {
+            debug!("Found verified user by email: {}", &u.id);
+        }
+        user
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::common::validation::UserInput; // For creating users
+    use crate::config::database::DatabaseConfig; // For test DB connection
+    use std::sync::Arc;
+    use tokio; // For async tests
+
+    // Helper to set up a test database and repository
+    async fn setup_test_repository() -> UserRepository {
+        // Replace with your actual test DB configuration logic
+        // This often involves environment variables or a test config file
+        // For simplicity, using a hardcoded fallback (NOT recommended for real projects)
+        let db_url = std::env::var("TEST_DATABASE_URL")
+            .unwrap_or_else(|_| "postgres://testuser:testpassword@localhost:5433/testdb".to_string());
+        
+        let config = DatabaseConfig { url: db_url };
+        let pool = config.get_pool().await.expect("Failed to create test DB pool");
+        
+        // Optional: Run migrations if your test DB is ephemeral or needs schema setup
+        // sqlx::migrate!("./migrations").run(&pool).await.expect("Failed to run migrations on test DB");
+
+        UserRepository::new(pool)
+    }
+
+    // Helper to create a unique user for testing
+    fn create_test_user_input(username_suffix: &str, email_suffix: &str) -> UserInput {
+        UserInput {
+            username: format!("testuser_{}", username_suffix),
+            email: Some(format!("test_{}@example.com", email_suffix)),
+            password: Some("Password123!".to_string()),
+        }
+    }
+    
+    #[tokio::test]
+    async fn test_update_email_and_set_unverified_success() {
+        let repo = setup_test_repository().await;
+        repo.clear_all().await.unwrap(); // Clear previous test data
+
+        let user_input = create_test_user_input("update_email", "update_email");
+        let initial_user = repo.create_user_with_details(
+            &user_input, 
+            "hashed_password".to_string(), 
+            "initial_token".to_string()
+        ).await.unwrap();
+
+        let new_email = "new.updated.email@example.com";
+        let new_token = "new_verification_token";
+        
+        let updated_user_res = repo.update_email_and_set_unverified(initial_user.id, new_email, new_token).await;
+        assert!(updated_user_res.is_ok());
+        let updated_user = updated_user_res.unwrap();
+
+        assert_eq!(updated_user.email.as_deref(), Some(new_email));
+        assert_eq!(updated_user.is_email_verified, false);
+        assert_eq!(updated_user.verification_token.as_deref(), Some(new_token));
+        
+        let expected_expiry = Utc::now() + Duration::hours(24);
+        assert!(updated_user.verification_token_expires_at.is_some());
+        let diff = expected_expiry - updated_user.verification_token_expires_at.unwrap();
+        assert!(diff.num_seconds().abs() < 60, "Expiry time should be roughly 24 hours from now"); // Allow 1 min difference
+
+        // Fetch directly and assert
+        let fetched_user = repo.find_by_id(initial_user.id).await.unwrap().unwrap();
+        assert_eq!(fetched_user.email.as_deref(), Some(new_email));
+        assert_eq!(fetched_user.is_email_verified, false);
+        assert_eq!(fetched_user.verification_token.as_deref(), Some(new_token));
+        assert!(fetched_user.verification_token_expires_at.is_some());
+        let diff_fetched = expected_expiry - fetched_user.verification_token_expires_at.unwrap();
+        assert!(diff_fetched.num_seconds().abs() < 60);
+        
+        repo.clear_all().await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_find_by_email_and_verified_found() {
+        let repo = setup_test_repository().await;
+        repo.clear_all().await.unwrap();
+
+        let email_verified = "verified.user@example.com";
+        // Create a verified user directly using NewUser for more control
+        let new_user_verified = NewUser {
+            username: "verified_user".to_string(),
+            email: Some(email_verified.to_string()),
+            password_hash: "hashed_password".to_string(),
+            is_email_verified: true,
+            verification_token: None,
+            verification_token_expires_at: None,
+            role: "user".to_string(),
+        };
+        let created_verified_user = repo.create_user(new_user_verified).await.unwrap();
+
+        let result = repo.find_by_email_and_verified(email_verified).await;
+        assert!(result.is_ok());
+        let found_user_opt = result.unwrap();
+        assert!(found_user_opt.is_some());
+        let found_user = found_user_opt.unwrap();
+        assert_eq!(found_user.id, created_verified_user.id);
+        assert_eq!(found_user.email.as_deref(), Some(email_verified));
+        assert!(found_user.is_email_verified);
+        
+        repo.clear_all().await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_find_by_email_and_verified_not_found_if_unverified() {
+        let repo = setup_test_repository().await;
+        repo.clear_all().await.unwrap();
+
+        let email_unverified = "unverified.user@example.com";
+        let new_user_unverified = NewUser {
+            username: "unverified_user".to_string(),
+            email: Some(email_unverified.to_string()),
+            password_hash: "hashed_password".to_string(),
+            is_email_verified: false, // Key part of this test
+            verification_token: Some("some_token".to_string()),
+            verification_token_expires_at: Some(Utc::now() + Duration::hours(24)),
+            role: "user".to_string(),
+        };
+        repo.create_user(new_user_unverified).await.unwrap();
+
+        let result = repo.find_by_email_and_verified(email_unverified).await;
+        assert!(result.is_ok());
+        assert!(result.unwrap().is_none());
+        
+        repo.clear_all().await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_find_by_email_and_verified_not_found_for_nonexistent_email() {
+        let repo = setup_test_repository().await;
+        repo.clear_all().await.unwrap(); // Ensure clean state
+
+        let result = repo.find_by_email_and_verified("nosuch.user@example.com").await;
+        assert!(result.is_ok());
+        assert!(result.unwrap().is_none());
+        
+        // No cleanup needed as no user was created
     }
 }
