@@ -21,6 +21,8 @@ pub struct Claims {
     pub jti: String,      // JWT ID (unique identifier for this token)
     pub role: String,     // User role
     pub token_type: TokenType, // Token type (access or refresh)
+    pub aud: String,      // Audience
+    pub iss: String,      // Issuer
 }
 
 /// Token types to distinguish between access and refresh tokens
@@ -84,7 +86,9 @@ pub fn create_jwt(
     user_id: Uuid,
     role: String,
     secret: &str,
-    token_type: TokenType
+    token_type: TokenType,
+    audience: String,
+    issuer: String,
 ) -> Result<(String, TokenMetadata), jsonwebtoken::errors::Error> {
     let now = Utc::now().timestamp();
     let expiration = get_token_expiration(&token_type);
@@ -98,6 +102,8 @@ pub fn create_jwt(
         jti: jti.clone(), 
         role,
         token_type: token_type.clone(),
+        aud: audience,
+        iss: issuer,
     };
 
     info!("Creating {} token for user {} with expiration in {} seconds",
@@ -128,8 +134,11 @@ pub fn create_token_pair(
     role: String,
     secret: &str
 ) -> Result<TokenPair, jsonwebtoken::errors::Error> {
-    let (access_token, _access_metadata) = create_jwt(user_id, role.clone(), secret, TokenType::Access)?;
-    let (refresh_token, _refresh_metadata) = create_jwt(user_id, role, secret, TokenType::Refresh)?;
+    let audience = env::var("JWT_AUDIENCE").unwrap_or_else(|_| "default_audience".to_string());
+    let issuer = env::var("JWT_ISSUER").unwrap_or_else(|_| "default_issuer".to_string());
+
+    let (access_token, _access_metadata) = create_jwt(user_id, role.clone(), secret, TokenType::Access, audience.clone(), issuer.clone())?;
+    let (refresh_token, _refresh_metadata) = create_jwt(user_id, role, secret, TokenType::Refresh, audience, issuer)?;
     
     let token_pair = TokenPair {
         access_token,
@@ -162,13 +171,23 @@ pub async fn validate_jwt(
     token_revocation_service: &Arc<dyn TokenRevocationServiceTrait>,
     token: &str,
     secret: &str,
-    expected_type: Option<TokenType>
+    expected_type: Option<TokenType>,
+    expected_audience: Option<String>,
+    expected_issuer: Option<String>,
 ) -> Result<Claims, jsonwebtoken::errors::Error> {
     debug!("Attempting to validate JWT");
 
     let mut validation = Validation::default();
     validation.leeway = 60; 
     validation.validate_nbf = true; // Enable NBF (Not Before) claim validation
+
+    if let Some(ref aud_str) = expected_audience {
+        validation.set_audience(&[aud_str.as_str()]);
+    }
+
+    if let Some(ref iss_str) = expected_issuer {
+        validation.set_issuer(&[iss_str.as_str()]);
+    }
     
     match decode::<Claims>(token, &DecodingKey::from_secret(secret.as_ref()), &validation) {
         Ok(token_data) => {
@@ -221,13 +240,39 @@ pub async fn refresh_token_pair(
     refresh_token_str: &str,
     secret: &str
 ) -> Result<TokenPair, jsonwebtoken::errors::Error> {
-    let refresh_claims = match validate_jwt(&token_revocation_service, refresh_token_str, secret, Some(TokenType::Refresh)).await {
+    let audience = env::var("JWT_AUDIENCE").unwrap_or_else(|_| "default_audience".to_string());
+    let issuer = env::var("JWT_ISSUER").unwrap_or_else(|_| "default_issuer".to_string());
+
+    let refresh_claims = match validate_jwt(
+        &token_revocation_service,
+        refresh_token_str,
+        secret,
+        Some(TokenType::Refresh),
+        Some(audience.clone()),
+        Some(issuer.clone()),
+    )
+    .await
+    {
         Ok(claims) => claims,
         Err(e) => return Err(e),
     };
 
-    let (access_token, access_metadata) = create_jwt(refresh_claims.sub, refresh_claims.role.clone(), secret, TokenType::Access)?;
-    let (new_refresh_token, refresh_metadata) = create_jwt(refresh_claims.sub, refresh_claims.role.clone(), secret, TokenType::Refresh)?;
+    let (access_token, access_metadata) = create_jwt(
+        refresh_claims.sub,
+        refresh_claims.role.clone(),
+        secret,
+        TokenType::Access,
+        audience.clone(),
+        issuer.clone(),
+    )?;
+    let (new_refresh_token, refresh_metadata) = create_jwt(
+        refresh_claims.sub,
+        refresh_claims.role.clone(),
+        secret,
+        TokenType::Refresh,
+        audience,
+        issuer,
+    )?;
 
     let sub_clone = refresh_claims.sub;
     let access_meta_clone = access_metadata.clone();
@@ -340,6 +385,8 @@ mod tests {
     fn setup_test_environment() {
         env::set_var("JWT_ACCESS_TOKEN_EXPIRATION_MINUTES", "1"); 
         env::set_var("JWT_REFRESH_TOKEN_EXPIRATION_DAYS", "1"); 
+        env::set_var("JWT_AUDIENCE", "test_aud");
+        env::set_var("JWT_ISSUER", "test_iss");
     }
 
     #[test]
@@ -348,9 +395,11 @@ mod tests {
         let user_id = Uuid::new_v4();
         let role = "user".to_string();
         let token_type = TokenType::Access;
+        let aud = "test_aud".to_string();
+        let iss = "test_iss".to_string();
 
         let (token_str, metadata) =
-            create_jwt(user_id, role.clone(), TEST_SECRET, token_type.clone()).unwrap();
+            create_jwt(user_id, role.clone(), TEST_SECRET, token_type.clone(), aud.clone(), iss.clone()).unwrap();
 
         let decoding_key = DecodingKey::from_secret(TEST_SECRET.as_ref());
         let mut validation = Validation::new(jsonwebtoken::Algorithm::HS256);
@@ -361,6 +410,8 @@ mod tests {
         assert_eq!(claims.sub, user_id);
         assert_eq!(claims.role, role);
         assert_eq!(claims.token_type, token_type);
+        assert_eq!(claims.aud, aud);
+        assert_eq!(claims.iss, iss);
         assert!(!claims.jti.is_empty());
         assert_eq!(claims.jti, metadata.jti);
 
@@ -398,9 +449,11 @@ mod tests {
         let user_id = Uuid::new_v4();
         let role = "admin".to_string();
         let token_type = TokenType::Refresh;
+        let aud = "test_aud".to_string();
+        let iss = "test_iss".to_string();
 
         let (token_str, metadata) =
-            create_jwt(user_id, role.clone(), TEST_SECRET, token_type.clone()).unwrap();
+            create_jwt(user_id, role.clone(), TEST_SECRET, token_type.clone(), aud.clone(), iss.clone()).unwrap();
 
         let decoding_key = DecodingKey::from_secret(TEST_SECRET.as_ref());
         let mut validation = Validation::new(jsonwebtoken::Algorithm::HS256);
@@ -411,6 +464,8 @@ mod tests {
         assert_eq!(claims.sub, user_id);
         assert_eq!(claims.role, role);
         assert_eq!(claims.token_type, token_type);
+        assert_eq!(claims.aud, aud);
+        assert_eq!(claims.iss, iss);
         assert!(!claims.jti.is_empty());
         assert_eq!(claims.jti, metadata.jti);
 
@@ -447,6 +502,8 @@ mod tests {
         setup_test_environment();
         let user_id = Uuid::new_v4();
         let role = "user".to_string();
+        let expected_aud = env::var("JWT_AUDIENCE").unwrap_or_else(|_| "default_audience".to_string());
+        let expected_iss = env::var("JWT_ISSUER").unwrap_or_else(|_| "default_issuer".to_string());
 
         let token_pair = create_token_pair(user_id, role.clone(), TEST_SECRET).unwrap();
 
@@ -461,11 +518,15 @@ mod tests {
             decode::<Claims>(&token_pair.access_token, &decoding_key, &validation).unwrap();
         assert_eq!(decoded_access_token.claims.sub, user_id);
         assert_eq!(decoded_access_token.claims.token_type, TokenType::Access);
+        assert_eq!(decoded_access_token.claims.aud, expected_aud);
+        assert_eq!(decoded_access_token.claims.iss, expected_iss);
 
         let decoded_refresh_token =
             decode::<Claims>(&token_pair.refresh_token, &decoding_key, &validation).unwrap();
         assert_eq!(decoded_refresh_token.claims.sub, user_id);
         assert_eq!(decoded_refresh_token.claims.token_type, TokenType::Refresh);
+        assert_eq!(decoded_refresh_token.claims.aud, expected_aud);
+        assert_eq!(decoded_refresh_token.claims.iss, expected_iss);
     }
     
     #[test]
@@ -525,15 +586,19 @@ mod tests {
         setup_test_environment();
         let user_id = Uuid::new_v4();
         let role = "test_role".to_string();
+        let test_aud = "test_aud".to_string();
+        let test_iss = "test_iss".to_string();
         let (token_str, _metadata) =
-            create_jwt(user_id, role.clone(), TEST_SECRET, TokenType::Access).unwrap();
+            create_jwt(user_id, role.clone(), TEST_SECRET, TokenType::Access, test_aud.clone(), test_iss.clone()).unwrap();
 
         let mock_revocation_service: Arc<dyn TokenRevocationServiceTrait> = Arc::new(MockTokenRevocationService);
 
-        let claims_result = validate_jwt(&mock_revocation_service, &token_str, TEST_SECRET, Some(TokenType::Access)).await;
+        let claims_result = validate_jwt(&mock_revocation_service, &token_str, TEST_SECRET, Some(TokenType::Access), Some(test_aud.clone()), Some(test_iss.clone())).await;
         assert!(claims_result.is_ok());
         let claims = claims_result.unwrap();
         assert_eq!(claims.sub, user_id);
+        assert_eq!(claims.aud, test_aud);
+        assert_eq!(claims.iss, test_iss);
         assert_eq!(claims.role, role);
         assert_eq!(claims.token_type, TokenType::Access);
     }
@@ -554,6 +619,8 @@ mod tests {
             jti: Uuid::new_v4().to_string(),
             role: role.clone(),
             token_type: TokenType::Access,
+            aud: "test_aud".to_string(),
+            iss: "test_iss".to_string(),
         };
         let token_str = encode(
             &Header::default(),
@@ -563,7 +630,7 @@ mod tests {
 
         let mock_revocation_service: Arc<dyn TokenRevocationServiceTrait> = Arc::new(MockTokenRevocationService);
 
-        let claims_result = validate_jwt(&mock_revocation_service, &token_str, TEST_SECRET, Some(TokenType::Access)).await;
+        let claims_result = validate_jwt(&mock_revocation_service, &token_str, TEST_SECRET, Some(TokenType::Access), Some("test_aud".to_string()), Some("test_iss".to_string())).await;
         assert!(claims_result.is_err());
         assert!(matches!(
             claims_result.unwrap_err().kind(),
@@ -586,10 +653,10 @@ mod tests {
         setup_test_environment();
         let user_id = Uuid::new_v4();
         let role = "test_role".to_string();
-        let (token_str, _metadata) = create_jwt(user_id, role.clone(), TEST_SECRET, TokenType::Access).unwrap();
+        let (token_str, _metadata) = create_jwt(user_id, role.clone(), TEST_SECRET, TokenType::Access, "test_aud".to_string(), "test_iss".to_string()).unwrap();
 
         let mock_revoked_service: Arc<dyn TokenRevocationServiceTrait> = Arc::new(MockRevokedTokenRevocationService);
-        let claims_result = validate_jwt(&mock_revoked_service, &token_str, TEST_SECRET, Some(TokenType::Access)).await;
+        let claims_result = validate_jwt(&mock_revoked_service, &token_str, TEST_SECRET, Some(TokenType::Access), Some("test_aud".to_string()), Some("test_iss".to_string())).await;
         assert!(claims_result.is_err());
         assert!(matches!(claims_result.unwrap_err().kind(), jsonwebtoken::errors::ErrorKind::InvalidToken), "Expected InvalidToken for revoked token");
     }
@@ -611,6 +678,8 @@ mod tests {
             jti: Uuid::new_v4().to_string(),
             role: role.clone(),
             token_type: TokenType::Access,
+            aud: "test_aud".to_string(),
+            iss: "test_iss".to_string(),
         };
         let token_str = encode(
             &Header::default(),
@@ -620,7 +689,7 @@ mod tests {
         
         let mock_revocation_service: Arc<dyn TokenRevocationServiceTrait> = Arc::new(MockTokenRevocationService);
 
-        let claims_result = validate_jwt(&mock_revocation_service, &token_str, TEST_SECRET, Some(TokenType::Access)).await;
+        let claims_result = validate_jwt(&mock_revocation_service, &token_str, TEST_SECRET, Some(TokenType::Access), Some("test_aud".to_string()), Some("test_iss".to_string())).await;
         assert!(claims_result.is_err());
         assert!(matches!(
             claims_result.unwrap_err().kind(),
@@ -634,11 +703,11 @@ mod tests {
         let user_id = Uuid::new_v4();
         let role = "test_role".to_string();
         let (token_str, _metadata) =
-            create_jwt(user_id, role.clone(), TEST_SECRET, TokenType::Access).unwrap();
+            create_jwt(user_id, role.clone(), TEST_SECRET, TokenType::Access, "test_aud".to_string(), "test_iss".to_string()).unwrap();
 
         let mock_revocation_service: Arc<dyn TokenRevocationServiceTrait> = Arc::new(MockTokenRevocationService);
         
-        let claims_result = validate_jwt(&mock_revocation_service, &token_str, "wrong_secret_shhh", Some(TokenType::Access)).await;
+        let claims_result = validate_jwt(&mock_revocation_service, &token_str, "wrong_secret_shhh", Some(TokenType::Access), Some("test_aud".to_string()), Some("test_iss".to_string())).await;
         assert!(claims_result.is_err());
         assert!(matches!(
             claims_result.unwrap_err().kind(),
@@ -652,11 +721,13 @@ mod tests {
         let user_id = Uuid::new_v4();
         let role = "test_role".to_string();
         let (token_str, _metadata) =
-            create_jwt(user_id, role.clone(), TEST_SECRET, TokenType::Refresh).unwrap();
+            create_jwt(user_id, role.clone(), TEST_SECRET, TokenType::Refresh, "test_aud".to_string(), "test_iss".to_string()).unwrap();
 
         let mock_revocation_service: Arc<dyn TokenRevocationServiceTrait> = Arc::new(MockTokenRevocationService);
 
-        let claims_result = validate_jwt(&mock_revocation_service, &token_str, TEST_SECRET, Some(TokenType::Access)).await;
+        // Expecting Access, aud "test_aud", iss "test_iss"
+        // Token is Refresh, so type mismatch error is expected.
+        let claims_result = validate_jwt(&mock_revocation_service, &token_str, TEST_SECRET, Some(TokenType::Access), Some("test_aud".to_string()), Some("test_iss".to_string())).await;
         assert!(claims_result.is_err());
         assert!(matches!(
             claims_result.unwrap_err().kind(),
@@ -670,14 +741,72 @@ mod tests {
         let user_id = Uuid::new_v4();
         let role = "test_role".to_string();
         let (token_str, _metadata) =
-            create_jwt(user_id, role.clone(), TEST_SECRET, TokenType::Access).unwrap();
+            create_jwt(user_id, role.clone(), TEST_SECRET, TokenType::Access, "test_aud".to_string(), "test_iss".to_string()).unwrap();
 
         let mock_revocation_service: Arc<dyn TokenRevocationServiceTrait> = Arc::new(MockTokenRevocationService);
 
-        let claims_result = validate_jwt(&mock_revocation_service, &token_str, TEST_SECRET, None).await;
+        let claims_result = validate_jwt(&mock_revocation_service, &token_str, TEST_SECRET, None, Some("test_aud".to_string()), Some("test_iss".to_string())).await;
         assert!(claims_result.is_ok());
         let claims = claims_result.unwrap();
         assert_eq!(claims.sub, user_id);
+        assert_eq!(claims.aud, "test_aud");
+        assert_eq!(claims.iss, "test_iss");
         assert_eq!(claims.token_type, TokenType::Access);
+    }
+
+    #[tokio::test]
+    async fn test_validate_jwt_invalid_audience() {
+        setup_test_environment();
+        let user_id = Uuid::new_v4();
+        let role = "test_role".to_string();
+        // Token created with "test_aud"
+        let (token_str, _metadata) =
+            create_jwt(user_id, role.clone(), TEST_SECRET, TokenType::Access, "test_aud".to_string(), "test_iss".to_string()).unwrap();
+
+        let mock_revocation_service: Arc<dyn TokenRevocationServiceTrait> = Arc::new(MockTokenRevocationService);
+
+        // Validate expecting "wrong_aud"
+        let claims_result = validate_jwt(
+            &mock_revocation_service,
+            &token_str,
+            TEST_SECRET,
+            Some(TokenType::Access),
+            Some("wrong_aud".to_string()), // Incorrect audience
+            Some("test_iss".to_string())
+        ).await;
+
+        assert!(claims_result.is_err());
+        assert!(matches!(
+            claims_result.unwrap_err().kind(),
+            jsonwebtoken::errors::ErrorKind::InvalidAudience
+        ));
+    }
+
+    #[tokio::test]
+    async fn test_validate_jwt_invalid_issuer() {
+        setup_test_environment();
+        let user_id = Uuid::new_v4();
+        let role = "test_role".to_string();
+        // Token created with "test_iss"
+        let (token_str, _metadata) =
+            create_jwt(user_id, role.clone(), TEST_SECRET, TokenType::Access, "test_aud".to_string(), "test_iss".to_string()).unwrap();
+
+        let mock_revocation_service: Arc<dyn TokenRevocationServiceTrait> = Arc::new(MockTokenRevocationService);
+
+        // Validate expecting "wrong_iss"
+        let claims_result = validate_jwt(
+            &mock_revocation_service,
+            &token_str,
+            TEST_SECRET,
+            Some(TokenType::Access),
+            Some("test_aud".to_string()),
+            Some("wrong_iss".to_string()) // Incorrect issuer
+        ).await;
+
+        assert!(claims_result.is_err());
+        assert!(matches!(
+            claims_result.unwrap_err().kind(),
+            jsonwebtoken::errors::ErrorKind::InvalidIssuer
+        ));
     }
 }
