@@ -177,7 +177,8 @@ async fn main() -> std::io::Result<()> {
             .wrap(configure_cors()) // Assuming configure_cors is correctly in scope via use statement
             .wrap(
                 middleware::DefaultHeaders::new()
-                    .add(("X-XSS-Protection", "1; mode=block"))
+                    .add(("X-XSS-Protection", "0"))
+                    .add(("Strict-Transport-Security", "max-age=31536000; includeSubDomains"))
                     .add(("X-Frame-Options", "DENY"))
                     .add(("X-Content-Type-Options", "nosniff"))
                     .add(("Referrer-Policy", "strict-origin-when-cross-origin"))

@@ -691,3 +691,51 @@ Key recommendations include:
 4. Implementing distributed and user-based rate limiting
 
 By implementing these recommendations, the project can further strengthen its security posture and provide better protection against common web application vulnerabilities.
+
+---
+
+## HTTP Security Headers
+
+HTTP security headers are a fundamental part of web application security, providing an additional layer of defense by instructing the browser on how to behave when handling the site's content. These headers help mitigate common attacks such as Cross-Site Scripting (XSS), clickjacking, and protocol downgrade attacks.
+
+These headers are configured in `src/main.rs` within the `DefaultHeaders` middleware provided by Actix Web.
+
+### `X-Frame-Options`
+-   **Value in `src/main.rs`**: `DENY`
+-   **Rationale**: The `X-Frame-Options: DENY` header prevents the site from being embedded within an `<iframe>` or `<object>` on other sites. This is a crucial defense against clickjacking attacks, where an attacker might trick users into clicking on malicious content by overlaying it with a legitimate-looking iframe of the target site. `DENY` is the most restrictive option, ensuring the site cannot be framed anywhere. (OWASP Clickjacking Defense Cheat Sheet)
+
+### `X-Content-Type-Options`
+-   **Value in `src/main.rs`**: `nosniff`
+-   **Rationale**: The `X-Content-Type-Options: nosniff` header prevents the browser from MIME-sniffing the `Content-Type` of a response away from the one declared by the server. This is important because browsers might otherwise misinterpret files (e.g., treat a text file as JavaScript) if the `Content-Type` is ambiguous or incorrect, potentially leading to XSS vulnerabilities. (OWASP XSS Prevention Cheat Sheet, MDN Web Docs)
+
+### `X-XSS-Protection`
+-   **Value in `src/main.rs`**: `0`
+-   **Rationale**: This header was originally designed to enable browser-based XSS filters.
+    -   Previously, this was set to `1; mode=block`, which would instruct the browser to block the rendering of a page if it detected a reflected XSS attack.
+    -   However, modern browsers have largely deprecated or removed their XSS auditors due to their potential to introduce new vulnerabilities (e.g., XSS auditor bypasses, information leakage) and their unreliability in stopping all XSS attacks.
+    -   Setting the value to `0` explicitly disables the XSS auditor, relying instead on more robust defenses like a strong Content Security Policy (CSP). This is the current best practice recommended by security communities and browser vendors. (OWASP XSS Prevention Cheat Sheet, MDN Web Docs)
+
+### `Strict-Transport-Security (HSTS)`
+-   **Value in `src/main.rs`**: `max-age=31536000; includeSubDomains`
+-   **Rationale**: The `Strict-Transport-Security` header (HSTS) enforces secure (HTTPS) connections to the server.
+    -   `max-age=31536000`: This directive specifies that for one year (31,536,000 seconds), browsers that have visited the site should only connect using HTTPS, automatically converting any HTTP requests to HTTPS. This helps prevent man-in-the-middle attacks like protocol downgrade attacks and cookie hijacking.
+    -   `includeSubDomains`: This directive extends the HSTS policy to all subdomains of the site. This is critical for ensuring that if `example.com` is secure, `sub.example.com` is also forced to use HTTPS.
+    -   **Recommendation for User**:
+        -   **Infrastructure Check**: It's important to verify if HSTS is already being handled at the infrastructure level (e.g., by a reverse proxy, load balancer, or CDN). Duplicate HSTS headers are generally not harmful but managing it in one place is cleaner.
+        -   **Preload Considerations**: For enhanced security, consider adding the site to the HSTS preload list. This would require adding the `preload` directive to the header value (e.g., `max-age=31536000; includeSubDomains; preload`). However, preloading is a significant commitment: the site and all its subdomains must be reliably served over HTTPS, as browsers will be hardcoded to never connect via HTTP. Thorough testing and a long-term commitment to HTTPS are essential before enabling `preload`. (OWASP HSTS Cheat Sheet, RFC 6797)
+
+### `Content-Security-Policy`
+-   **Value in `src/main.rs`**: (A detailed policy string is configured, see previous sections of this document for a full breakdown).
+-   **Rationale**: While not the primary focus of this specific update, it's important to note that a comprehensive `Content-Security-Policy` (CSP) is also configured. CSP provides a powerful, fine-grained defense against XSS and other content injection attacks by allowing developers to specify which sources of content (scripts, styles, images, etc.) are legitimate. The `X-XSS-Protection` header is disabled in favor of a strong CSP.
+
+---
+**Note on Compilation Issues:**
+
+During the process of updating these security headers in `src/main.rs` (as part of a previous subtask) and attempting to ensure the project compiled, significant challenges were encountered related to Minimum Supported Rust Version (MSRV) incompatibilities. The Rust version in the environment was 1.75.0, while several direct and transitive dependencies required newer Rust compiler versions (e.g., 1.80.0, 1.81.0, 1.82.0).
+
+Efforts to resolve these MSRV issues involved:
+-   Deleting and regenerating `Cargo.lock`.
+-   Pinning direct dependencies in `Cargo.toml` to specific versions using `~` and then stricter `=` operators.
+-   Adjusting feature flags for certain crates (e.g., `lettre` to use `rustls-tls` instead of `native-tls`).
+
+While the changes to the security headers in `src/main.rs` are complete and correctly implemented, the project's overall dependency tree requires a more thorough review and potential updates or downgrades to ensure full compatibility with Rust 1.75.0. The compilation issues are separate from the correctness of the header configurations themselves.
