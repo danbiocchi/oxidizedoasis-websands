@@ -108,41 +108,166 @@ impl UserService {
     }
 
     pub async fn update_user(&self, id: Uuid, input: UserInput) -> Result<User, ApiError> {
-        debug!("Updating user: {}", id);
-        let validated_input = validate_and_sanitize_user_input(input)
-            .map_err(|_| ApiError::new("Invalid input", ApiErrorType::Validation))?;
-        
-        let password_hash = if let Some(ref password) = validated_input.password {
-            Some(hash(password.as_bytes(), DEFAULT_COST)
-                .map_err(|e| {
-                    error!("Failed to hash password during update: {}", e);
-                    ApiError::new("Failed to process password", ApiErrorType::Internal)
-                })?)
-        } else {
-            None
-        };
+        debug!("Attempting to update user: {}", id);
 
-        let updated_user = self.repository.update(id, &validated_input, password_hash.clone())
-            .await
+        let validated_input = validate_and_sanitize_user_input(input)
             .map_err(|e| {
-                error!("Failed to update user {}: {}", id, e);
-                ApiError::from(DbError::from(e))
+                error!("Invalid input for user update {}: {:?}", id, e);
+                ApiError::new_with_type("Invalid input", ApiErrorType::Validation, Some(e.into_iter().map(|ie| ie.to_string()).collect::<Vec<String>>().join(", ")))
             })?;
 
-        if password_hash.is_some() {
-            match self.token_revocation_service.revoke_all_user_tokens(
-                id,
-                Some("Password changed"),
-            ).await {
-                Ok(count) => {
-                    info!("Revoked {} tokens after password change for user {}", count, id);
-                },
-                Err(e) => {
-                    error!("Failed to revoke tokens after password change: {:?}", e);
+        let current_user = self.repository.find_by_id(id).await
+            .map_err(|e| {
+                error!("DB error fetching user {} for update: {}", id, e);
+                ApiError::from(DbError::from(e))
+            })?
+            .ok_or_else(|| {
+                error!("User {} not found for update", id);
+                ApiError::new("User not found", ApiErrorType::NotFound)
+            })?;
+
+        let email_being_changed = validated_input.email.is_some() && validated_input.email != current_user.email;
+        let password_being_changed = validated_input.password.is_some();
+
+        if email_being_changed {
+            info!("Email is being changed for user: {}", id);
+            let new_email_str = validated_input.email.as_ref().unwrap(); // Safe due to is_some() check
+
+            // Check if new email is already in use by another verified user
+            if let Some(other_user) = self.repository.find_by_email_and_verified(new_email_str).await
+                .map_err(|e| {
+                    error!("DB error checking email {} for user {}: {}", new_email_str, id, e);
+                    ApiError::from(DbError::from(e))
+                })? {
+                if other_user.id != current_user.id {
+                    error!("Attempt to change email for user {} to {}, but it's already in use by user {}", id, new_email_str, other_user.id);
+                    return Err(ApiError::new("Email address is already in use by a verified account.", ApiErrorType::Conflict));
                 }
             }
+
+            let verification_token = generate_secure_token();
+            let user_after_email_update = self.repository.update_email_and_set_unverified(
+                current_user.id,
+                new_email_str,
+                &verification_token,
+            ).await.map_err(|e| {
+                error!("DB error updating email for user {}: {}", id, e);
+                ApiError::from(DbError::from(e))
+            })?;
+            info!("User {} email updated to {} and marked as unverified. Verification token generated.", id, new_email_str);
+
+            let email_service = self.email_service.clone();
+            let email_to_send = new_email_str.clone();
+            let token_for_email = verification_token.clone();
+            tokio::spawn(async move {
+                debug!("Asynchronously sending verification email to: {}", email_to_send);
+                if let Err(e) = email_service.send_verification_email(&email_to_send, &token_for_email).await {
+                    error!("Failed to send verification email to {}: {}", email_to_send, e);
+                } else {
+                    info!("Verification email successfully dispatched to: {}", email_to_send);
+                }
+            });
+
+            let mut final_user = user_after_email_update;
+
+            if password_being_changed {
+                info!("Password is also being changed for user: {}", id);
+                let new_password = validated_input.password.as_ref().unwrap(); // Safe due to is_some() check
+                validate_password(new_password).map_err(|e| ApiError::new_with_type(e.to_string(), ApiErrorType::Validation, None))?; // Additional validation
+                
+                let password_hash = hash(new_password.as_bytes(), DEFAULT_COST)
+                    .map_err(|e| {
+                        error!("Failed to hash new password for user {}: {}", id, e);
+                        ApiError::new("Failed to process password", ApiErrorType::Internal)
+                    })?;
+                
+                self.repository.update_password(current_user.id, &password_hash).await
+                    .map_err(|e| {
+                        error!("DB error updating password for user {}: {}", id, e);
+                        ApiError::from(DbError::from(e))
+                    })?;
+                info!("Password updated for user: {}", id);
+
+                final_user = self.repository.find_by_id(current_user.id).await
+                    .map_err(|e| {
+                        error!("DB error re-fetching user {} after password update: {}", id, e);
+                        ApiError::from(DbError::from(e))
+                    })?
+                    .ok_or_else(|| {
+                        error!("User {} not found after password update, this should not happen.", id);
+                        ApiError::new("User consistency error after update", ApiErrorType::Internal)
+                    })?;
+                
+                debug!("Revoking tokens for user {} due to email and password change.", id);
+                match self.token_revocation_service.revoke_all_user_tokens(current_user.id, Some("Password and email changed")).await {
+                    Ok(count) => info!("Revoked {} tokens for user {} after email and password change.", count, id),
+                    Err(e) => error!("Failed to revoke tokens for user {} after email and password change: {:?}", id, e),
+                }
+            } else {
+                 // Email changed, but password did not. No specific token revocation reason for email change alone yet.
+                 // Depending on policy, might want to revoke tokens here too. For now, only password change triggers it.
+                debug!("Email changed for user {} but password did not. No token revocation.", id);
+            }
+            
+            info!("User {} update (email change path) completed successfully.", id);
+            Ok(final_user)
+
+        } else {
+            // Scenario 2: Email is NOT being changed (or is the same as current), or validated_input.email is None
+            debug!("Email is not being changed for user: {}", id);
+            let mut password_hash_opt: Option<String> = None;
+            let mut revocation_reason: Option<&str> = None;
+
+            if password_being_changed {
+                info!("Password is being changed for user: {} (email not changing)", id);
+                let new_password = validated_input.password.as_ref().unwrap(); // Safe
+                validate_password(new_password).map_err(|e| ApiError::new_with_type(e.to_string(), ApiErrorType::Validation, None))?;
+
+                password_hash_opt = Some(hash(new_password.as_bytes(), DEFAULT_COST)
+                    .map_err(|e| {
+                        error!("Failed to hash password during update for user {}: {}", id, e);
+                        ApiError::new("Failed to process password", ApiErrorType::Internal)
+                    })?);
+                revocation_reason = Some("Password changed");
+                info!("Password hash generated for user {}", id);
+            }
+
+            // Use existing repository.update for username or other non-email-verification changes.
+            // This method will also update the password if password_hash_opt is Some.
+            // It should NOT alter email or verification status if validated_input.email is None or same as current.
+            // The `validated_input` here will have `email` as `None` if it wasn't changed,
+            // or the same email if it was provided but matched current.
+            // The `update` method in repository needs to be robust to handle `None` email in UserInput correctly (e.g., not update it).
+            // Let's ensure validated_input for the repository.update call reflects that email should not be changed if it wasn't intended.
+            // We create a specific UserInput for the repository.update call.
+            let mut update_payload = validated_input.clone();
+            if !email_being_changed { // Should always be true in this branch, but for clarity
+                update_payload.email = None; // Prevent repository.update from touching the email if it wasn't meant to change.
+                                             // Or, if we want to allow setting email to None explicitly (clearing it), this logic would need adjustment.
+                                             // Current requirement implies `update` handles other fields.
+            }
+
+
+            debug!("Calling repository.update for user {} with payload: {:?}, password_hash_opt present: {}", id, update_payload, password_hash_opt.is_some());
+            let updated_user = self.repository.update(current_user.id, &update_payload, password_hash_opt.clone())
+                .await
+                .map_err(|e| {
+                    error!("Failed to update user {} (non-email change path): {}", id, e);
+                    ApiError::from(DbError::from(e))
+                })?;
+            info!("User {} (non-email change path) updated in repository.", id);
+            
+            if let Some(reason) = revocation_reason {
+                debug!("Revoking tokens for user {} due to: {}", id, reason);
+                match self.token_revocation_service.revoke_all_user_tokens(current_user.id, Some(reason)).await {
+                    Ok(count) => info!("Revoked {} tokens for user {} reason: {}.", count, id, reason),
+                    Err(e) => error!("Failed to revoke tokens for user {}: {:?}", id, e),
+                }
+            }
+            
+            info!("User {} update (non-email change path) completed successfully.", id);
+            Ok(updated_user)
         }
-        Ok(updated_user)
     }
 
     pub async fn delete_user(&self, id: Uuid) -> Result<(), ApiError> {
@@ -1553,5 +1678,313 @@ mod tests {
         assert!(result.is_err());
         let err = result.unwrap_err();
         assert_eq!(err.error_type, ApiErrorType::Database);
+    }
+
+    // --- Tests for update_user (new email update logic) ---
+
+    #[tokio::test]
+    async fn test_update_user_email_change_success_new_email_unverified() {
+        let mut mock_repo = MockUserRepositoryTrait::new();
+        let mut mock_email_service = MockEmailService::new(); // Using manual mock from existing tests
+        let mut mock_token_revocation_service = MockTokenRevocationServiceTrait::new();
+
+        let user_id = Uuid::new_v4();
+        let old_email = "old@example.com";
+        let new_email = "new@example.com";
+
+        let current_user = create_test_user(user_id, "testuser", old_email, true);
+        let user_after_email_update = User {
+            email: Some(new_email.to_string()),
+            is_email_verified: false,
+            verification_token: Some("new_generated_token".to_string()), // Actual token is generated, mock this part
+            ..current_user.clone()
+        };
+        
+        let cloned_user_after_email_update = user_after_email_update.clone();
+
+        mock_repo.expect_find_by_id()
+            .with(predicate::eq(user_id))
+            .times(1)
+            .returning(move |_| Ok(Some(current_user.clone())));
+        
+        mock_repo.expect_find_by_email_and_verified()
+            .with(predicate::eq(new_email))
+            .times(1)
+            .returning(|_| Ok(None));
+        
+        mock_repo.expect_update_email_and_set_unverified()
+            .withf(move |id, email, _token| *id == user_id && email == new_email)
+            .times(1)
+            .returning(move |_, _, _| Ok(cloned_user_after_email_update.clone()));
+
+        // Expect email sending
+        mock_email_service.expect_send_verification_email()
+            .withf(move |email_arg, token_arg| email_arg == new_email && !token_arg.is_empty())
+            .times(1)
+            .returning(|_, _| Ok(()));
+        
+        mock_token_revocation_service.expect_revoke_all_user_tokens().never();
+
+        let user_service = UserService::new(
+            Arc::new(mock_repo),
+            Arc::new(mock_email_service),
+            Arc::new(mock_token_revocation_service),
+        );
+
+        let input = UserInput {
+            username: "testuser".to_string(), // Assuming username is not changed or matches current
+            email: Some(new_email.to_string()),
+            password: None,
+        };
+
+        let result = user_service.update_user(user_id, input).await;
+        assert!(result.is_ok());
+        let updated_user = result.unwrap();
+        assert_eq!(updated_user.email.as_deref(), Some(new_email));
+        assert!(!updated_user.is_email_verified);
+    }
+
+    #[tokio::test]
+    async fn test_update_user_email_change_conflict_new_email_already_verified() {
+        let mut mock_repo = MockUserRepositoryTrait::new();
+        let mock_email_service = Arc::new(MockEmailService::new());
+        let mock_token_revocation_service = MockTokenRevocationServiceTrait::new();
+
+        let user_id = Uuid::new_v4();
+        let other_user_id = Uuid::new_v4();
+        let current_email = "current@example.com";
+        let new_email_conflict = "conflict@example.com";
+
+        let current_user = create_test_user(user_id, "currentUser", current_email, true);
+        let other_verified_user = create_test_user(other_user_id, "otherUser", new_email_conflict, true);
+
+        mock_repo.expect_find_by_id()
+            .with(predicate::eq(user_id))
+            .times(1)
+            .returning(move |_| Ok(Some(current_user.clone())));
+        
+        mock_repo.expect_find_by_email_and_verified()
+            .with(predicate::eq(new_email_conflict))
+            .times(1)
+            .returning(move |_| Ok(Some(other_verified_user.clone())));
+
+        // No further calls to repo for update expected
+        mock_repo.expect_update_email_and_set_unverified().never();
+
+        let user_service = UserService::new(
+            Arc::new(mock_repo),
+            mock_email_service,
+            Arc::new(mock_token_revocation_service),
+        );
+        
+        let input = UserInput {
+            username: "currentUser".to_string(),
+            email: Some(new_email_conflict.to_string()),
+            password: None,
+        };
+
+        let result = user_service.update_user(user_id, input).await;
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert_eq!(err.error_type, ApiErrorType::Conflict);
+        assert_eq!(err.message, "Email address is already in use by a verified account.");
+    }
+
+    #[tokio::test]
+    async fn test_update_user_email_and_password_change_success() {
+        let mut mock_repo = MockUserRepositoryTrait::new();
+        let mut mock_email_service = MockEmailService::new();
+        let mut mock_token_revocation_service = MockTokenRevocationServiceTrait::new();
+
+        let user_id = Uuid::new_v4();
+        let old_email = "oldpass@example.com";
+        let new_email = "newpass@example.com";
+        let new_password = "NewSecurePassword123!";
+
+        let current_user = create_test_user(user_id, "testuserpass", old_email, true);
+        
+        let user_after_email_update = User {
+            email: Some(new_email.to_string()),
+            is_email_verified: false,
+            verification_token: Some("generated_token_for_email".to_string()),
+            ..current_user.clone()
+        };
+        let cloned_user_after_email_update = user_after_email_update.clone();
+
+        // This will be the final state after password update too (mocked)
+        let final_user_state = User { 
+            password_hash: "new_hashed_password".to_string(), // Simulate new hash
+            ..cloned_user_after_email_update.clone()
+        };
+        let cloned_final_user_state = final_user_state.clone();
+
+
+        // Initial find_by_id for current_user
+        mock_repo.expect_find_by_id()
+            .with(predicate::eq(user_id))
+            .times(1) // First call
+            .returning(move |_| Ok(Some(current_user.clone())));
+        
+        // Check for new email conflict (none)
+        mock_repo.expect_find_by_email_and_verified()
+            .with(predicate::eq(new_email))
+            .times(1)
+            .returning(|_| Ok(None));
+        
+        // Update email and set unverified
+        mock_repo.expect_update_email_and_set_unverified()
+            .withf(move |id, email, _token| *id == user_id && email == new_email)
+            .times(1)
+            .returning(move |_, _, _| Ok(cloned_user_after_email_update.clone()));
+        
+        // Update password
+        mock_repo.expect_update_password()
+            .withf(move |id, pass_hash| *id == user_id && !pass_hash.is_empty())
+            .times(1)
+            .returning(|_, _| Ok(()));
+
+        // Re-fetch user after password update
+        mock_repo.expect_find_by_id()
+            .with(predicate::eq(user_id))
+            .times(1) // Second call
+            .returning(move |_| Ok(Some(cloned_final_user_state.clone())));
+
+        // Email sending
+        mock_email_service.expect_send_verification_email().times(1).returning(|_,_| Ok(()));
+        
+        // Token revocation
+        mock_token_revocation_service.expect_revoke_all_user_tokens()
+            .with(predicate::eq(user_id), predicate::eq(Some("Password and email changed")))
+            .times(1)
+            .returning(|_, _| Ok(1));
+
+        let user_service = UserService::new(
+            Arc::new(mock_repo),
+            Arc::new(mock_email_service),
+            Arc::new(mock_token_revocation_service),
+        );
+
+        let input = UserInput {
+            username: "testuserpass".to_string(), 
+            email: Some(new_email.to_string()),
+            password: Some(new_password.to_string()),
+        };
+
+        let result = user_service.update_user(user_id, input).await;
+        assert!(result.is_ok());
+        let updated_user = result.unwrap();
+        assert_eq!(updated_user.email.as_deref(), Some(new_email));
+        assert!(!updated_user.is_email_verified);
+        assert_eq!(updated_user.password_hash, "new_hashed_password");
+    }
+
+    #[tokio::test]
+    async fn test_update_user_username_only_no_email_change() {
+        let mut mock_repo = MockUserRepositoryTrait::new();
+        let mock_email_service = Arc::new(MockEmailService::new()); // Manual mock, no expect needed if not called
+        let mut mock_token_revocation_service = MockTokenRevocationServiceTrait::new();
+
+        let user_id = Uuid::new_v4();
+        let current_username = "currentUsername";
+        let new_username = "newUsername";
+        let current_email = "same_email@example.com";
+
+        let current_user = create_test_user(user_id, current_username, current_email, true);
+        let user_after_username_update = User {
+            username: new_username.to_string(),
+            ..current_user.clone()
+        };
+        let cloned_user_after_update = user_after_username_update.clone();
+
+        // Initial find_by_id for current_user
+        mock_repo.expect_find_by_id()
+            .with(predicate::eq(user_id))
+            .times(1)
+            .returning(move |_| Ok(Some(current_user.clone())));
+        
+        // find_by_email_and_verified should NOT be called if email doesn't change
+        mock_repo.expect_find_by_email_and_verified().never();
+        mock_repo.expect_update_email_and_set_unverified().never();
+        
+        // Generic update for username
+        mock_repo.expect_update()
+            .withf(move |id, input_args, pass_hash_opt| {
+                *id == user_id &&
+                input_args.username == new_username &&
+                input_args.email.is_none() && // Service layer sets email to None in payload if not changing
+                pass_hash_opt.is_none()
+            })
+            .times(1)
+            .returning(move |_, _, _| Ok(cloned_user_after_update.clone()));
+
+        mock_token_revocation_service.expect_revoke_all_user_tokens().never();
+
+        let user_service = UserService::new(
+            Arc::new(mock_repo),
+            mock_email_service, // Pass the manual mock
+            Arc::new(mock_token_revocation_service),
+        );
+
+        let input = UserInput {
+            username: new_username.to_string(),
+            email: Some(current_email.to_string()), // Email is same as current
+            password: None,
+        };
+        
+        let result = user_service.update_user(user_id, input).await;
+        assert!(result.is_ok());
+        let updated_user = result.unwrap();
+        assert_eq!(updated_user.username, new_username);
+        assert_eq!(updated_user.email.as_deref(), Some(current_email)); // Email remains unchanged
+    }
+
+    #[tokio::test]
+    async fn test_update_user_email_change_email_sending_fails_still_succeeds() {
+        let mut mock_repo = MockUserRepositoryTrait::new();
+        let mut mock_email_service = MockEmailService::new(); // Using manual mock
+        let mock_token_revocation_service = MockTokenRevocationServiceTrait::new();
+
+        let user_id = Uuid::new_v4();
+        let old_email = "old_email_fail@example.com";
+        let new_email = "new_email_fail@example.com";
+
+        let current_user = create_test_user(user_id, "testuser_email_fail", old_email, true);
+        let user_after_email_update = User {
+            email: Some(new_email.to_string()),
+            is_email_verified: false,
+            ..current_user.clone()
+        };
+        let cloned_user_after_email_update = user_after_email_update.clone();
+
+        mock_repo.expect_find_by_id().times(1).returning(move |_| Ok(Some(current_user.clone())));
+        mock_repo.expect_find_by_email_and_verified().times(1).returning(|_| Ok(None));
+        mock_repo.expect_update_email_and_set_unverified()
+            .times(1)
+            .returning(move |_, _, _| Ok(cloned_user_after_email_update.clone()));
+
+        // Expect email sending to fail
+        mock_email_service.expect_send_verification_email()
+            .times(1)
+            .returning(|_, _| Err(ApiError::new("Simulated email send failure", ApiErrorType::ExternalService))); // Or any appropriate error
+
+        let user_service = UserService::new(
+            Arc::new(mock_repo),
+            Arc::new(mock_email_service), // Pass the manual mock
+            Arc::new(mock_token_revocation_service),
+        );
+
+        let input = UserInput {
+            username: "testuser_email_fail".to_string(),
+            email: Some(new_email.to_string()),
+            password: None,
+        };
+
+        let result = user_service.update_user(user_id, input).await;
+        // Operation should still succeed from user's perspective
+        assert!(result.is_ok()); 
+        let updated_user = result.unwrap();
+        assert_eq!(updated_user.email.as_deref(), Some(new_email));
+        assert!(!updated_user.is_email_verified);
+        // Error for email sending should be logged by the service, but not fail the operation.
     }
 }
