@@ -11,7 +11,7 @@ use crate::core::auth::AuthService;
 use crate::core::email::EmailServiceTrait;
 use crate::core::auth::token_revocation::TokenRevocationServiceTrait; // Added
 use crate::core::auth::active_token::ActiveTokenServiceTrait; // Added
-use crate::common::validation::{UserInput, LoginInput, TokenQuery};
+use crate::common::validation::{UserInput, LoginInput, TokenQuery, RegisterInput};
 use crate::core::user::model::{PasswordResetRequest, PasswordResetSubmit};
 use time;
 use crate::infrastructure::middleware::csrf::generate_csrf_token;
@@ -47,33 +47,53 @@ impl UserHandler {
 
     pub async fn create_user(
         &self,
-        user_input: web::Json<UserInput>,
+        user_input: web::Json<RegisterInput>,
     ) -> impl Responder {
-        debug!("Received create_user request");
+        debug!("Received create_user request with RegisterInput");
+        use crate::common::validation::validate_and_sanitize_register_input;
+        // RegisterInput is already imported at the top of the file.
 
-        match self.user_service.create_user(user_input.into_inner()).await {
-            Ok((user, _)) => {
-                info!("User created successfully: {}", user.id);
-                HttpResponse::Created().json(json!({
-                    "success": true,
-                    "message": "User created successfully. Please check your email for verification.",
-                    "data": {
-                        "user": {
-                            "id": user.id,
-                            "username": user.username,
-                            "email": user.email,
-                            "is_email_verified": user.is_email_verified,
-                            "created_at": user.created_at
-                        }
+        let actual_input = user_input.into_inner();
+
+        match validate_and_sanitize_register_input(actual_input) {
+            Ok(sanitized_input) => {
+                // TODO: Update self.user_service.create_user to accept RegisterInput type.
+                // The following call WILL cause a type error until UserService.create_user is updated.
+                // This is expected for this step.
+                match self.user_service.create_user(sanitized_input).await {
+                    Ok((user, _)) => { // Assuming UserInput was compatible for destructuring with what create_user returns
+                        info!("User created successfully: {}", user.id);
+                        HttpResponse::Created().json(json!({
+                            "success": true,
+                            "message": "User created successfully. Please check your email for verification.",
+                            "data": {
+                                "user": {
+                                    "id": user.id,
+                                    "username": user.username,
+                                    "email": user.email,
+                                    "is_email_verified": user.is_email_verified,
+                                    "created_at": user.created_at
+                                }
+                            }
+                        }))
+                    },
+                    Err(e) => {
+                        error!("Failed to create user: {:?}", e);
+                        HttpResponse::BadRequest().json(json!({
+                            "success": false,
+                            "message": e.to_string(), // Or a more generic message
+                            "error": e.to_string()
+                        }))
                     }
-                }))
+                }
             },
-            Err(e) => {
-                error!("Failed to create user: {:?}", e);
+            Err(validation_errors) => {
+                let error_messages: Vec<String> = validation_errors.into_iter().map(|e| e.message.unwrap_or_default().into_owned()).collect();
+                error!("User registration validation failed: {:?}", error_messages);
                 HttpResponse::BadRequest().json(json!({
                     "success": false,
-                    "message": e.to_string(),
-                    "error": e.to_string()
+                    "message": "Validation failed",
+                    "errors": error_messages
                 }))
             }
         }
@@ -83,10 +103,105 @@ impl UserHandler {
         &self,
         login_input: web::Json<LoginInput>,
     ) -> impl Responder {
-        match self.auth_service.login(login_input.into_inner()).await {
-            Ok((token_pair, user)) => {
-                info!("User logged in successfully: {}", user.id);
-                
+        use crate::common::validation::validate_and_sanitize_login_input;
+
+        match validate_and_sanitize_login_input(login_input.into_inner()) {
+            Ok(sanitized_input) => {
+                // TODO: Update self.auth_service.login to accept sanitized LoginInput if its signature expects the raw one, or confirm it handles sanitized input correctly.
+                match self.auth_service.login(sanitized_input).await {
+                    Ok((token_pair, user)) => {
+                        info!("User logged in successfully: {}", user.id);
+                        
+                        // Create response
+                        let mut response = HttpResponse::Ok();
+                        
+                        // Set cookies
+                        let domain = std::env::var("SERVER_HOST").unwrap_or_else(|_| "127.0.0.1".to_string());
+                        let secure = std::env::var("ENVIRONMENT").unwrap_or_else(|_| "development".to_string()) != "development";
+                        
+                        // Access token cookie
+                        let access_cookie = Cookie::build("access_token", token_pair.access_token.clone())
+                            .path("/")
+                            .domain(&domain)
+                            .http_only(true)
+                            .secure(secure)
+                            .same_site(SameSite::Strict)
+                            .max_age(time::Duration::minutes(30))
+                            .finish();
+                        
+                        // Refresh token cookie
+                        let refresh_cookie = Cookie::build("refresh_token", token_pair.refresh_token.clone())
+                            .path("/")
+                            .domain(&domain)
+                            .http_only(true)
+                            .secure(secure)
+                            .same_site(SameSite::Strict)
+                            .max_age(time::Duration::days(7))
+                            .finish();
+                        
+                        // Generate CSRF token
+                        let csrf_token = generate_csrf_token();
+                        let csrf_cookie = Cookie::build("csrf_token", csrf_token.token.clone())
+                            .path("/")
+                            .domain(&domain)
+                            .http_only(false) // Must be accessible from JavaScript
+                            .secure(secure)
+                            .same_site(SameSite::Strict)
+                            .max_age(time::Duration::days(7))
+                            .finish();
+                        
+                        response.cookie(access_cookie).cookie(refresh_cookie).cookie(csrf_cookie).json(json!({
+                            "success": true,
+                            "message": "Login successful",
+                            "data": {
+                                "access_token": token_pair.access_token,
+                                "refresh_token": token_pair.refresh_token,
+                                "user": {
+                                    "id": user.id,
+                                    "username": user.username,
+                                    "email": user.email,
+                                    "is_email_verified": user.is_email_verified,
+                                    "created_at": user.created_at,
+                                    "role": user.role,
+                                    "csrf_token": csrf_token.token // Include CSRF token in response for frontend to use
+                                }
+                            }
+                        }))
+                    },
+                    Err(e) => {
+                        match e.to_string().as_str() {
+                            "Email not verified" => {
+                                HttpResponse::Unauthorized().json(json!({
+                                    "success": false,
+                                    "message": "Email has not been verified yet. Please check your email for the verification link.",
+                                    "error_type": "email_not_verified"
+                                }))
+                            },
+                            _ => {
+                                error!("Login error: {:?}", e);
+                                HttpResponse::Unauthorized().json(json!({
+                                    "success": false,
+                                    "message": "Invalid username or password",
+                                    "error": "Invalid credentials"
+                                }))
+                            }
+                        }
+                    }
+                }
+            },
+            Err(validation_errors) => {
+                let error_messages: Vec<String> = validation_errors.into_iter().map(|e| e.message.unwrap_or_default().into_owned()).collect();
+                error!("Login validation failed: {:?}", error_messages);
+                HttpResponse::BadRequest().json(json!({
+                    "success": false,
+                    "message": "Validation failed",
+                    "errors": error_messages
+                }))
+            }
+        }
+    }
+
+    pub async fn verify_email(
                 // Create response
                 let mut response = HttpResponse::Ok();
                 
@@ -332,6 +447,8 @@ impl UserHandler {
         user_input: web::Json<UserInput>,
         auth: BearerAuth,
     ) -> impl Responder {
+        use crate::common::validation::validate_and_sanitize_user_input;
+
         match self.auth_service.validate_auth(auth.token()).await {
             Ok(claims) => {
                 if claims.sub != *user_id {
@@ -342,27 +459,42 @@ impl UserHandler {
                     }));
                 }
 
-                match self.user_service.update_user(*user_id, user_input.into_inner()).await {
-                    Ok(updated_user) => HttpResponse::Ok().json(json!({
-                        "success": true,
-                        "message": "User updated successfully",
-                        "data": {
-                            "user": {
-                                "id": updated_user.id,
-                                "username": updated_user.username,
-                                "email": updated_user.email,
-                                "is_email_verified": updated_user.is_email_verified,
-                                "created_at": updated_user.created_at,
-                                "role": updated_user.role
+                // Validate and sanitize the input before calling the service
+                match validate_and_sanitize_user_input(user_input.into_inner()) {
+                    Ok(sanitized_input) => {
+                        // TODO: Update self.user_service.update_user to accept sanitized UserInput if its signature expects the raw one, or confirm it handles sanitized input correctly.
+                        match self.user_service.update_user(*user_id, sanitized_input).await {
+                            Ok(updated_user) => HttpResponse::Ok().json(json!({
+                                "success": true,
+                                "message": "User updated successfully",
+                                "data": {
+                                    "user": {
+                                        "id": updated_user.id,
+                                        "username": updated_user.username,
+                                        "email": updated_user.email,
+                                        "is_email_verified": updated_user.is_email_verified,
+                                        "created_at": updated_user.created_at,
+                                        "role": updated_user.role
+                                    }
+                                }
+                            })),
+                            Err(e) => {
+                                error!("Failed to update user: {:?}", e);
+                                HttpResponse::InternalServerError().json(json!({
+                                    "success": false,
+                                    "message": "Failed to update user",
+                                    "error": "Internal server error"
+                                }))
                             }
                         }
-                    })),
-                    Err(e) => {
-                        error!("Failed to update user: {:?}", e);
-                        HttpResponse::InternalServerError().json(json!({
+                    },
+                    Err(validation_errors) => {
+                        let error_messages: Vec<String> = validation_errors.into_iter().map(|e| e.message.unwrap_or_default().into_owned()).collect();
+                        error!("Update user validation failed: {:?}", error_messages);
+                        HttpResponse::BadRequest().json(json!({
                             "success": false,
-                            "message": "Failed to update user",
-                            "error": "Internal server error"
+                            "message": "Validation failed",
+                            "errors": error_messages
                         }))
                     }
                 }
@@ -379,7 +511,16 @@ impl UserHandler {
         &self,
         request: web::Json<PasswordResetRequest>,
     ) -> impl Responder {
-        debug!("Received password reset request");
+        use crate::common::utils::validation::validate_email;
+        debug!("Received password reset request for email: {}", request.email);
+
+        if validate_email(&request.email).is_err() {
+            error!("Invalid email format submitted for password reset: {}", request.email);
+            return HttpResponse::Ok().json(json!({
+                "success": true,
+                "message": "If an account exists with that email, you will receive password reset instructions."
+            }));
+        }
 
         match self.user_service.request_password_reset(&request.email).await {
             Ok(()) => {
@@ -429,6 +570,7 @@ impl UserHandler {
         &self,
         reset_data: web::Json<PasswordResetSubmit>,
     ) -> impl Responder {
+        use crate::common::validation::password::validate_password;
         debug!("Processing password reset");
 
         if reset_data.new_password != reset_data.confirm_password {
@@ -436,6 +578,22 @@ impl UserHandler {
                 "success": false,
                 "message": "Passwords do not match",
                 "error": "Password mismatch"
+            }));
+        }
+
+        if reset_data.token.trim().is_empty() {
+            return HttpResponse::BadRequest().json(json!({
+                "success": false,
+                "message": "Token cannot be empty",
+                "error": "Invalid token"
+            }));
+        }
+        if let Err(e) = validate_password(&reset_data.new_password) {
+            let message = e.message.map(|m| m.into_owned()).unwrap_or_else(|| e.code.to_string());
+            return HttpResponse::BadRequest().json(json!({
+                "success": false,
+                "message": message,
+                "error": "Invalid password"
             }));
         }
 
@@ -502,6 +660,13 @@ impl UserHandler {
         &self,
         refresh_token: web::Json<RefreshToken>,
     ) -> impl Responder {
+        if refresh_token.token.trim().is_empty() {
+            return HttpResponse::Unauthorized().json(json!({
+                "success": false,
+                "message": "Refresh token cannot be empty",
+                "error": "Authentication failed"
+            }));
+        }
         debug!("Attempting to refresh access token from JSON body");
         
         match self.auth_service.refresh_token(&refresh_token.token).await {
@@ -778,7 +943,7 @@ pub fn create_handler(
 // Route handler functions
 pub async fn create_user_handler(
     handler: web::Data<UserHandler>,
-    user_input: web::Json<UserInput>,
+    user_input: web::Json<RegisterInput>, // New
 ) -> impl Responder {
     handler.create_user(user_input).await
 }

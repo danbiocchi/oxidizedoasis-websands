@@ -163,11 +163,17 @@ pub async fn update_user_username(
         }
     }
     
-    // Validate username - ensure it's not empty
-    if req.username.trim().is_empty() {
-        debug!("Empty username attempted");
-        return Err(ApiError::bad_request("Username cannot be empty"));
+    // Validate username
+    let trimmed_username = req.username.trim();
+    if trimmed_username.len() < 3 {
+        debug!("Username too short: {}", trimmed_username);
+        return Err(ApiError::bad_request("Username must be at least 3 characters long"));
     }
+    if trimmed_username.len() > 50 {
+        debug!("Username too long: {}", trimmed_username);
+        return Err(ApiError::bad_request("Username cannot exceed 50 characters"));
+    }
+    // TODO: Consider adding character set validation for username (e.g., alphanumeric, no spaces).
     
     // Find the user first to check if it exists
     let user = repo.find_by_id(*id)
@@ -182,7 +188,7 @@ pub async fn update_user_username(
         })?;
     
     // Update the username
-    let updated_user = repo.update_username(*id, &req.username)
+    let updated_user = repo.update_username(*id, trimmed_username)
         .await
         .map_err(|e| {
             debug!("Error updating username for user {}: {:?}", id, e);

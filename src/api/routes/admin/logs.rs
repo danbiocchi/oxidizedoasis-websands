@@ -52,7 +52,15 @@ pub async fn get_logs(
     // TODO: Implement actual log retrieval from the database
     // This is a placeholder that returns an empty response
     let page = query.page.unwrap_or(1);
-    let per_page = query.per_page.unwrap_or(50).min(100);
+    if page < 1 {
+        return Err(ApiError::bad_request("Page number must be positive"));
+    }
+
+    let per_page = query.per_page.unwrap_or(50);
+    if per_page < 1 {
+        return Err(ApiError::bad_request("Per page count must be positive"));
+    }
+    let per_page = per_page.min(100); // Apply max limit after positive check
 
     let response = LogResponse {
         logs: Vec::new(),
@@ -90,6 +98,13 @@ pub async fn update_log_settings(
         if !["error", "warn", "info", "debug", "trace"].contains(&level.as_str()) {
             return Err(ApiError::bad_request("Invalid log level"));
         }
+    }
+
+    if let Some(sources) = &req.enabled_sources {
+        if sources.is_empty() {
+            return Err(ApiError::bad_request("Enabled sources cannot be an empty list if provided. To disable all, omit the field or ensure the API supports an explicit mechanism for disabling all sources."));
+        }
+        // TODO: Consider validating source names against a predefined list or configuration if such a list exists.
     }
 
     // TODO: Implement actual settings update
