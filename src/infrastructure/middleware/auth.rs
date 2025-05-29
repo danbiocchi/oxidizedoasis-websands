@@ -470,6 +470,11 @@ where
     fn call(&self, req: ServiceRequest) -> Self::Future {
         let service = Rc::clone(&self.service);
         
+        // CSRF Protection:
+        // For any request that is not GET, HEAD, or OPTIONS (implicitly handled by checking not GET),
+        // ensure that a CSRF token is present in both the `X-CSRF-Token` header
+        // and the `csrf_token` cookie, and that their values match.
+        // This helps prevent CSRF attacks on state-changing operations.
         let csrf_header = req.headers().get("X-CSRF-Token").cloned();
         let csrf_cookie = req.cookie("csrf_token");
         

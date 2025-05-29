@@ -5,6 +5,7 @@ use std::sync::Arc;
 use log::{debug, error, info, warn};
 use actix_web_httpauth::extractors::bearer::BearerAuth;
 use serde_json::json;
+use crate::common::error::{ApiError, ApiErrorType};
 use crate::core::auth::jwt::Claims;
 use crate::core::user::{UserRepository, UserService};
 use crate::core::auth::AuthService;
@@ -78,12 +79,8 @@ impl UserHandler {
                         }))
                     },
                     Err(e) => {
-                        error!("Failed to create user: {:?}", e);
-                        HttpResponse::BadRequest().json(json!({
-                            "success": false,
-                            "message": e.to_string(), // Or a more generic message
-                            "error": e.to_string()
-                        }))
+                        error!("Failed to create user service error: {:?}", e); // Log the original error
+                        ApiError::new("An unexpected error occurred while creating the user. Please try again later.", ApiErrorType::Internal).error_response()
                     }
                 }
             },
@@ -479,12 +476,8 @@ impl UserHandler {
                                 }
                             })),
                             Err(e) => {
-                                error!("Failed to update user: {:?}", e);
-                                HttpResponse::InternalServerError().json(json!({
-                                    "success": false,
-                                    "message": "Failed to update user",
-                                    "error": "Internal server error"
-                                }))
+                                error!("Failed to update user service error: {:?}", e); // Log the original error
+                                ApiError::new("An unexpected error occurred while updating the user. Please try again later.", ApiErrorType::Internal).error_response()
                             }
                         }
                     },
@@ -582,19 +575,11 @@ impl UserHandler {
         }
 
         if reset_data.token.trim().is_empty() {
-            return HttpResponse::BadRequest().json(json!({
-                "success": false,
-                "message": "Token cannot be empty",
-                "error": "Invalid token"
-            }));
+            return ApiError::bad_request("Token cannot be empty").error_response();
         }
         if let Err(e) = validate_password(&reset_data.new_password) {
             let message = e.message.map(|m| m.into_owned()).unwrap_or_else(|| e.code.to_string());
-            return HttpResponse::BadRequest().json(json!({
-                "success": false,
-                "message": message,
-                "error": "Invalid password"
-            }));
+            return ApiError::bad_request(message).error_response();
         }
 
         match self.user_service.reset_password(&reset_data.token, &reset_data.new_password).await {
@@ -606,12 +591,8 @@ impl UserHandler {
                 }))
             },
             Err(e) => {
-                error!("Password reset failed: {:?}", e);
-                HttpResponse::BadRequest().json(json!({
-                    "success": false,
-                    "message": e.to_string(),
-                    "error": "Password reset failed"
-                }))
+                error!("Password reset service error: {:?}", e);
+                ApiError::bad_request(format!("Password reset failed: {}", e.to_string())).error_response()
             }
         }
     }
@@ -637,12 +618,8 @@ impl UserHandler {
                         "message": "User deleted successfully"
                     })),
                     Err(e) => {
-                        error!("Failed to delete user: {:?}", e);
-                        HttpResponse::InternalServerError().json(json!({
-                            "success": false,
-                            "message": "Failed to delete user",
-                            "error": "Internal server error"
-                        }))
+                        error!("Failed to delete user service error: {:?}", e); // Log the original error
+                        ApiError::new("An unexpected error occurred while deleting the user. Please try again later.", ApiErrorType::Internal).error_response()
                     }
                 }
             },
@@ -661,11 +638,7 @@ impl UserHandler {
         refresh_token: web::Json<RefreshToken>,
     ) -> impl Responder {
         if refresh_token.token.trim().is_empty() {
-            return HttpResponse::Unauthorized().json(json!({
-                "success": false,
-                "message": "Refresh token cannot be empty",
-                "error": "Authentication failed"
-            }));
+            return ApiError::new("Refresh token cannot be empty", ApiErrorType::Authentication).error_response();
         }
         debug!("Attempting to refresh access token from JSON body");
         
@@ -724,12 +697,8 @@ impl UserHandler {
                 }))
             },
             Err(e) => {
-                error!("Failed to refresh token: {:?}", e);
-                HttpResponse::Unauthorized().json(json!({
-                    "success": false,
-                    "message": "Invalid refresh token",
-                    "error": "Authentication failed"
-                }))
+                error!("Failed to refresh token service error: {:?}", e);
+                ApiError::new("Invalid or expired refresh token.", ApiErrorType::Authentication).error_response()
             }
         }
     }
