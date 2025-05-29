@@ -1,26 +1,60 @@
 use yew::prelude::*;
 use web_sys::HtmlInputElement;
 use wasm_bindgen_futures::spawn_local;
+use crate::services::request::Request; // Import Request service
+use serde::{Deserialize, Serialize}; // Import serde traits
+use serde_json; // Import serde_json for parsing
 
-// Placeholder for API functions that will be implemented later
-// use crate::api::user::{update_user, get_current_user};
-// use crate::models::User;
+// Helper Structs for API responses
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+pub struct User {
+    pub id: String,
+    pub username: String,
+    pub email: Option<String>,
+    pub is_email_verified: bool,
+    // pub role: String, // Uncomment if needed
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+pub struct UserResponseData {
+   pub user: User,
+   pub csrf_token: Option<String>, // If CSRF token is part of this response
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+pub struct UserLoadResponse { // Wrapper for /api/cookie/users/me GET response
+    pub success: bool,
+    pub data: UserResponseData,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+pub struct ProfileUpdateResponse { // Wrapper for PUT /api/cookie/users/{id} response
+    pub success: bool,
+    pub message: String,
+    pub data: UserResponseData, // Assuming the update returns the user and potentially a new CSRF
+}
+
 
 pub struct AccountSettings {
     username: String,
     email: String,
+    original_email: String, // Added
+    user_id: Option<String>, // Added
+    csrf_token: Option<String>, // Added (though request.rs might handle it)
     is_loading: bool,
     error_message: Option<String>,
     success_message: Option<String>,
 }
 
 pub enum Msg {
-    // UserLoaded(User),
+    UserLoaded(Result<serde_json::Value, String>), // Updated
+    ProfileUpdateResponse(Result<serde_json::Value, String>), // Added
     UpdateUsername(String),
     UpdateEmail(String),
     SaveChanges,
-    SaveSuccess(String),
-    SaveError(String),
+    // SaveSuccess and SaveError might be replaced by ProfileUpdateResponse handling
+    // For now, let's keep them if they are used for UI feedback distinct from API response.
+    // We'll use success_message and error_message fields directly.
     ClearMessages,
 }
 
@@ -30,21 +64,19 @@ impl Component for AccountSettings {
 
     fn create(ctx: &Context<Self>) -> Self {
         // Load user data when component is created
-        // This is a placeholder for the actual API call
-        /*
         let link = ctx.link().clone();
         spawn_local(async move {
-            match get_current_user().await {
-                Ok(user) => link.send_message(Msg::UserLoaded(user)),
-                Err(err) => link.send_message(Msg::SaveError(err.to_string())),
-            }
+            let response = Request::get("/api/cookie/users/me").send().await;
+            link.send_message(Msg::UserLoaded(response));
         });
-        */
 
         Self {
-            username: "User".to_string(), // Placeholder
-            email: "user@example.com".to_string(), // Placeholder
-            is_loading: false,
+            username: String::new(),
+            email: String::new(),
+            original_email: String::new(),
+            user_id: None,
+            csrf_token: None,
+            is_loading: true, // Start in loading state
             error_message: None,
             success_message: None,
         }
@@ -52,14 +84,99 @@ impl Component for AccountSettings {
 
     fn update(&mut self, ctx: &Context<Self>, msg: Self::Message) -> bool {
         match msg {
-            /*
-            Msg::UserLoaded(user) => {
-                self.username = user.username.clone();
-                self.email = user.email.clone().unwrap_or_default();
+            Msg::UserLoaded(response) => {
                 self.is_loading = false;
+                match response {
+                    Ok(json_value) => {
+                        // Assuming the response structure is UserLoadResponse
+                        match serde_json::from_value::<UserLoadResponse>(json_value) {
+                            Ok(load_response) => {
+                                if load_response.success {
+                                    let user = load_response.data.user;
+                                    self.username = user.username.clone();
+                                    self.email = user.email.clone().unwrap_or_default();
+                                    self.original_email = self.email.clone();
+                                    self.user_id = Some(user.id.clone());
+                                    // CSRF token might be handled by request.rs or from cookie.
+                                    // If it's in this response, store it:
+                                    self.csrf_token = load_response.data.csrf_token; 
+                                    self.error_message = None;
+                                } else {
+                                    self.error_message = Some("Failed to load user data: API indicated failure.".to_string());
+                                }
+                            }
+                            Err(e) => {
+                                self.error_message = Some(format!("Failed to parse user data: {}", e));
+                            }
+                        }
+                    }
+                    Err(error_string) => {
+                        self.error_message = Some(format!("API Error: {}", error_string));
+                    }
+                }
                 true
             }
-            */
+            Msg::ProfileUpdateResponse(response) => {
+                self.is_loading = false;
+                match response {
+                    Ok(json_value) => {
+                        match serde_json::from_value::<ProfileUpdateResponse>(json_value.clone()) {
+                            Ok(update_response) => {
+                                if update_response.success {
+                                    let updated_user = update_response.data.user;
+                                    self.username = updated_user.username.clone();
+                                    
+                                    let email_was_changed = self.email != self.original_email;
+                                    self.email = updated_user.email.clone().unwrap_or_default();
+                                    self.original_email = self.email.clone(); // Update original_email to new email
+
+                                    // Update CSRF token if backend sends a new one on update
+                                    if update_response.data.csrf_token.is_some() {
+                                        self.csrf_token = update_response.data.csrf_token;
+                                    }
+
+                                    if email_was_changed && !updated_user.is_email_verified {
+                                        self.success_message = Some("Profile updated. A verification email has been sent to your new address. Please check your inbox.".to_string());
+                                    } else {
+                                        self.success_message = Some(update_response.message);
+                                    }
+                                    self.error_message = None;
+
+                                    // Clear success message after 5 seconds
+                                    let link = ctx.link().clone();
+                                    spawn_local(async move {
+                                        gloo::timers::future::TimeoutFuture::new(5000).await;
+                                        link.send_message(Msg::ClearMessages);
+                                    });
+                                } else {
+                                    // API indicated failure, but successfully parsed response
+                                    self.error_message = Some(update_response.message);
+                                    self.success_message = None;
+                                }
+                            }
+                            Err(e) => {
+                                // Attempt to get a message from the raw JSON if parsing ProfileUpdateResponse fails
+                                let message = json_value.get("message").and_then(|m| m.as_str()).unwrap_or("Failed to parse server response.");
+                                self.error_message = Some(format!("Error: {}. Details: {}", message, e));
+                                self.success_message = None;
+                            }
+                        }
+                    }
+                    Err(error_string) => {
+                        // Try to parse the error_string as JSON for more specific error
+                        if let Ok(json_error) = serde_json::from_str::<serde_json::Value>(&error_string) {
+                            let message = json_error.get("message").and_then(|m| m.as_str())
+                                .or_else(|| json_error.get("error").and_then(|e| e.as_str()))
+                                .unwrap_or("An unknown API error occurred.");
+                            self.error_message = Some(message.to_string());
+                        } else {
+                            self.error_message = Some(format!("API Error: {}", error_string));
+                        }
+                        self.success_message = None;
+                    }
+                }
+                true
+            }
             Msg::UpdateUsername(username) => {
                 self.username = username;
                 true

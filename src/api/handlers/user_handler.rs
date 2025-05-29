@@ -9,6 +9,7 @@ use crate::core::auth::jwt::Claims;
 use crate::core::user::{UserRepository, UserService};
 use crate::core::auth::AuthService;
 use crate::core::email::EmailServiceTrait;
+use crate::common::error::ApiErrorType;
 use crate::core::auth::token_revocation::TokenRevocationServiceTrait; // Added
 use crate::core::auth::active_token::ActiveTokenServiceTrait; // Added
 use crate::common::validation::{UserInput, LoginInput, TokenQuery};
@@ -358,12 +359,40 @@ impl UserHandler {
                         }
                     })),
                     Err(e) => {
-                        error!("Failed to update user: {:?}", e);
-                        HttpResponse::InternalServerError().json(json!({
-                            "success": false,
-                            "message": "Failed to update user",
-                            "error": "Internal server error"
-                        }))
+                        error!("Failed to update user {}: {:?}", user_id, e);
+                        match e.error_type {
+                            ApiErrorType::NotFound => HttpResponse::NotFound().json(json!({
+                                "success": false,
+                                "message": e.message,
+                                "error": "User not found"
+                            })),
+                            ApiErrorType::Validation => HttpResponse::BadRequest().json(json!({
+                                "success": false,
+                                "message": e.message,
+                                "error": "Validation failed",
+                                "details": e.details
+                            })),
+                            ApiErrorType::Conflict => HttpResponse::Conflict().json(json!({
+                                "success": false,
+                                "message": e.message,
+                                "error": "Conflict with existing resource"
+                            })),
+                            ApiErrorType::Unauthorized => HttpResponse::Unauthorized().json(json!({
+                                "success": false,
+                                "message": e.message,
+                                "error": "Unauthorized"
+                            })),
+                            ApiErrorType::Forbidden => HttpResponse::Forbidden().json(json!({
+                                "success": false,
+                                "message": e.message,
+                                "error": "Forbidden"
+                            })),
+                            _ => HttpResponse::InternalServerError().json(json!({
+                                "success": false,
+                                "message": "An unexpected error occurred",
+                                "error": "Internal server error"
+                            })),
+                        }
                     }
                 }
             },
