@@ -134,7 +134,7 @@ pub fn create_token_pair(
     role: String,
     secret: &str
 ) -> Result<TokenPair, jsonwebtoken::errors::Error> {
-    let audience = env::var("JWT_AUDIENCE").unwrap_or_else(|_| "default_audience".to_string());
+    let audience = env::var("JWT_AUDIENCE").unwrap_or_else(|_| "oxidizedoasis".to_string());
     let issuer = env::var("JWT_ISSUER").unwrap_or_else(|_| "default_issuer".to_string());
 
     let (access_token, _access_metadata) = create_jwt(user_id, role.clone(), secret, TokenType::Access, audience.clone(), issuer.clone())?;

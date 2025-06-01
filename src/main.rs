@@ -126,6 +126,7 @@ async fn main() -> std::io::Result<()> {
     let auth_service_arc = Arc::new(AuthService::new(
         user_repository_arc.clone(), // Use the Arc<dyn Trait>
         jwt_secret_main,
+        config.jwt.audience.clone(), // Pass the JWT audience from AppConfig
         token_revocation_service_arc.clone(),
         active_token_service_arc.clone(),
         email_service_arc.clone() // Added email_service_arc

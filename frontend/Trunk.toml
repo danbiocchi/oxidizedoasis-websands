@@ -12,6 +12,7 @@ stage = "pre_build"
 command = "cmd"
 command_arguments = ["/C", "if not exist dist\\static\\css\\core mkdir dist\\static\\css\\core && if not exist dist\\static\\css\\components\\nav mkdir dist\\static\\css\\components\\nav && if not exist dist\\static\\css\\components\\forms mkdir dist\\static\\css\\components\\forms && if not exist dist\\static\\css\\layouts mkdir dist\\static\\css\\layouts && if not exist dist\\static\\css\\utils mkdir dist\\static\\css\\utils && if not exist dist\\static\\css\\pages\\home mkdir dist\\static\\css\\pages\\home && if not exist dist\\static\\css\\pages\\about mkdir dist\\static\\css\\pages\\about && if not exist dist\\static\\css\\pages\\auth mkdir dist\\static\\css\\pages\\auth && if not exist dist\\static\\css\\pages\\dashboard mkdir dist\\static\\css\\pages\\dashboard"]
 
+
 [[hooks]]
 stage = "post_build"
 command = "cmd"

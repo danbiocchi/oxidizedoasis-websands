@@ -2,6 +2,13 @@
 pub struct AppConfig {
     pub server: ServerConfig,
     pub database: DatabaseConfig,
+    pub jwt: JwtConfig,
+}
+
+#[derive(Clone)]
+pub struct JwtConfig {
+    pub secret: String,
+    pub audience: String,
 }
 
 #[derive(Clone)]
@@ -28,6 +35,11 @@ impl AppConfig {
                 max_connections: std::env::var("DB_MAX_CONNECTIONS")
                     .unwrap_or_else(|_| "5".to_string())
                     .parse()?,
+            },
+            jwt: JwtConfig {
+                secret: std::env::var("JWT_SECRET")?,
+                audience: std::env::var("JWT_AUDIENCE")
+                    .unwrap_or_else(|_| "oxidizedoasis".to_string()),
             },
         })
     }
@@ -105,6 +117,8 @@ mod tests {
             ("SERVER_PORT", Some("9000")),
             ("DATABASE_URL", Some("postgres://test:test@localhost/testdb")),
             ("DB_MAX_CONNECTIONS", Some("10")),
+            ("JWT_SECRET", Some("supersecretjwtkey")),
+            ("JWT_AUDIENCE", Some("test_audience")),
         ];
         with_env_vars(vars, || {
             let config_result = AppConfig::from_env();
@@ -114,6 +128,8 @@ mod tests {
             assert_eq!(config.server.port, "9000");
             assert_eq!(config.database.url, "postgres://test:test@localhost/testdb");
             assert_eq!(config.database.max_connections, 10);
+            assert_eq!(config.jwt.secret, "supersecretjwtkey");
+            assert_eq!(config.jwt.audience, "test_audience");
         });
     }
 
@@ -133,6 +149,9 @@ mod tests {
             assert_eq!(config.server.port, "8080");
             assert_eq!(config.database.url, "postgres://default:default@localhost/defaultdb");
             assert_eq!(config.database.max_connections, 5);
+            // JWT_SECRET is required, so it must be set even for default tests
+            assert_eq!(config.jwt.secret, "test_default_secret");
+            assert_eq!(config.jwt.audience, "oxidizedoasis");
         });
     }
 
@@ -140,6 +159,7 @@ mod tests {
     fn test_from_env_database_url_missing() {
         let vars = vec![
             ("DATABASE_URL", None),
+            ("JWT_SECRET", Some("some_secret")), // JWT_SECRET is required, so provide it
         ];
        with_env_vars(vars, || {
             let config_result = AppConfig::from_env();
@@ -147,6 +167,20 @@ mod tests {
             let error_msg = config_result.err().unwrap().to_string();
             // std::env::VarError is "environment variable not found"
             assert!(error_msg.contains("environment variable not found") || error_msg.contains("DATABASE_URL"));
+        });
+    }
+
+    #[test]
+    fn test_from_env_jwt_secret_missing() {
+        let vars = vec![
+            ("DATABASE_URL", Some("postgres://test:test@localhost/testdb")),
+            ("JWT_SECRET", None),
+        ];
+        with_env_vars(vars, || {
+            let config_result = AppConfig::from_env();
+            assert!(config_result.is_err());
+            let error_msg = config_result.err().unwrap().to_string();
+            assert!(error_msg.contains("environment variable not found") || error_msg.contains("JWT_SECRET"));
         });
     }
 

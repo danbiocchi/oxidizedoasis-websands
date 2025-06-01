@@ -113,7 +113,7 @@ impl UserService {
         let validated_input = validate_and_sanitize_user_input(input)
             .map_err(|e| {
                 error!("Invalid input for user update {}: {:?}", id, e);
-                ApiError::new_with_type("Invalid input", ApiErrorType::Validation, Some(e.into_iter().map(|ie| ie.to_string()).collect::<Vec<String>>().join(", ")))
+                ApiError::new(e.into_iter().map(|ie| ie.to_string()).collect::<Vec<String>>().join(", "), ApiErrorType::Validation)
             })?;
 
         let current_user = self.repository.find_by_id(id).await
@@ -141,7 +141,7 @@ impl UserService {
                 })? {
                 if other_user.id != current_user.id {
                     error!("Attempt to change email for user {} to {}, but it's already in use by user {}", id, new_email_str, other_user.id);
-                    return Err(ApiError::new("Email address is already in use by a verified account.", ApiErrorType::Conflict));
+                    return Err(ApiError::new("Email address is already in use by a verified account.", ApiErrorType::Validation));
                 }
             }
 
@@ -173,7 +173,7 @@ impl UserService {
             if password_being_changed {
                 info!("Password is also being changed for user: {}", id);
                 let new_password = validated_input.password.as_ref().unwrap(); // Safe due to is_some() check
-                validate_password(new_password).map_err(|e| ApiError::new_with_type(e.to_string(), ApiErrorType::Validation, None))?; // Additional validation
+                validate_password(new_password).map_err(|e| ApiError::new(e.to_string(), ApiErrorType::Validation))?; // Additional validation
                 
                 let password_hash = hash(new_password.as_bytes(), DEFAULT_COST)
                     .map_err(|e| {
@@ -221,7 +221,7 @@ impl UserService {
             if password_being_changed {
                 info!("Password is being changed for user: {} (email not changing)", id);
                 let new_password = validated_input.password.as_ref().unwrap(); // Safe
-                validate_password(new_password).map_err(|e| ApiError::new_with_type(e.to_string(), ApiErrorType::Validation, None))?;
+                validate_password(new_password).map_err(|e| ApiError::new(e.to_string(), ApiErrorType::Validation))?;
 
                 password_hash_opt = Some(hash(new_password.as_bytes(), DEFAULT_COST)
                     .map_err(|e| {
@@ -1786,7 +1786,7 @@ mod tests {
         let result = user_service.update_user(user_id, input).await;
         assert!(result.is_err());
         let err = result.unwrap_err();
-        assert_eq!(err.error_type, ApiErrorType::Conflict);
+        assert_eq!(err.error_type, ApiErrorType::Validation);
         assert_eq!(err.message, "Email address is already in use by a verified account.");
     }
 
@@ -1965,7 +1965,7 @@ mod tests {
         // Expect email sending to fail
         mock_email_service.expect_send_verification_email()
             .times(1)
-            .returning(|_, _| Err(ApiError::new("Simulated email send failure", ApiErrorType::ExternalService))); // Or any appropriate error
+            .returning(|_, _| Err(ApiError::new("Simulated email send failure", ApiErrorType::Internal))); // Or any appropriate error
 
         let user_service = UserService::new(
             Arc::new(mock_repo),

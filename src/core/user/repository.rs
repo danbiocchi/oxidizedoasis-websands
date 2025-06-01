@@ -660,7 +660,7 @@ impl UserRepositoryTrait for UserRepository {
 mod tests {
     use super::*;
     use crate::common::validation::UserInput; // For creating users
-    use crate::config::database::DatabaseConfig; // For test DB connection
+    use crate::infrastructure::config::app_config::DatabaseConfig; // For test DB connection
     use std::sync::Arc;
     use tokio; // For async tests
 

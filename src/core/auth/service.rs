@@ -17,6 +17,7 @@ use chrono::{Utc, Duration};
 pub struct AuthService {
     user_repository: Arc<dyn UserRepositoryTrait>,
     jwt_secret: String,
+    jwt_audience: String, // Add jwt_audience field
     token_revocation_service: Arc<dyn TokenRevocationServiceTrait>,
     active_token_service: Arc<dyn ActiveTokenServiceTrait>,
     email_service: Arc<dyn EmailServiceTrait>,
@@ -26,6 +27,7 @@ impl AuthService {
     pub fn new(
         user_repository: Arc<dyn UserRepositoryTrait>,
         jwt_secret: String,
+        jwt_audience: String, // Add jwt_audience parameter
         token_revocation_service: Arc<dyn TokenRevocationServiceTrait>,
         active_token_service: Arc<dyn ActiveTokenServiceTrait>,
         email_service: Arc<dyn EmailServiceTrait>,
@@ -33,6 +35,7 @@ impl AuthService {
         Self {
             user_repository,
             jwt_secret,
+            jwt_audience, // Initialize jwt_audience
             token_revocation_service,
             active_token_service,
             email_service,
@@ -80,7 +83,7 @@ impl AuthService {
     }
 
     pub async fn validate_auth(&self, token: &str) -> Result<Claims, AuthError> {
-        let claims = match jwt::validate_jwt(&self.token_revocation_service, token, &self.jwt_secret, Some(TokenType::Access)).await {
+        let claims = match jwt::validate_jwt(&self.token_revocation_service, token, &self.jwt_secret, Some(TokenType::Access), Some(self.jwt_audience.clone()), None).await {
             Ok(claims) => claims,
             Err(e) => {
                 warn!("Token validation failed: {:?}", e);
@@ -121,7 +124,7 @@ impl AuthService {
             }
         };
 
-        let access_claims = match jwt::validate_jwt(&self.token_revocation_service, &token_pair.access_token, &self.jwt_secret, Some(TokenType::Access)).await {
+        let access_claims = match jwt::validate_jwt(&self.token_revocation_service, &token_pair.access_token, &self.jwt_secret, Some(TokenType::Access), Some(self.jwt_audience.clone()), None).await {
             Ok(claims) => claims,
             Err(_) => {
                  warn!("Refresh_token: Failed to validate newly created access token during refresh flow.");
@@ -138,7 +141,7 @@ impl AuthService {
     }
 
     async fn record_tokens_for_user(&self, user_id: uuid::Uuid, token_pair: &TokenPair) -> Result<(), AuthError> {
-        let access_claims = match jwt::validate_jwt(&self.token_revocation_service, &token_pair.access_token, &self.jwt_secret, Some(TokenType::Access)).await {
+        let access_claims = match jwt::validate_jwt(&self.token_revocation_service, &token_pair.access_token, &self.jwt_secret, Some(TokenType::Access), Some(self.jwt_audience.clone()), None).await {
             Ok(claims) => claims,
             Err(e) => {
                 warn!("record_tokens_for_user: Failed to validate access token for recording for user {}: {:?}", user_id, e);
@@ -146,7 +149,7 @@ impl AuthService {
             }
         };
 
-        let refresh_claims = match jwt::validate_jwt(&self.token_revocation_service, &token_pair.refresh_token, &self.jwt_secret, Some(TokenType::Refresh)).await {
+        let refresh_claims = match jwt::validate_jwt(&self.token_revocation_service, &token_pair.refresh_token, &self.jwt_secret, Some(TokenType::Refresh), Some(self.jwt_audience.clone()), None).await {
             Ok(claims) => claims,
             Err(e) => {
                 warn!("record_tokens_for_user: Failed to validate refresh token for recording for user {}: {:?}", user_id, e);
@@ -161,7 +164,7 @@ impl AuthService {
     }
 
     pub async fn logout(&self, access_token: &str, refresh_token: Option<&str>) -> Result<(), AuthError> {
-        let access_claims = match jwt::validate_jwt(&self.token_revocation_service, access_token, &self.jwt_secret, Some(TokenType::Access)).await {
+        let access_claims = match jwt::validate_jwt(&self.token_revocation_service, access_token, &self.jwt_secret, Some(TokenType::Access), Some(self.jwt_audience.clone()), None).await {
             Ok(claims) => claims,
             Err(e) => {
                 warn!("Logout: Failed to validate access token: {:?}", e);
@@ -172,7 +175,7 @@ impl AuthService {
         jwt::revoke_token(&self.token_revocation_service, &self.active_token_service, &access_claims.jti, access_claims.sub, TokenType::Access, Some("User logout")).await;
 
         if let Some(rt_str) = refresh_token {
-            match jwt::validate_jwt(&self.token_revocation_service, rt_str, &self.jwt_secret, Some(TokenType::Refresh)).await {
+            match jwt::validate_jwt(&self.token_revocation_service, rt_str, &self.jwt_secret, Some(TokenType::Refresh), Some(self.jwt_audience.clone()), None).await {
                 Ok(refresh_claims) => {
                      jwt::revoke_token(&self.token_revocation_service, &self.active_token_service, &refresh_claims.jti, refresh_claims.sub, TokenType::Refresh, Some("User logout")).await;
                 },
@@ -508,9 +511,10 @@ mod tests {
         let auth_service = AuthService::new(
             Arc::new(mock_user_repo),
             TEST_JWT_SECRET.to_string(),
+            "test_aud".to_string(),
             mock_trs_arc.clone(),
             mock_ats_arc_for_login.clone(),
-            setup_mock_email_service()
+            setup_mock_email_service(),
         );
 
         let login_input = LoginInput {
@@ -526,9 +530,10 @@ mod tests {
         assert!(!token_pair.access_token.is_empty());
         assert!(!token_pair.refresh_token.is_empty());
 
-        let claims = jwt::validate_jwt(&mock_trs_arc, &token_pair.access_token, TEST_JWT_SECRET, Some(TokenType::Access)).await.unwrap();
+        let claims = jwt::validate_jwt(&mock_trs_arc, &token_pair.access_token, TEST_JWT_SECRET, Some(TokenType::Access), None, None).await.unwrap();
         assert_eq!(claims.sub, test_user_id);
         assert_eq!(claims.role, "user");
+        assert_eq!(claims.aud, "test_aud"); // Add audience assertion
     }
 
     #[tokio::test]
@@ -545,9 +550,10 @@ mod tests {
         let auth_service = AuthService::new(
             Arc::new(mock_user_repo),
             TEST_JWT_SECRET.to_string(),
+            "test_aud".to_string(),
             mock_trs,
             mock_ats,
-            setup_mock_email_service()
+            setup_mock_email_service(),
         );
 
         let login_input = LoginInput {
@@ -578,9 +584,10 @@ mod tests {
         let auth_service = AuthService::new(
             Arc::new(mock_user_repo),
             TEST_JWT_SECRET.to_string(),
+            "test_aud".to_string(),
             mock_trs,
             mock_ats,
-            setup_mock_email_service()
+            setup_mock_email_service(),
         );
 
         let login_input = LoginInput {
@@ -611,9 +618,10 @@ mod tests {
         let auth_service = AuthService::new(
             Arc::new(mock_user_repo),
             TEST_JWT_SECRET.to_string(),
+            "test_aud".to_string(),
             mock_trs,
             mock_ats,
-            setup_mock_email_service()
+            setup_mock_email_service(),
         );
 
         let login_input = LoginInput {
@@ -641,9 +649,10 @@ mod tests {
         let auth_service = AuthService::new(
             Arc::new(mock_user_repo),
             TEST_JWT_SECRET.to_string(),
+            "test_aud".to_string(),
             mock_trs,
             mock_ats,
-            setup_mock_email_service()
+            setup_mock_email_service(),
         );
 
         let login_input = LoginInput {
@@ -671,17 +680,19 @@ mod tests {
 
         let token_pair = jwt::create_token_pair(test_user_id, "user".to_string(), TEST_JWT_SECRET).unwrap();
         let token_str = token_pair.access_token;
-
-        let (mock_trs_for_jwt_val, _) : (Arc<dyn TokenRevocationServiceTrait>, Arc<dyn ActiveTokenServiceTrait>) = setup_mock_services();
-        jwt::validate_jwt(&mock_trs_for_jwt_val, &token_str, TEST_JWT_SECRET, Some(TokenType::Access)).await.expect("Token for test_validate_auth_successful should be valid");
-
-        let (mock_trs, mock_ats) = setup_mock_services();
+        let test_aud = "test_aud".to_string(); // Define test audience
+ 
+         let (mock_trs_for_jwt_val, _) : (Arc<dyn TokenRevocationServiceTrait>, Arc<dyn ActiveTokenServiceTrait>) = setup_mock_services();
+        jwt::validate_jwt(&mock_trs_for_jwt_val, &token_str, TEST_JWT_SECRET, Some(TokenType::Access), Some(test_aud.clone()), None).await.expect("Token for test_validate_auth_successful should be valid");
+ 
+         let (mock_trs, mock_ats) = setup_mock_services();
         let auth_service = AuthService::new(
             Arc::new(mock_user_repo),
             TEST_JWT_SECRET.to_string(),
+            test_aud.clone(),
             mock_trs,
             mock_ats,
-            setup_mock_email_service()
+            setup_mock_email_service(),
         );
 
         let result = auth_service.validate_auth(&token_str).await;
@@ -697,23 +708,24 @@ mod tests {
         let (mock_trs, mock_ats) = setup_mock_services();
 
         let auth_service = AuthService::new(
-            Arc::new(mock_user_repo),
-            TEST_JWT_SECRET.to_string(),
-            mock_trs,
-            mock_ats,
-            setup_mock_email_service()
-        );
+           Arc::new(mock_user_repo),
+           TEST_JWT_SECRET.to_string(),
+           "test_aud".to_string(),
+           mock_trs,
+           mock_ats,
+           setup_mock_email_service(),
+       );
 
         let token_pair_diff_secret = jwt::create_token_pair(Uuid::new_v4(), "user".to_string(), "a_different_secret").unwrap();
         let token_str = token_pair_diff_secret.access_token;
 
         let (fresh_mock_trs, _) : (Arc<dyn TokenRevocationServiceTrait>, Arc<dyn ActiveTokenServiceTrait>) = setup_mock_services();
-        jwt::validate_jwt(&fresh_mock_trs, &token_str, "a_different_secret", Some(TokenType::Access)).await.expect("Token created with different secret should be valid with that secret");
+       jwt::validate_jwt(&fresh_mock_trs, &token_str, "a_different_secret", Some(TokenType::Access), Some("test_aud".to_string()), None).await.expect("Token created with different secret should be valid with that secret");
 
         let result = auth_service.validate_auth(&token_str).await;
-        assert!(result.is_err());
-        let auth_error = result.unwrap_err();
-        assert_eq!(auth_error.error_type, AuthErrorType::InvalidToken);
+       assert!(result.is_err());
+       let auth_error = result.unwrap_err();
+       assert_eq!(auth_error.error_type, AuthErrorType::InvalidToken);
     }
 
     #[tokio::test]
@@ -730,16 +742,17 @@ mod tests {
         let token_str = token_pair.access_token;
 
         let (fresh_mock_trs, _) : (Arc<dyn TokenRevocationServiceTrait>, Arc<dyn ActiveTokenServiceTrait>) = setup_mock_services();
-        jwt::validate_jwt(&fresh_mock_trs, &token_str, TEST_JWT_SECRET, Some(TokenType::Access)).await.expect("Token for test_validate_auth_user_not_found_by_id should be valid");
+       jwt::validate_jwt(&fresh_mock_trs, &token_str, TEST_JWT_SECRET, Some(TokenType::Access), Some("test_aud".to_string()), None).await.expect("Token for test_validate_auth_user_not_found_by_id should be valid");
 
         let (mock_trs, mock_ats) = setup_mock_services();
-        let auth_service = AuthService::new(
-            Arc::new(mock_user_repo),
-            TEST_JWT_SECRET.to_string(),
-            mock_trs,
-            mock_ats,
-            setup_mock_email_service()
-        );
+       let auth_service = AuthService::new(
+          Arc::new(mock_user_repo),
+          TEST_JWT_SECRET.to_string(),
+          "test_aud".to_string(),
+          mock_trs,
+          mock_ats,
+          setup_mock_email_service(),
+      );
 
         let result = auth_service.validate_auth(&token_str).await;
         assert!(result.is_err());
@@ -763,16 +776,17 @@ mod tests {
         let token_str = token_pair.access_token;
 
         let (fresh_mock_trs, _) : (Arc<dyn TokenRevocationServiceTrait>, Arc<dyn ActiveTokenServiceTrait>) = setup_mock_services();
-        jwt::validate_jwt(&fresh_mock_trs, &token_str, TEST_JWT_SECRET, Some(TokenType::Access)).await.expect("Token for test_validate_auth_user_email_not_verified should be valid");
+       jwt::validate_jwt(&fresh_mock_trs, &token_str, TEST_JWT_SECRET, Some(TokenType::Access), Some("test_aud".to_string()), None).await.expect("Token for test_validate_auth_user_email_not_verified should be valid");
 
         let (mock_trs, mock_ats) = setup_mock_services();
-        let auth_service = AuthService::new(
-            Arc::new(mock_user_repo),
-            TEST_JWT_SECRET.to_string(),
-            mock_trs,
-            mock_ats,
-            setup_mock_email_service()
-        );
+       let auth_service = AuthService::new(
+          Arc::new(mock_user_repo),
+          TEST_JWT_SECRET.to_string(),
+          "test_aud".to_string(),
+          mock_trs,
+          mock_ats,
+          setup_mock_email_service(),
+      );
 
         let result = auth_service.validate_auth(&token_str).await;
         assert!(result.is_err());
@@ -804,9 +818,10 @@ mod tests {
         let auth_service = AuthService::new(
             Arc::new(mock_user_repo),
             TEST_JWT_SECRET.to_string(),
+            "test_aud".to_string(),
             mock_trs.clone(),
             mock_ats.clone(),
-            setup_mock_email_service()
+            setup_mock_email_service(),
         );
 
         let initial_token_pair = jwt::create_token_pair(test_user_id, "user".to_string(), TEST_JWT_SECRET).unwrap();
@@ -819,10 +834,11 @@ mod tests {
         assert!(!new_token_pair.access_token.is_empty());
         assert!(!new_token_pair.refresh_token.is_empty());
         assert_ne!(new_token_pair.refresh_token, refresh_token_str, "New refresh token should be different from the old one");
-
-        let (fresh_mock_trs_val, _) : (Arc<dyn TokenRevocationServiceTrait>, Arc<dyn ActiveTokenServiceTrait>) = setup_mock_services();
-        let claims = jwt::validate_jwt(&fresh_mock_trs_val, &new_token_pair.access_token, TEST_JWT_SECRET, Some(TokenType::Access)).await.unwrap();
+ 
+         let (fresh_mock_trs_val, _) : (Arc<dyn TokenRevocationServiceTrait>, Arc<dyn ActiveTokenServiceTrait>) = setup_mock_services();
+        let claims = jwt::validate_jwt(&fresh_mock_trs_val, &new_token_pair.access_token, TEST_JWT_SECRET, Some(TokenType::Access), Some("test_aud".to_string()), None).await.unwrap();
         assert_eq!(claims.sub, test_user_id);
+        assert_eq!(claims.aud, "test_aud"); // Add audience assertion
     }
 
     #[tokio::test]
@@ -831,12 +847,13 @@ mod tests {
         let (mock_trs, mock_ats) = setup_mock_services();
 
         let auth_service = AuthService::new(
-            Arc::new(mock_user_repo),
-            TEST_JWT_SECRET.to_string(),
-            mock_trs,
-            mock_ats,
-            setup_mock_email_service()
-        );
+           Arc::new(mock_user_repo),
+           TEST_JWT_SECRET.to_string(),
+           "test_aud".to_string(),
+           mock_trs,
+           mock_ats,
+           setup_mock_email_service(),
+       );
 
         let invalid_refresh_token = "this.is.not.a.valid.token";
         let result = auth_service.refresh_token(invalid_refresh_token).await;
@@ -892,12 +909,13 @@ mod tests {
         let mock_ats: Arc<dyn ActiveTokenServiceTrait> = Arc::new(mock_ats_concrete);
 
         let auth_service = AuthService::new(
-            Arc::new(mock_user_repo),
-            TEST_JWT_SECRET.to_string(),
-            mock_trs,
-            mock_ats,
-            setup_mock_email_service()
-        );
+           Arc::new(mock_user_repo),
+           TEST_JWT_SECRET.to_string(),
+           "test_aud".to_string(),
+           mock_trs,
+           mock_ats,
+           setup_mock_email_service(),
+       );
 
         let token_pair = jwt::create_token_pair(test_user_id, "user".to_string(), TEST_JWT_SECRET).unwrap();
 
@@ -935,12 +953,13 @@ mod tests {
         let mock_ats: Arc<dyn ActiveTokenServiceTrait> = Arc::new(mock_ats_concrete);
 
         let auth_service = AuthService::new(
-            Arc::new(mock_user_repo),
-            TEST_JWT_SECRET.to_string(),
-            mock_trs,
-            mock_ats,
-            setup_mock_email_service()
-        );
+           Arc::new(mock_user_repo),
+           TEST_JWT_SECRET.to_string(),
+           "test_aud".to_string(),
+           mock_trs,
+           mock_ats,
+           setup_mock_email_service(),
+       );
 
         let token_pair = jwt::create_token_pair(test_user_id, "user".to_string(), TEST_JWT_SECRET).unwrap();
 
@@ -956,9 +975,10 @@ mod tests {
         let auth_service = AuthService::new(
             Arc::new(mock_user_repo),
             TEST_JWT_SECRET.to_string(),
+            "test_aud".to_string(),
             mock_trs,
             mock_ats,
-            setup_mock_email_service()
+            setup_mock_email_service(),
         );
 
         let result = auth_service.logout("invalid.access.token", None).await;
@@ -967,18 +987,10 @@ mod tests {
         assert_eq!(auth_error.error_type, AuthErrorType::InvalidToken);
     }
 
-    /*
-    // TODO: This test is temporarily commented out due to a persistent lifetime error:
-    // "verification_token does not live long enough" on the auth_service.register call.
-    // This error occurs even after simplifying mock predicates and ensuring owned String data
-    // is used for the verification token within the register method and its mock interactions.
-    // The issue likely involves a complex interaction between async, mockall, and lifetimes
-    // that requires further investigation.
-
-    // #[tokio::test]
-    // async fn test_register_successful() {
-    //     let mut mock_user_repo = MockUserRepositoryTrait::new();
-    //     let mut mock_email_service = MockEmailServiceTrait::new();
+    #[tokio::test]
+    async fn test_register_successful() {
+        let mut mock_user_repo = MockUserRepositoryTrait::new();
+        let mut mock_email_service = MockEmailServiceTrait::new();
         let (mock_trs, mock_ats) = setup_mock_services();
 
         let register_input = RegisterInput {
@@ -993,11 +1005,6 @@ mod tests {
         let cloned_input_email = register_input.email.clone();
         let password_for_closure_verification = register_input.password.clone();
 
-        // Token capturing mechanism fully removed for this test to isolate lifetime error.
-        // let captured_token_for_email_check: Arc<std::sync::Mutex<Option<String>>> = Arc::new(std::sync::Mutex::new(None));
-        // let captured_token_clone_for_create_user = captured_token_for_email_check.clone();
-        // let captured_token_clone_for_send_email = captured_token_for_email_check.clone();
-
         mock_user_repo.expect_find_by_username()
             .with(predicate::eq(register_input.username.clone()))
             .times(1)
@@ -1007,26 +1014,24 @@ mod tests {
             .times(1)
             .returning(|_| Ok(None));
         mock_user_repo.expect_create_user()
-            // Restore .withf but without token capture logic inside it for now
             .withf(move |new_user: &NewUser| {
-                new_user.username == cloned_input_username && // Use moved cloned_input_username
-                new_user.email.as_deref() == Some(cloned_input_email.as_str()) && // Use moved cloned_input_email
+                new_user.username == cloned_input_username &&
+                new_user.email.as_deref() == Some(cloned_input_email.as_str()) &&
                 bcrypt::verify(&password_for_closure_verification, &new_user.password_hash).unwrap_or(false) &&
                 !new_user.is_email_verified &&
                 new_user.role == "user" &&
-                new_user.verification_token.is_some() && // Still check a token exists
+                new_user.verification_token.is_some() &&
                 new_user.verification_token_expires_at.is_some()
             })
             .times(1)
-            .returning(move |new_user_data| { 
-                // No token capture. User token will be None.
+            .returning(move |new_user_data| {
                 Ok(User {
                     id: expected_user_id,
                     username: new_user_data.username.clone(),
                     email: new_user_data.email.clone(),
                     password_hash: new_user_data.password_hash.clone(),
                     is_email_verified: new_user_data.is_email_verified,
-                    verification_token: None, // Set to None to simplify lifetime issues
+                    verification_token: None,
                     verification_token_expires_at: new_user_data.verification_token_expires_at,
                     created_at: Utc::now(),
                     updated_at: Utc::now(),
@@ -1038,7 +1043,6 @@ mod tests {
         mock_email_service.expect_send_verification_email()
             .with(
                 predicate::eq("newuser@example.com"),
-                // Verify that a non-empty token is sent, but not its exact value against a captured one
                 predicate::function(|token_arg: &str| !token_arg.is_empty())
             )
             .times(1)
@@ -1047,6 +1051,7 @@ mod tests {
         let auth_service = AuthService::new(
             Arc::new(mock_user_repo),
             TEST_JWT_SECRET.to_string(),
+            "test_aud".to_string(),
             mock_trs,
             mock_ats,
             Arc::new(mock_email_service),
@@ -1059,13 +1064,9 @@ mod tests {
         assert_eq!(user.username, "newuser");
         assert_eq!(user.email.unwrap(), "newuser@example.com");
         assert!(!user.is_email_verified);
-        assert!(user.verification_token.is_none()); // Adjusted assertion
-    // }
-    */
+        assert!(user.verification_token.is_none());
+    }
 
-    /*
-    // TODO: Temporarily commented out due to persistent lifetime errors when calling auth_service.register().
-    // Needs further investigation into async/mockall lifetime interactions.
     #[tokio::test]
     async fn test_register_username_exists() {
         let mut mock_user_repo = MockUserRepositoryTrait::new();
@@ -1092,6 +1093,7 @@ mod tests {
         let auth_service = AuthService::new(
             Arc::new(mock_user_repo),
             TEST_JWT_SECRET.to_string(),
+            "test_aud".to_string(),
             mock_trs,
             mock_ats,
             mock_email_service,
@@ -1102,10 +1104,7 @@ mod tests {
         let auth_error = result.unwrap_err();
         assert_eq!(auth_error.error_type, AuthErrorType::UserAlreadyExists);
     }
-    */
 
-    /*
-    // TODO: Temporarily commented out due to persistent lifetime errors when calling auth_service.register().
     #[tokio::test]
     async fn test_register_email_exists() {
         let mut mock_user_repo = MockUserRepositoryTrait::new();
@@ -1150,6 +1149,7 @@ mod tests {
         let auth_service = AuthService::new(
             Arc::new(mock_user_repo),
             TEST_JWT_SECRET.to_string(),
+            "test_aud".to_string(),
             mock_trs,
             mock_ats,
             mock_email_service,
@@ -1160,10 +1160,7 @@ mod tests {
         let auth_error = result.unwrap_err();
         assert_eq!(auth_error.error_type, AuthErrorType::UserAlreadyExists);
     }
-    */
 
-    /*
-    // TODO: Temporarily commented out due to persistent lifetime errors when calling auth_service.register().
     #[tokio::test]
     async fn test_register_email_send_failure_still_creates_user() {
         let mut mock_user_repo = MockUserRepositoryTrait::new();
@@ -1220,6 +1217,7 @@ mod tests {
         let auth_service = AuthService::new(
             Arc::new(mock_user_repo),
             TEST_JWT_SECRET.to_string(),
+            "test_aud".to_string(),
             mock_trs,
             mock_ats,
             Arc::new(mock_email_service),
@@ -1230,11 +1228,7 @@ mod tests {
         let user = result.unwrap();
         assert_eq!(user.username, "emailfailuser");
     }
-    */
 
-    /*
-    // TODO: Temporarily commented out due to persistent lifetime error "verification_token does not live long enough"
-    // when calling auth_service.change_password(). Needs further investigation.
     #[tokio::test]
     async fn test_change_password_successful() {
         let mut mock_user_repo = MockUserRepositoryTrait::new();
@@ -1258,26 +1252,21 @@ mod tests {
                 Ok(())
             });
 
-        // Use the general mock services. The specific call to revoke_all_user_tokens is commented out in AuthService::change_password
-        // so no specific expectation is needed here for that call from TokenRevocationService.
         let (mock_trs_from_setup, mock_ats_from_setup) = setup_mock_services();
 
         let auth_service = AuthService::new(
             Arc::new(mock_user_repo),
             TEST_JWT_SECRET.to_string(),
-            mock_trs_from_setup, // Use mock from setup_mock_services
-            mock_ats_from_setup, // Use mock from setup_mock_services
+            "test_aud".to_string(),
+            mock_trs_from_setup,
+            mock_ats_from_setup,
             setup_mock_email_service(),
         );
 
         let result = auth_service.change_password(test_user_id, old_password.to_string(), new_password.to_string()).await;
         assert!(result.is_ok());
     }
-    */
 
-    /*
-    // TODO: Temporarily commented out due to persistent lifetime error "verification_token does not live long enough"
-    // when calling auth_service.change_password(). Needs further investigation.
     #[tokio::test]
     async fn test_change_password_user_not_found() {
         let mut mock_user_repo = MockUserRepositoryTrait::new();
@@ -1294,9 +1283,10 @@ mod tests {
         let auth_service = AuthService::new(
             Arc::new(mock_user_repo),
             TEST_JWT_SECRET.to_string(),
+            "test_aud".to_string(),
             mock_trs,
             mock_ats,
-            setup_mock_email_service()
+            setup_mock_email_service(),
         );
 
         let result = auth_service.change_password(test_user_id, old_password.to_string(), new_password.to_string()).await;
@@ -1304,16 +1294,11 @@ mod tests {
         let auth_error = result.unwrap_err();
         assert_eq!(auth_error.error_type, AuthErrorType::UserNotFound);
     }
-    */
 
-    /*
-    // TODO: Temporarily commented out due to persistent lifetime error "verification_token does not live long enough"
-    // when calling auth_service.change_password(). Needs further investigation.
     #[tokio::test]
     async fn test_change_password_incorrect_old_password() {
         let mut mock_user_repo = MockUserRepositoryTrait::new();
         let test_user_id = Uuid::new_v4();
-        // let old_password = "OldPassword123!"; // Not used directly in this test's logic path
         let wrong_old_password = "WrongOldPassword!";
         let new_password = "NewPassword123!";
         let test_user = create_test_user(test_user_id, "passwordchangeuser", true, "user");
@@ -1330,6 +1315,7 @@ mod tests {
         let auth_service = AuthService::new(
             Arc::new(mock_user_repo),
             TEST_JWT_SECRET.to_string(),
+            "test_aud".to_string(),
             mock_trs,
             mock_ats,
             setup_mock_email_service(),
@@ -1340,11 +1326,7 @@ mod tests {
         let auth_error = result.unwrap_err();
         assert_eq!(auth_error.error_type, AuthErrorType::InvalidCredentials);
     }
-    */
 
-    /*
-    // TODO: Temporarily commented out due to persistent lifetime error "verification_token does not live long enough"
-    // when calling auth_service.change_password(). Needs further investigation.
     #[tokio::test]
     async fn test_change_password_user_repo_find_fails() {
         let mut mock_user_repo = MockUserRepositoryTrait::new();
@@ -1361,43 +1343,7 @@ mod tests {
         let auth_service = AuthService::new(
             Arc::new(mock_user_repo),
             TEST_JWT_SECRET.to_string(),
-            mock_trs,
-            mock_ats,
-            setup_mock_email_service(),
-        );
-
-        let result = auth_service.change_password(test_user_id, old_password.to_string(), new_password.to_string()).await;
-        assert!(result.is_err());
-        let auth_error = result.unwrap_err();
-        assert_eq!(auth_error.error_type, AuthErrorType::InternalServerError);
-    }
-    */
-
-    #[tokio::test]
-    async fn test_change_password_user_repo_update_fails() {
-        let mut mock_user_repo = MockUserRepositoryTrait::new();
-        let test_user_id = Uuid::new_v4();
-        let old_password = "password123"; // Corrected to match create_test_user
-        let new_password = "NewPassword123!"; // Used for hashing expectation
-        let test_user = create_test_user(test_user_id, "passwordchangeuser", true, "user");
-        let cloned_user = test_user.clone();
-
-        mock_user_repo.expect_find_by_id()
-            .with(predicate::eq(test_user_id))
-            .times(1)
-            .returning(move |_| Ok(Some(cloned_user.clone())));
-
-        mock_user_repo.expect_update_password()
-            .withf(move |uid, new_hash| {
-                *uid == test_user_id && bcrypt::verify(&new_password, new_hash).is_ok()
-            })
-            .times(1)
-            .returning(|_, _| Err(SqlxError::RowNotFound));
-
-        let (mock_trs, mock_ats) = setup_mock_services();
-        let auth_service = AuthService::new(
-            Arc::new(mock_user_repo),
-            TEST_JWT_SECRET.to_string(),
+            "test_aud".to_string(),
             mock_trs,
             mock_ats,
             setup_mock_email_service(),
@@ -1409,8 +1355,6 @@ mod tests {
         assert_eq!(auth_error.error_type, AuthErrorType::InternalServerError);
     }
 
-    /*
-    // TODO: Temporarily commented out due to persistent lifetime errors when calling auth_service.register().
     #[tokio::test]
     async fn test_register_user_repo_create_user_fails() {
         let mut mock_user_repo = MockUserRepositoryTrait::new();
@@ -1433,6 +1377,7 @@ mod tests {
         let auth_service = AuthService::new(
             Arc::new(mock_user_repo),
             TEST_JWT_SECRET.to_string(),
+            "test_aud".to_string(),
             mock_trs,
             mock_ats,
             mock_email_service,
@@ -1443,11 +1388,7 @@ mod tests {
         let auth_error = result.unwrap_err();
         assert_eq!(auth_error.error_type, AuthErrorType::InternalServerError);
     }
-    */
 
-    /*
-    // TODO: Temporarily commented out due to persistent lifetime error "verification_token does not live long enough"
-    // when calling async AuthService methods. Needs further investigation.
     #[tokio::test]
     async fn test_verify_email_successful() {
         let mut mock_user_repo = MockUserRepositoryTrait::new();
@@ -1470,6 +1411,7 @@ mod tests {
         let auth_service = AuthService::new(
             Arc::new(mock_user_repo),
             TEST_JWT_SECRET.to_string(),
+            "test_aud".to_string(),
             mock_trs,
             mock_ats,
             setup_mock_email_service(),
@@ -1478,11 +1420,7 @@ mod tests {
         let result = auth_service.verify_email(&verification_token).await;
         assert!(result.is_ok());
     }
-    */
 
-    /*
-    // TODO: Temporarily commented out due to persistent lifetime error "verification_token does not live long enough"
-    // when calling async AuthService methods. Needs further investigation.
     #[tokio::test]
     async fn test_verify_email_invalid_token() {
         let mut mock_user_repo = MockUserRepositoryTrait::new();
@@ -1502,6 +1440,7 @@ mod tests {
         let auth_service = AuthService::new(
             Arc::new(mock_user_repo),
             TEST_JWT_SECRET.to_string(),
+            "test_aud".to_string(),
             mock_trs,
             mock_ats,
             setup_mock_email_service(),
@@ -1512,11 +1451,7 @@ mod tests {
         let auth_error = result.unwrap_err();
         assert_eq!(auth_error.error_type, AuthErrorType::InvalidVerificationToken);
     }
-    */
 
-    /*
-    // TODO: Temporarily commented out due to persistent lifetime error "verification_token does not live long enough"
-    // when calling async AuthService methods. Needs further investigation.
     #[tokio::test]
     async fn test_verify_email_token_expired() {
         let mut mock_user_repo = MockUserRepositoryTrait::new();
@@ -1553,6 +1488,7 @@ mod tests {
         let auth_service = AuthService::new(
             Arc::new(mock_user_repo),
             TEST_JWT_SECRET.to_string(),
+            "test_aud".to_string(),
             mock_trs,
             mock_ats,
             setup_mock_email_service(),
@@ -1563,18 +1499,14 @@ mod tests {
         let auth_error = result.unwrap_err();
         assert_eq!(auth_error.error_type, AuthErrorType::VerificationTokenExpired);
     }
-    */
 
-    /*
-    // TODO: Temporarily commented out due to persistent lifetime error "verification_token does not live long enough"
-    // when calling async AuthService methods. Needs further investigation.
     #[tokio::test]
     async fn test_verify_email_user_repo_find_fails() {
         let mut mock_user_repo = MockUserRepositoryTrait::new();
         let verification_token = Uuid::new_v4().to_string();
 
         mock_user_repo.expect_verify_email()
-            .with(predicate::eq(verification_token.as_str()))
+            .with(predicate::eq(verification_token.clone()))
             .times(1)
             .returning(|_| Err(SqlxError::RowNotFound));
 
@@ -1582,6 +1514,7 @@ mod tests {
         let auth_service = AuthService::new(
             Arc::new(mock_user_repo),
             TEST_JWT_SECRET.to_string(),
+            "test_aud".to_string(),
             mock_trs,
             mock_ats,
             setup_mock_email_service(),
@@ -1592,11 +1525,7 @@ mod tests {
         let auth_error = result.unwrap_err();
         assert_eq!(auth_error.error_type, AuthErrorType::InternalServerError);
     }
-    */
 
-    /*
-    // TODO: Temporarily commented out due to persistent lifetime error "verification_token does not live long enough"
-    // when calling async AuthService methods. Needs further investigation.
     #[tokio::test]
     async fn test_verify_email_user_repo_update_fails() {
         let mut mock_user_repo = MockUserRepositoryTrait::new();
@@ -1633,6 +1562,7 @@ mod tests {
         let auth_service = AuthService::new(
             Arc::new(mock_user_repo),
             TEST_JWT_SECRET.to_string(),
+            "test_aud".to_string(),
             mock_trs,
             mock_ats,
             setup_mock_email_service(),
@@ -1643,11 +1573,7 @@ mod tests {
         let auth_error = result.unwrap_err();
         assert_eq!(auth_error.error_type, AuthErrorType::InvalidVerificationToken);
     }
-    */
 
-    /*
-    // TODO: Temporarily commented out due to persistent lifetime error "verification_token does not live long enough"
-    // when calling async AuthService methods. Needs further investigation.
     #[tokio::test]
     async fn test_request_password_reset_successful() {
         let mut mock_user_repo = MockUserRepositoryTrait::new();
@@ -1672,7 +1598,7 @@ mod tests {
         let cloned_user = test_user.clone();
 
         let reset_token_value = "test_reset_token".to_string();
-        let reset_token_model = PasswordResetToken { // Corrected: Use PasswordResetToken directly
+        let reset_token_model = PasswordResetToken {
             id: Uuid::new_v4(),
             user_id: test_user_id,
             token: reset_token_value.clone(),
@@ -1701,6 +1627,7 @@ mod tests {
         let auth_service = AuthService::new(
             Arc::new(mock_user_repo),
             TEST_JWT_SECRET.to_string(),
+            "test_aud".to_string(),
             mock_trs,
             mock_ats,
             Arc::new(mock_email_service),
@@ -1709,7 +1636,6 @@ mod tests {
         let result = auth_service.request_password_reset(test_email.clone()).await;
         assert!(result.is_ok());
     }
-    */
 
     #[tokio::test]
     async fn test_request_password_reset_user_not_found() {
@@ -1728,6 +1654,7 @@ mod tests {
         let auth_service = AuthService::new(
             Arc::new(mock_user_repo),
             TEST_JWT_SECRET.to_string(),
+            "test_aud".to_string(),
             mock_trs,
             mock_ats,
             Arc::new(mock_email_service),
@@ -1786,6 +1713,7 @@ mod tests {
         let auth_service = AuthService::new(
             Arc::new(mock_user_repo),
             TEST_JWT_SECRET.to_string(),
+            "test_aud".to_string(),
             mock_trs,
             mock_ats,
             Arc::new(mock_email_service),
@@ -1823,6 +1751,7 @@ mod tests {
         let auth_service = AuthService::new(
             Arc::new(mock_user_repo),
             TEST_JWT_SECRET.to_string(),
+            "test_aud".to_string(),
             mock_trs,
             mock_ats,
             mock_email_service,
@@ -1850,6 +1779,7 @@ mod tests {
         let auth_service = AuthService::new(
             Arc::new(mock_user_repo),
             TEST_JWT_SECRET.to_string(),
+            "test_aud".to_string(),
             mock_trs,
             mock_ats,
             mock_email_service,
@@ -1880,6 +1810,7 @@ mod tests {
         let auth_service = AuthService::new(
             Arc::new(mock_user_repo),
             TEST_JWT_SECRET.to_string(),
+            "test_aud".to_string(),
             mock_trs,
             mock_ats,
             mock_email_service,
@@ -1913,6 +1844,7 @@ mod tests {
         let auth_service = AuthService::new(
             Arc::new(mock_user_repo),
             TEST_JWT_SECRET.to_string(),
+            "test_aud".to_string(),
             mock_trs,
             mock_ats,
             mock_email_service,
@@ -1939,12 +1871,13 @@ mod tests {
             .returning(|_| Err(SqlxError::RowNotFound)); // Simulate a generic DB error
 
         let auth_service = AuthService::new(
-            Arc::new(mock_user_repo),
-            TEST_JWT_SECRET.to_string(),
-            mock_trs,
-            mock_ats,
-            mock_email_service,
-        );
+           Arc::new(mock_user_repo),
+           TEST_JWT_SECRET.to_string(),
+           "test_aud".to_string(),
+           mock_trs,
+           mock_ats,
+           mock_email_service,
+       );
 
         let result = auth_service.verify_password_reset_token(&token_str).await;
         assert!(result.is_err());
@@ -2011,8 +1944,9 @@ mod tests {
         let auth_service = AuthService::new(
             Arc::new(mock_user_repo),
             TEST_JWT_SECRET.to_string(),
-            Arc::new(specific_mock_trs), // Pass the Arc of the specifically configured mock
-            mock_ats_arc,                
+            "test_aud".to_string(), // Added jwt_audience
+            Arc::new(specific_mock_trs),
+            mock_ats_arc,
             mock_email_service,
         );
 
@@ -2039,6 +1973,7 @@ mod tests {
         let auth_service = AuthService::new(
             Arc::new(mock_user_repo),
             TEST_JWT_SECRET.to_string(),
+            "test_aud".to_string(),
             mock_trs,
             mock_ats,
             mock_email_service,
@@ -2090,6 +2025,7 @@ mod tests {
         let auth_service = AuthService::new(
             Arc::new(mock_user_repo),
             TEST_JWT_SECRET.to_string(),
+            "test_aud".to_string(),
             mock_trs,
             mock_ats,
             mock_email_service,

@@ -46,7 +46,7 @@ pub async fn admin_validator(req: ServiceRequest, credentials: BearerAuth) -> Re
     debug!("Attempting to validate token for admin access");
 
     // Validate as an access token - we don't accept refresh tokens for API access
-    let validation_result = validate_jwt(&token_revocation_service, token, &jwt_secret, Some(TokenType::Access)).await;
+    let validation_result = validate_jwt(&token_revocation_service, token, &jwt_secret, Some(TokenType::Access), None, None).await;
     
     match validation_result {
         Ok(claims) => {
@@ -157,7 +157,9 @@ mod tests {
     fn create_test_claims_for_middleware(user_id: Uuid, role: &str, exp_duration_secs: i64) -> Claims {
         let now = Utc::now();
         let iat_ts = now.timestamp();
-        Claims {
+        Claims { // Added aud and iss fields
+            aud: "".to_string(), // Placeholder, actual audience should come from validated token
+            iss: "".to_string(), // Placeholder, actual issuer should come from validated token
             sub: user_id,
             role: role.to_string(),
             exp: (now + Duration::seconds(exp_duration_secs)).timestamp(),

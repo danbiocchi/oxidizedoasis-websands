@@ -370,19 +370,19 @@ impl UserHandler {
                                 "success": false,
                                 "message": e.message,
                                 "error": "Validation failed",
-                                "details": e.details
+                                "message": e.message
                             })),
-                            ApiErrorType::Conflict => HttpResponse::Conflict().json(json!({
+                            ApiErrorType::Validation => HttpResponse::BadRequest().json(json!({
                                 "success": false,
                                 "message": e.message,
                                 "error": "Conflict with existing resource"
                             })),
-                            ApiErrorType::Unauthorized => HttpResponse::Unauthorized().json(json!({
+                            ApiErrorType::Authentication => HttpResponse::Unauthorized().json(json!({
                                 "success": false,
                                 "message": e.message,
                                 "error": "Unauthorized"
                             })),
-                            ApiErrorType::Forbidden => HttpResponse::Forbidden().json(json!({
+                            ApiErrorType::Authorization => HttpResponse::Forbidden().json(json!({
                                 "success": false,
                                 "message": e.message,
                                 "error": "Forbidden"
