@@ -110,7 +110,7 @@ async fn jwt_auth_validator_internal(
     };
 
     debug!("Validating JWT token");
-    let validation_result = validate_jwt(&token_revocation_service, &token[..], &jwt_secret, Some(TokenType::Access)).await;
+    let validation_result = validate_jwt(&token_revocation_service, &token[..], &jwt_secret, Some(TokenType::Access), None, None).await;
     
     match validation_result {
         Ok(claims) => {
@@ -203,7 +203,9 @@ mod tests {
     fn generate_test_token_auth(user_id: Uuid, role: &str, secret: &str, exp_duration_secs: i64) -> String {
         let now = Utc::now();
         let iat_ts = now.timestamp();
-        let claims = Claims {
+        let claims = Claims { // Added aud and iss fields
+            aud: "".to_string(), // Placeholder, actual audience should come from validated token
+            iss: "".to_string(), // Placeholder, actual issuer should come from validated token
             sub: user_id,
             role: role.to_string(),
             exp: (now + Duration::seconds(exp_duration_secs)).timestamp(),
@@ -521,7 +523,7 @@ where
                 }
             };
 
-            match validate_jwt(&token_revocation_service, &token, &jwt_secret, Some(TokenType::Access)).await {
+            match validate_jwt(&token_revocation_service, &token, &jwt_secret, Some(TokenType::Access), None, None).await {
                 Ok(claims) => {
                     debug!("Token validated successfully for user: {}", claims.sub);
                     req.extensions_mut().insert(claims);
@@ -569,7 +571,7 @@ pub async fn cookie_auth_middleware(
     };
 
     debug!("Validating JWT token from cookie");
-    let validation_result = validate_jwt(&token_revocation_service, &token, &jwt_secret, Some(TokenType::Access)).await;
+    let validation_result = validate_jwt(&token_revocation_service, &token, &jwt_secret, Some(TokenType::Access), None, None).await;
     
     match validation_result {
         Ok(claims) => {

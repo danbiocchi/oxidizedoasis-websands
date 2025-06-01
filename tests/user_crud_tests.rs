@@ -6,14 +6,14 @@ mod tests {
     use uuid::Uuid;
     use chrono::Utc;
 
-    use rust_backend_template_for_mass_production::core::user::{User, UserRepositoryTrait, MockUserRepositoryTrait, UserError};
-    use rust_backend_template_for_mass_production::api::routes::admin::user_management::{
+    use crate::core::user::{User, UserRepositoryTrait, MockUserRepositoryTrait, UserError};
+    use crate::api::routes::admin::user_management::{
         update_user_role, update_user_status, UpdateRoleRequest, UpdateStatusRequest,
         list_users, get_user, delete_user, update_user_username, UpdateUsernameRequest
     };
-    use rust_backend_template_for_mass_production::core::auth::jwt::Claims;
-    use rust_backend_template_for_mass_production::api::error_handling::api_error_handler;
-    use rust_backend_template_for_mass_production::common::error::ApiErrorType;
+    use crate::core::auth::jwt::Claims;
+    use crate::api::error_handling::api_error_handler;
+    use crate::common::error::ApiErrorType;
 
     // Helper function to create a mock user
     fn mock_user(id: Uuid, username: &str, role: &str, is_active: bool) -> User {
@@ -46,9 +46,14 @@ mod tests {
 
         let claims = Claims {
             sub: admin_user_id, // Admin's own ID
-            exp: (Utc::now() + chrono::Duration::days(1)).timestamp() as usize,
+            exp: (Utc::now() + chrono::Duration::days(1)).timestamp(), // Changed to i64
+            iat: Utc::now().timestamp(), // Added iat
+            nbf: Utc::now().timestamp(), // Added nbf
+            jti: Uuid::new_v4().to_string(), // Added jti
             role: "admin".to_string(),
-            username: "admin_user".to_string(),
+            token_type: crate::core::auth::jwt::TokenType::Access, // Added token_type
+            aud: "test_aud".to_string(), // Added aud
+            iss: "test_iss".to_string(), // Added iss
         };
 
         let app = test::init_service(
@@ -95,9 +100,14 @@ mod tests {
 
         let claims = Claims {
             sub: admin_user_id, // Admin's ID
-            exp: (Utc::now() + chrono::Duration::days(1)).timestamp() as usize,
+            exp: (Utc::now() + chrono::Duration::days(1)).timestamp(), // Changed to i64
+            iat: Utc::now().timestamp(), // Added iat
+            nbf: Utc::now().timestamp(), // Added nbf
+            jti: Uuid::new_v4().to_string(), // Added jti
             role: "admin".to_string(),
-            username: "admin_user".to_string(),
+            token_type: crate::core::auth::jwt::TokenType::Access, // Added token_type
+            aud: "test_aud".to_string(), // Added aud
+            iss: "test_iss".to_string(), // Added iss
         };
 
         let app = test::init_service(
@@ -135,9 +145,14 @@ mod tests {
 
         let claims = Claims {
             sub: admin_user_id, // Admin's own ID
-            exp: (Utc::now() + chrono::Duration::days(1)).timestamp() as usize,
+            exp: (Utc::now() + chrono::Duration::days(1)).timestamp(), // Changed to i64
+            iat: Utc::now().timestamp(), // Added iat
+            nbf: Utc::now().timestamp(), // Added nbf
+            jti: Uuid::new_v4().to_string(), // Added jti
             role: "admin".to_string(),
-            username: "admin_user".to_string(),
+            token_type: crate::core::auth::jwt::TokenType::Access, // Added token_type
+            aud: "test_aud".to_string(), // Added aud
+            iss: "test_iss".to_string(), // Added iss
         };
 
         let app = test::init_service(
@@ -184,9 +199,14 @@ mod tests {
 
         let claims = Claims {
             sub: admin_user_id, // Admin's ID
-            exp: (Utc::now() + chrono::Duration::days(1)).timestamp() as usize,
+            exp: (Utc::now() + chrono::Duration::days(1)).timestamp(), // Changed to i64
+            iat: Utc::now().timestamp(), // Added iat
+            nbf: Utc::now().timestamp(), // Added nbf
+            jti: Uuid::new_v4().to_string(), // Added jti
             role: "admin".to_string(),
-            username: "admin_user".to_string(),
+            token_type: crate::core::auth::jwt::TokenType::Access, // Added token_type
+            aud: "test_aud".to_string(), // Added aud
+            iss: "test_iss".to_string(), // Added iss
         };
 
         let app = test::init_service(
@@ -230,9 +250,14 @@ mod tests {
 
         let claims = Claims {
             sub: admin_user_id, // Admin's own ID
-            exp: (Utc::now() + chrono::Duration::days(1)).timestamp() as usize,
+            exp: (Utc::now() + chrono::Duration::days(1)).timestamp(), // Changed to i64
+            iat: Utc::now().timestamp(), // Added iat
+            nbf: Utc::now().timestamp(), // Added nbf
+            jti: Uuid::new_v4().to_string(), // Added jti
             role: "admin".to_string(),
-            username: "admin_user".to_string(),
+            token_type: crate::core::auth::jwt::TokenType::Access, // Added token_type
+            aud: "test_aud".to_string(), // Added aud
+            iss: "test_iss".to_string(), // Added iss
         };
 
         let app = test::init_service(

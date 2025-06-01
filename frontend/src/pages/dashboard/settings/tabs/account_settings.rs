@@ -1,9 +1,9 @@
 use yew::prelude::*;
 use web_sys::HtmlInputElement;
 use wasm_bindgen_futures::spawn_local;
-use crate::services::request::Request; // Import Request service
+use gloo::net::http::Request; // Import Request service directly
 use serde::{Deserialize, Serialize}; // Import serde traits
-use serde_json; // Import serde_json for parsing
+use serde_json::{self, json}; // Import serde_json for parsing and json! macro
 
 // Helper Structs for API responses
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
@@ -12,7 +12,7 @@ pub struct User {
     pub username: String,
     pub email: Option<String>,
     pub is_email_verified: bool,
-    // pub role: String, // Uncomment if needed
+    pub role: String, // Uncommented and added
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
@@ -47,14 +47,11 @@ pub struct AccountSettings {
 }
 
 pub enum Msg {
-    UserLoaded(Result<serde_json::Value, String>), // Updated
-    ProfileUpdateResponse(Result<serde_json::Value, String>), // Added
+    UserLoaded(Result<serde_json::Value, String>),
+    ProfileUpdateResponse(Result<serde_json::Value, String>),
     UpdateUsername(String),
     UpdateEmail(String),
     SaveChanges,
-    // SaveSuccess and SaveError might be replaced by ProfileUpdateResponse handling
-    // For now, let's keep them if they are used for UI feedback distinct from API response.
-    // We'll use success_message and error_message fields directly.
     ClearMessages,
 }
 
@@ -67,7 +64,15 @@ impl Component for AccountSettings {
         let link = ctx.link().clone();
         spawn_local(async move {
             let response = Request::get("/api/cookie/users/me").send().await;
-            link.send_message(Msg::UserLoaded(response));
+            let result = match response {
+                Ok(resp) => {
+                    // resp.json().await returns Result<serde_json::Value, gloo::net::Error>
+                    // We need to map the inner error to String as well
+                    resp.json().await.map_err(|e| e.to_string())
+                },
+                Err(e) => Err(e.to_string()),
+            };
+            link.send_message(Msg::UserLoaded(result));
         });
 
         Self {
@@ -194,31 +199,30 @@ impl Component for AccountSettings {
                 let link = ctx.link().clone();
                 
                 // Simulate API call with a timeout
-                spawn_local(async move {
-                    gloo::timers::future::TimeoutFuture::new(1000).await;
-                    link.send_message(Msg::SaveSuccess("Profile updated successfully".to_string()));
-                });
-                
-                true
-            }
-            Msg::SaveSuccess(message) => {
-                self.success_message = Some(message);
-                self.error_message = None;
-                self.is_loading = false;
-                
-                // Clear success message after 5 seconds
+                let user_id = self.user_id.clone().unwrap_or_default(); // Get user ID
                 let link = ctx.link().clone();
                 spawn_local(async move {
-                    gloo::timers::future::TimeoutFuture::new(5000).await;
-                    link.send_message(Msg::ClearMessages);
+                    let update_payload = json!({
+                        "username": username,
+                        "email": email,
+                    });
+
+                    let response = Request::put(&format!("/api/cookie/users/{}", user_id))
+                        .header("Content-Type", "application/json")
+                        .json(&update_payload)
+                        .expect("Failed to build request")
+                        .send()
+                        .await;
+
+                    let result = match response {
+                        Ok(resp) => {
+                            resp.json().await.map_err(|e| e.to_string())
+                        },
+                        Err(e) => Err(e.to_string()),
+                    };
+                    link.send_message(Msg::ProfileUpdateResponse(result));
                 });
                 
-                true
-            }
-            Msg::SaveError(error) => {
-                self.error_message = Some(error);
-                self.success_message = None;
-                self.is_loading = false;
                 true
             }
             Msg::ClearMessages => {
