@@ -240,7 +240,7 @@ pub async fn refresh_token_pair(
     refresh_token_str: &str,
     secret: &str
 ) -> Result<TokenPair, jsonwebtoken::errors::Error> {
-    let audience = env::var("JWT_AUDIENCE").unwrap_or_else(|_| "default_audience".to_string());
+    let audience = env::var("JWT_AUDIENCE").unwrap_or_else(|_| "oxidizedoasis".to_string());
     let issuer = env::var("JWT_ISSUER").unwrap_or_else(|_| "default_issuer".to_string());
 
     let refresh_claims = match validate_jwt(
@@ -502,7 +502,8 @@ mod tests {
         setup_test_environment();
         let user_id = Uuid::new_v4();
         let role = "user".to_string();
-        let expected_aud = env::var("JWT_AUDIENCE").unwrap_or_else(|_| "default_audience".to_string());
+        // Updated to reflect the actual default audience in create_token_pair
+        let expected_aud = env::var("JWT_AUDIENCE").unwrap_or_else(|_| "oxidizedoasis".to_string());
         let expected_iss = env::var("JWT_ISSUER").unwrap_or_else(|_| "default_issuer".to_string());
 
         let token_pair = create_token_pair(user_id, role.clone(), TEST_SECRET).unwrap();
@@ -808,5 +809,82 @@ mod tests {
             claims_result.unwrap_err().kind(),
             jsonwebtoken::errors::ErrorKind::InvalidIssuer
         ));
+    }
+
+    #[tokio::test]
+    async fn test_refresh_token_pair_uses_default_audience_when_env_not_set() {
+        let original_audience = std::env::var("JWT_AUDIENCE").ok();
+        let original_issuer = std::env::var("JWT_ISSUER").ok();
+
+        std::env::remove_var("JWT_AUDIENCE"); // Ensure JWT_AUDIENCE is not set
+        std::env::set_var("JWT_ISSUER", "test_issuer_default_aud_test");
+
+        let user_id = Uuid::new_v4();
+        let role = "user_default_aud_test".to_string();
+        // Use TEST_SECRET for consistency if it's suitable, or define a specific one
+        let secret = TEST_SECRET;
+
+        // Create an initial refresh token with the expected default audience "oxidizedoasis"
+        // and the issuer we just set.
+        let (initial_refresh_token, _) = create_jwt(
+            user_id,
+            role.clone(),
+            secret,
+            TokenType::Refresh,
+            "oxidizedoasis".to_string(), // Explicitly use the default audience for the initial token
+            "test_issuer_default_aud_test".to_string(), // Explicitly use the issuer for initial token
+        ).unwrap();
+
+        let mock_revocation_service = Arc::new(MockTokenRevocationService);
+        // Ensure mock returns false for is_token_revoked for the JTI of initial_refresh_token
+        // For simplicity, current MockTokenRevocationService always returns Ok(false).
+
+        let mock_active_token_service = Arc::new(MockActiveTokenService);
+        // Ensure mock get_active_token returns a valid ActiveToken for revoke_token to proceed
+        // Current MockActiveTokenService returns a generic valid ActiveToken.
+
+        // Act: Attempt to refresh the token pair
+        let result = refresh_token_pair(
+            mock_revocation_service.clone(),
+            mock_active_token_service.clone(),
+            &initial_refresh_token,
+            secret,
+        )
+        .await;
+
+        assert!(result.is_ok(), "refresh_token_pair failed: {:?}", result.err());
+        if let Ok(ref new_token_pair) = result {
+            // Assert: Validate the new tokens for the default audience "oxidizedoasis"
+            // and the issuer "test_issuer_default_aud_test"
+            let decoding_key = DecodingKey::from_secret(secret.as_ref());
+            let mut validation = Validation::default();
+            validation.set_audience(&["oxidizedoasis"]);
+            validation.set_issuer(&["test_issuer_default_aud_test"]);
+
+            let access_claims_result = decode::<Claims>(&new_token_pair.access_token, &decoding_key, &validation);
+            assert!(access_claims_result.is_ok(), "Failed to decode new access token with default audience: {:?}", access_claims_result.err());
+            let access_claims = access_claims_result.unwrap().claims;
+            assert_eq!(access_claims.aud, "oxidizedoasis");
+            assert_eq!(access_claims.iss, "test_issuer_default_aud_test");
+
+            let refresh_claims_result = decode::<Claims>(&new_token_pair.refresh_token, &decoding_key, &validation);
+            assert!(refresh_claims_result.is_ok(), "Failed to decode new refresh token with default audience: {:?}", refresh_claims_result.err());
+            let refresh_claims = refresh_claims_result.unwrap().claims;
+            assert_eq!(refresh_claims.aud, "oxidizedoasis");
+            assert_eq!(refresh_claims.iss, "test_issuer_default_aud_test");
+
+        }
+
+        // Restore original JWT_AUDIENCE and JWT_ISSUER
+        if let Some(aud) = original_audience {
+            std::env::set_var("JWT_AUDIENCE", aud);
+        } else {
+            std::env::remove_var("JWT_AUDIENCE");
+        }
+        if let Some(iss) = original_issuer {
+            std::env::set_var("JWT_ISSUER", iss);
+        } else {
+            std::env::remove_var("JWT_ISSUER");
+        }
     }
 }

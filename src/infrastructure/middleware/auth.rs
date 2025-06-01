@@ -20,6 +20,7 @@ use std::task::{Context, Poll};
 
 use crate::core::auth::jwt::{validate_jwt, TokenType};
 use crate::core::auth::token_revocation::TokenRevocationServiceTrait;
+use crate::infrastructure::config::app_config::AppConfig; // Added import
 
 #[derive(Debug)]
 pub struct AuthError {
@@ -88,6 +89,16 @@ async fn jwt_auth_validator_internal(
     req: ServiceRequest, credentials: Option<BearerAuth>) -> Result<ServiceRequest, (Error, ServiceRequest)> {
     let jwt_secret = std::env::var("JWT_SECRET").expect("JWT_SECRET must be set");
 
+    let app_config = req.app_data::<web::Data<AppConfig>>().cloned();
+    if app_config.is_none() {
+        error!("AppConfig not found in app_data for jwt_auth_validator_internal");
+        return Err((AuthError::new(
+            "Internal server configuration error (AppConfig missing)".to_string(),
+            500
+        ).into(), req));
+    }
+    let expected_audience = Some(app_config.unwrap().get_ref().jwt.audience.clone());
+
     let token_revocation_service_data = req.app_data::<web::Data<Arc<dyn TokenRevocationServiceTrait>>>().cloned();
     if token_revocation_service_data.is_none() {
         error!("TokenRevocationService not found in app_data for jwt_auth_validator_internal");
@@ -110,7 +121,14 @@ async fn jwt_auth_validator_internal(
     };
 
     debug!("Validating JWT token");
-    let validation_result = validate_jwt(&token_revocation_service, &token[..], &jwt_secret, Some(TokenType::Access), None, None).await;
+    let validation_result = validate_jwt(
+        &token_revocation_service,
+        &token[..],
+        &jwt_secret,
+        Some(TokenType::Access),
+        expected_audience, // Pass the retrieved audience
+        None // Keep issuer as None for now
+    ).await;
     
     match validation_result {
         Ok(claims) => {
@@ -154,6 +172,7 @@ mod tests {
     use std::sync::Mutex;
     use chrono::{Utc, Duration};
     // use bytes::Bytes; // This was for CookieAuthMiddleware tests, not needed for this reverted state
+    use crate::infrastructure::config::app_config::{AppConfig as ActualAppConfig, ServerConfig, DatabaseConfig, JwtConfig}; // For creating test AppConfig instances
 
     static ENV_MUTEX: Mutex<()> = Mutex::new(());
     const TEST_JWT_SECRET_AUTH: &str = "test_secret_key_for_auth_middleware";
@@ -200,12 +219,20 @@ mod tests {
         }
     }
 
-    fn generate_test_token_auth(user_id: Uuid, role: &str, secret: &str, exp_duration_secs: i64) -> String {
+    // Updated generate_test_token_auth function
+    fn generate_test_token_auth(
+        user_id: Uuid,
+        role: &str,
+        secret: &str,
+        exp_duration_secs: i64,
+        audience: Option<String>,
+        issuer: Option<String>
+    ) -> String {
         let now = Utc::now();
         let iat_ts = now.timestamp();
-        let claims = Claims { // Added aud and iss fields
-            aud: "".to_string(), // Placeholder, actual audience should come from validated token
-            iss: "".to_string(), // Placeholder, actual issuer should come from validated token
+        let claims = Claims {
+            aud: audience.unwrap_or_else(|| "default_test_aud".to_string()), // Default for tests if not specified
+            iss: issuer.unwrap_or_else(|| "default_test_iss".to_string()), // Default for tests if not specified
             sub: user_id,
             role: role.to_string(),
             exp: (now + Duration::seconds(exp_duration_secs)).timestamp(),
@@ -255,14 +282,23 @@ mod tests {
         mock_rev_service.expect_is_token_revoked().returning(|_| Ok(false));
         let app_data_rev_service = Data::new(Arc::new(mock_rev_service) as Arc<dyn TokenRevocationServiceTrait>);
 
+        let test_audience = "middleware_bearer_aud".to_string();
+        let app_config = ActualAppConfig {
+            server: ServerConfig { host: "test".into(), port: "0".into() },
+            database: DatabaseConfig { url: "test_db_url".into(), max_connections: 1 },
+            jwt: JwtConfig { secret: TEST_JWT_SECRET_AUTH.into(), audience: test_audience.clone(), issuer: "test_iss".into() },
+        };
+        let app_data_config = Data::new(app_config);
+
         let user_id = Uuid::new_v4();
-        let token_str = generate_test_token_auth(user_id, "user", TEST_JWT_SECRET_AUTH, 3600);
+        let token_str = generate_test_token_auth(user_id, "user", TEST_JWT_SECRET_AUTH, 3600, Some(test_audience.clone()), None);
         let bearer_auth = BearerAuth::from_request(
             &test::TestRequest::default().insert_header((header::AUTHORIZATION, format!("Bearer {}", token_str))).to_http_request(),
             &mut test::TestRequest::default().to_srv_request().into_parts().1 
         ).await.unwrap();
         
         let srv_req = test::TestRequest::default()
+            .app_data(app_data_config.clone())
             .app_data(app_data_rev_service.clone())
             .to_srv_request();
 
@@ -273,6 +309,7 @@ mod tests {
             let claims = validated_req.extensions().get::<Claims>().unwrap().clone();
             assert_eq!(claims.sub, user_id);
             assert_eq!(claims.role, "user");
+            assert_eq!(claims.aud, test_audience);
         }).await;
     }
 
@@ -282,11 +319,20 @@ mod tests {
         mock_rev_service.expect_is_token_revoked().returning(|_| Ok(false));
         let app_data_rev_service = Data::new(Arc::new(mock_rev_service) as Arc<dyn TokenRevocationServiceTrait>);
 
+        let test_audience = "middleware_cookie_aud".to_string();
+        let app_config = ActualAppConfig {
+            server: ServerConfig { host: "test".into(), port: "0".into() },
+            database: DatabaseConfig { url: "test_db_url".into(), max_connections: 1 },
+            jwt: JwtConfig { secret: TEST_JWT_SECRET_AUTH.into(), audience: test_audience.clone(), issuer: "test_iss".into() },
+        };
+        let app_data_config = Data::new(app_config);
+
         let user_id = Uuid::new_v4();
-        let token_str = generate_test_token_auth(user_id, "user", TEST_JWT_SECRET_AUTH, 3600);
+        let token_str = generate_test_token_auth(user_id, "user", TEST_JWT_SECRET_AUTH, 3600, Some(test_audience.clone()), None);
         
         let srv_req = test::TestRequest::default()
             .cookie(Cookie::new("access_token", token_str.clone()))
+            .app_data(app_data_config.clone())
             .app_data(app_data_rev_service.clone())
             .to_srv_request();
 
@@ -296,6 +342,7 @@ mod tests {
             let validated_req = result.unwrap();
             let claims = validated_req.extensions().get::<Claims>().unwrap().clone();
             assert_eq!(claims.sub, user_id);
+            assert_eq!(claims.aud, test_audience);
         }).await;
     }
 
@@ -304,7 +351,17 @@ mod tests {
         let mock_rev_service = MockTokenRevocationService::new(); 
         let app_data_rev_service = Data::new(Arc::new(mock_rev_service) as Arc<dyn TokenRevocationServiceTrait>);
         
+        // AppConfig is still needed as the function attempts to read it first
+        let test_audience = "middleware_no_token_aud".to_string();
+        let app_config = ActualAppConfig {
+            server: ServerConfig { host: "test".into(), port: "0".into() },
+            database: DatabaseConfig { url: "test_db_url".into(), max_connections: 1 },
+            jwt: JwtConfig { secret: TEST_JWT_SECRET_AUTH.into(), audience: test_audience.clone(), issuer: "test_iss".into() },
+        };
+        let app_data_config = Data::new(app_config);
+
         let srv_req = test::TestRequest::default()
+            .app_data(app_data_config.clone())
             .app_data(app_data_rev_service.clone())
             .to_srv_request();
 
@@ -326,6 +383,14 @@ mod tests {
         mock_rev_service.expect_is_token_revoked().returning(|_| Ok(false)).times(0..); 
         let app_data_rev_service = Data::new(Arc::new(mock_rev_service) as Arc<dyn TokenRevocationServiceTrait>);
 
+        let test_audience = "middleware_invalid_token_aud".to_string();
+        let app_config = ActualAppConfig {
+            server: ServerConfig { host: "test".into(), port: "0".into() },
+            database: DatabaseConfig { url: "test_db_url".into(), max_connections: 1 },
+            jwt: JwtConfig { secret: TEST_JWT_SECRET_AUTH.into(), audience: test_audience.clone(), issuer: "test_iss".into() },
+        };
+        let app_data_config = Data::new(app_config);
+
         let token_str = "this.is.not.a.valid.jwt".to_string();
          let bearer_auth = BearerAuth::from_request(
             &test::TestRequest::default().insert_header((header::AUTHORIZATION, format!("Bearer {}", token_str))).to_http_request(),
@@ -333,6 +398,7 @@ mod tests {
         ).await.unwrap();
         
         let srv_req = test::TestRequest::default()
+            .app_data(app_data_config.clone())
             .app_data(app_data_rev_service.clone())
             .to_srv_request();
 
@@ -354,8 +420,16 @@ mod tests {
         mock_rev_service.expect_is_token_revoked().returning(|_| Ok(false));
         let app_data_rev_service = Data::new(Arc::new(mock_rev_service) as Arc<dyn TokenRevocationServiceTrait>);
 
+        let test_audience = "middleware_wrapper_aud".to_string();
+        let app_config = ActualAppConfig {
+            server: ServerConfig { host: "test".into(), port: "0".into() },
+            database: DatabaseConfig { url: "test_db_url".into(), max_connections: 1 },
+            jwt: JwtConfig { secret: TEST_JWT_SECRET_AUTH.into(), audience: test_audience.clone(), issuer: "test_iss".into() },
+        };
+        let app_data_config = Data::new(app_config);
+
         let user_id = Uuid::new_v4();
-        let token_str = generate_test_token_auth(user_id, "user", TEST_JWT_SECRET_AUTH, 3600);
+        let token_str = generate_test_token_auth(user_id, "user", TEST_JWT_SECRET_AUTH, 3600, Some(test_audience.clone()), None);
         
         let srv_req_for_extraction = test::TestRequest::default()
             .insert_header((header::AUTHORIZATION, format!("Bearer {}", token_str)))
@@ -364,6 +438,7 @@ mod tests {
         let bearer_auth = BearerAuth::from_request(&http_req, &mut payload).await.unwrap();
         
         let srv_req = test::TestRequest::default()
+            .app_data(app_data_config.clone())
             .app_data(app_data_rev_service.clone())
             .to_srv_request();
 
@@ -373,6 +448,7 @@ mod tests {
             let validated_req = result.unwrap();
             let claims = validated_req.extensions().get::<Claims>().unwrap().clone();
             assert_eq!(claims.sub, user_id);
+            assert_eq!(claims.aud, test_audience);
         }).await;
     }
 
@@ -382,11 +458,20 @@ mod tests {
         mock_rev_service.expect_is_token_revoked().returning(|_| Ok(false));
         let app_data_rev_service = Data::new(Arc::new(mock_rev_service) as Arc<dyn TokenRevocationServiceTrait>);
 
+        let test_audience = "middleware_cookie_wrapper_aud".to_string();
+        let app_config = ActualAppConfig {
+            server: ServerConfig { host: "test".into(), port: "0".into() },
+            database: DatabaseConfig { url: "test_db_url".into(), max_connections: 1 },
+            jwt: JwtConfig { secret: TEST_JWT_SECRET_AUTH.into(), audience: test_audience.clone(), issuer: "test_iss".into() },
+        };
+        let app_data_config = Data::new(app_config);
+
         let user_id = Uuid::new_v4();
-        let token_str = generate_test_token_auth(user_id, "user", TEST_JWT_SECRET_AUTH, 3600);
+        let token_str = generate_test_token_auth(user_id, "user", TEST_JWT_SECRET_AUTH, 3600, Some(test_audience.clone()), None);
         
         let srv_req = test::TestRequest::default()
             .cookie(Cookie::new("access_token", token_str.clone()))
+            .app_data(app_data_config.clone())
             .app_data(app_data_rev_service.clone())
             .to_srv_request();
 
@@ -396,6 +481,7 @@ mod tests {
             let validated_req = result.unwrap();
             let claims = validated_req.extensions().get::<Claims>().unwrap().clone();
             assert_eq!(claims.sub, user_id);
+            assert_eq!(claims.aud, test_audience);
         }).await;
     }
 
@@ -403,8 +489,17 @@ mod tests {
     async fn test_cookie_auth_validator_wrapper_no_cookie() {
         let mock_rev_service = MockTokenRevocationService::new();
         let app_data_rev_service = Data::new(Arc::new(mock_rev_service) as Arc<dyn TokenRevocationServiceTrait>);
+
+        let test_audience = "middleware_cookie_wrapper_no_cookie_aud".to_string();
+        let app_config = ActualAppConfig {
+            server: ServerConfig { host: "test".into(), port: "0".into() },
+            database: DatabaseConfig { url: "test_db_url".into(), max_connections: 1 },
+            jwt: JwtConfig { secret: TEST_JWT_SECRET_AUTH.into(), audience: test_audience.clone(), issuer: "test_iss".into() },
+        };
+        let app_data_config = Data::new(app_config);
         
         let srv_req = test::TestRequest::default()
+            .app_data(app_data_config.clone())
             .app_data(app_data_rev_service.clone())
             .to_srv_request();
 
@@ -419,8 +514,91 @@ mod tests {
             assert_eq!(body["message"], "No authentication token found");
         }).await;
     }
+
+    #[actix_rt::test]
+    async fn test_jwt_auth_internal_invalid_audience() {
+        let mut mock_rev_service = MockTokenRevocationService::new();
+        // is_token_revoked should not be called if audience validation fails first.
+        // mock_rev_service.expect_is_token_revoked().returning(|_| Ok(false)).times(0);
+        let app_data_rev_service = Data::new(Arc::new(mock_rev_service) as Arc<dyn TokenRevocationServiceTrait>);
+
+        let configured_audience = "correct_audience".to_string();
+        let wrong_audience = "wrong_audience".to_string();
+        let app_config = ActualAppConfig {
+            server: ServerConfig { host: "test".into(), port: "0".into() },
+            database: DatabaseConfig { url: "test_db_url".into(), max_connections: 1 },
+            jwt: JwtConfig { secret: TEST_JWT_SECRET_AUTH.into(), audience: configured_audience.clone(), issuer: "test_iss".into() },
+        };
+        let app_data_config = Data::new(app_config);
+
+        let user_id = Uuid::new_v4();
+        // Generate token with the WRONG audience
+        let token_str = generate_test_token_auth(user_id, "user", TEST_JWT_SECRET_AUTH, 3600, Some(wrong_audience), None);
+        let bearer_auth = BearerAuth::from_request(
+            &test::TestRequest::default().insert_header((header::AUTHORIZATION, format!("Bearer {}", token_str))).to_http_request(),
+            &mut test::TestRequest::default().to_srv_request().into_parts().1
+        ).await.unwrap();
+
+        let srv_req = test::TestRequest::default()
+            .app_data(app_data_config.clone())
+            .app_data(app_data_rev_service.clone())
+            .to_srv_request();
+
+        run_test_with_env_vars_auth(vec![("JWT_SECRET", Some(TEST_JWT_SECRET_AUTH))], || async {
+            let result = jwt_auth_validator_internal(srv_req, Some(bearer_auth)).await;
+            assert!(result.is_err(), "Expected Err for invalid audience");
+            let (err, _) = result.err().unwrap();
+            let http_response = err.error_response();
+            // The core jwt library should return an error that results in a 401.
+            // The log inside validate_jwt in jwt.rs would show ErrorKind::InvalidAudience.
+            // AuthError wraps this into a generic "Invalid or expired token" message.
+            assert_eq!(http_response.status(), StatusCode::UNAUTHORIZED);
+            let body = test::read_body_json::<Value, _>(test::TestRequest::default().to_srv_response(http_response)).await;
+            assert_eq!(body["message"], "Invalid or expired token");
+        }).await;
+    }
+
+    #[actix_rt::test]
+    async fn test_jwt_auth_internal_token_missing_audience() {
+        let mut mock_rev_service = MockTokenRevocationService::new();
+        let app_data_rev_service = Data::new(Arc::new(mock_rev_service) as Arc<dyn TokenRevocationServiceTrait>);
+
+        let configured_audience = "correct_audience_for_missing_test".to_string();
+        let app_config = ActualAppConfig {
+            server: ServerConfig { host: "test".into(), port: "0".into() },
+            database: DatabaseConfig { url: "test_db_url".into(), max_connections: 1 },
+            jwt: JwtConfig { secret: TEST_JWT_SECRET_AUTH.into(), audience: configured_audience.clone(), issuer: "test_iss".into() },
+        };
+        let app_data_config = Data::new(app_config);
+
+        let user_id = Uuid::new_v4();
+        // Generate token with aud claim set to default_test_aud by passing None for audience
+        let token_str = generate_test_token_auth(user_id, "user", TEST_JWT_SECRET_AUTH, 3600, None, None);
+
+        let bearer_auth = BearerAuth::from_request(
+            &test::TestRequest::default().insert_header((header::AUTHORIZATION, format!("Bearer {}", token_str))).to_http_request(),
+            &mut test::TestRequest::default().to_srv_request().into_parts().1
+        ).await.unwrap();
+
+        let srv_req = test::TestRequest::default()
+            .app_data(app_data_config.clone())
+            .app_data(app_data_rev_service.clone())
+            .to_srv_request();
+
+        run_test_with_env_vars_auth(vec![("JWT_SECRET", Some(TEST_JWT_SECRET_AUTH))], || async {
+            let result = jwt_auth_validator_internal(srv_req, Some(bearer_auth)).await;
+            assert!(result.is_err(), "Expected Err for token with default_test_aud when specific one is configured");
+            let (err, _) = result.err().unwrap();
+            let http_response = err.error_response();
+            // As `validate_jwt` now gets an `expected_audience` and sets `validation.set_audience()`,
+            // a token with a different audience (like "default_test_aud") should fail.
+            assert_eq!(http_response.status(), StatusCode::UNAUTHORIZED);
+            let body = test::read_body_json::<Value, _>(test::TestRequest::default().to_srv_response(http_response)).await;
+            assert_eq!(body["message"], "Invalid or expired token");
+        }).await;
+    }
     
-    // TODO: Add tests for CookieAuthMiddleware (CSRF, etc.)
+    // TODO: Add tests for CookieAuthMiddleware (CSRF, etc., and audience checks)
 }
 
 pub struct CookieAuth;
@@ -510,6 +688,20 @@ where
             
             let jwt_secret = std::env::var("JWT_SECRET").expect("JWT_SECRET must be set");
 
+            let app_config_data = req.app_data::<web::Data<AppConfig>>().cloned();
+            if app_config_data.is_none() {
+                error!("AppConfig not found in app_data for CookieAuthMiddleware");
+                // Corrected: Ensure this is part of the Box::pin for async context
+                return Box::pin(async move {
+                    Err(Error::from(AuthError::new(
+                        "Internal server configuration error (AppConfig missing in CookieAuth)".to_string(),
+                        500,
+                    )))
+                });
+            }
+            // Corrected: Ensure get_ref() is used if app_config_data is Data<AppConfig>
+            let expected_audience = Some(app_config_data.as_ref().unwrap().get_ref().jwt.audience.clone());
+
             let token_revocation_service_data = req.app_data::<web::Data<Arc<dyn TokenRevocationServiceTrait>>>().cloned();
             
             let token_revocation_service = match token_revocation_service_data {
@@ -523,7 +715,14 @@ where
                 }
             };
 
-            match validate_jwt(&token_revocation_service, &token, &jwt_secret, Some(TokenType::Access), None, None).await {
+            match validate_jwt(
+                &token_revocation_service,
+                &token,
+                &jwt_secret,
+                Some(TokenType::Access),
+                expected_audience, // Pass the retrieved audience
+                None // Keep issuer as None for now
+            ).await {
                 Ok(claims) => {
                     debug!("Token validated successfully for user: {}", claims.sub);
                     req.extensions_mut().insert(claims);
@@ -545,6 +744,17 @@ pub async fn cookie_auth_middleware(
     req: ServiceRequest,
 ) -> Result<ServiceRequest, (Error, ServiceRequest)> {
     let jwt_secret = std::env::var("JWT_SECRET").expect("JWT_SECRET must be set");
+
+    let app_config = req.app_data::<web::Data<AppConfig>>().cloned();
+    if app_config.is_none() {
+        error!("AppConfig not found in app_data for cookie_auth_middleware");
+        return Err((AuthError::new(
+            "Internal server configuration error (AppConfig missing in cookie_auth_middleware)".to_string(), // Clarified error message
+            500
+        ).into(), req));
+    }
+    // Corrected: Ensure get_ref() is used if app_config is Data<AppConfig>
+    let expected_audience = Some(app_config.as_ref().unwrap().get_ref().jwt.audience.clone());
 
     let token_revocation_service_data = req.app_data::<web::Data<Arc<dyn TokenRevocationServiceTrait>>>().cloned();
     if token_revocation_service_data.is_none() {
@@ -571,7 +781,14 @@ pub async fn cookie_auth_middleware(
     };
 
     debug!("Validating JWT token from cookie");
-    let validation_result = validate_jwt(&token_revocation_service, &token, &jwt_secret, Some(TokenType::Access), None, None).await;
+    let validation_result = validate_jwt(
+        &token_revocation_service,
+        &token,
+        &jwt_secret,
+        Some(TokenType::Access),
+        expected_audience, // Pass the retrieved audience
+        None // Keep issuer as None for now
+    ).await;
     
     match validation_result {
         Ok(claims) => {
