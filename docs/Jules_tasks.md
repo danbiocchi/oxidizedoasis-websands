@@ -8,6 +8,8 @@
 
 Each task is a complete, focused implementation that an AI agent can finish in 5-10 minutes. All tasks deliver working functionality without placeholders and are suitable for creating a git branch, testing, and merging.
 
+--- Important note
+Upon completeing a task: Update each task you complete by checking off the task checkbox and add a field "Completion Status:" with your status after completing the task.
 ---
 
 ## **FOUNDATION & INFRASTRUCTURE (Tasks 1-15)**
