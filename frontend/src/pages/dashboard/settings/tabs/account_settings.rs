@@ -13,6 +13,7 @@ pub struct User {
     pub email: Option<String>,
     pub is_email_verified: bool,
     pub role: String, // Uncommented and added
+    pub is_active: bool, // Added is_active field
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]

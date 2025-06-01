@@ -34,6 +34,7 @@ struct UserAdminView {
     is_email_verified: bool,
     created_at: DateTime<Utc>,
     updated_at: DateTime<Utc>,
+    is_active: bool,
 }
 
 impl UserAdminView {

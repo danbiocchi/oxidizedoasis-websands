@@ -21,7 +21,10 @@ struct ApiResponse<T> {
 
 #[derive(Debug, Clone, Deserialize)]
 struct UserDetailResponse {
-    // This struct is now directly the UserDetail
+    pub success: bool,
+    pub message: Option<String>,
+    pub data: UserDetail,
+    pub error: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize, PartialEq)] // Added PartialEq for tests
@@ -785,24 +788,7 @@ async fn fetch_current_user_id() -> Result<String, String> {
     let response_text = response.text().await.map_err(|e| e.to_string())?;
     
     // Parse the response
-    #[derive(Debug, Deserialize)]
-    struct UserResponse {
-        success: bool,
-        data: Option<UserData>,
-        error: Option<String>,
-    }
-    
-    #[derive(Debug, Deserialize)]
-    struct UserData {
-        user: User,
-    }
-    
-    #[derive(Debug, Deserialize)]
-    struct User {
-        id: String,
-    }
-    
-    let data: UserResponse = serde_json::from_str(&response_text)
+    let data: UserDetailResponse = serde_json::from_str(&response_text)
         .map_err(|e| format!("Failed to parse response: {}", e))?;
     
     if !data.success {

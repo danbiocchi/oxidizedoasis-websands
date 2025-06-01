@@ -40,6 +40,7 @@ pub struct UserAdminView {
     is_email_verified: bool,
     created_at: chrono::DateTime<chrono::Utc>,
     updated_at: chrono::DateTime<chrono::Utc>,
+    is_active: bool, // Added is_active field
 }
 
 impl From<User> for UserAdminView {
@@ -48,6 +49,7 @@ impl From<User> for UserAdminView {
             id: user.id,
             username: user.username,
             email: user.email,
+            is_active: user.is_active, // Map is_active from User
             role: user.role,
             is_email_verified: user.is_email_verified,
             created_at: user.created_at,
@@ -170,7 +172,7 @@ pub async fn update_user_username(
     }
     
     // Find the user first to check if it exists
-    let user = repo.find_by_id(*id)
+    let _user = repo.find_by_id(*id)
         .await
         .map_err(|e| {
             debug!("Error finding user {}: {:?}", id, e);
