@@ -43,6 +43,7 @@ struct User {
     role: String,
     #[serde(default)]
     csrf_token: String,
+    is_active: bool, // Added is_active field
 }
 
 #[function_component(Login)]

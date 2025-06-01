@@ -34,7 +34,7 @@ impl UserHandler {
         email_service: Arc<dyn EmailServiceTrait>,
         auth_service: Arc<AuthService>, // Changed: Receive AuthService
         token_revocation_service: Arc<dyn TokenRevocationServiceTrait>, // Added
-        active_token_service: Arc<dyn ActiveTokenServiceTrait> // Renamed from _active_token_service as it's used by AuthService
+        _active_token_service: Arc<dyn ActiveTokenServiceTrait> // Renamed from _active_token_service as it's used by AuthService
     ) -> Self {
         let user_repo: Arc<dyn crate::core::user::UserRepositoryTrait> = Arc::new(UserRepository::new(pool.clone())); // Explicitly type as Arc<dyn Trait>
         // UserService now needs TokenRevocationService

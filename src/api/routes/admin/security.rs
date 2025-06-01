@@ -119,7 +119,7 @@ pub async fn create_incident(
 }
 
 pub async fn get_incident(
-    id: web::Path<Uuid>,
+    _id: web::Path<Uuid>,
 ) -> Result<HttpResponse, ApiError> {
     // TODO: Implement actual incident retrieval from database
     // This is a placeholder that returns a not found error
@@ -127,8 +127,8 @@ pub async fn get_incident(
 }
 
 pub async fn update_incident_status(
-    id: web::Path<Uuid>,
-    req: web::Json<UpdateIncidentStatusRequest>,
+    _id: web::Path<Uuid>,
+    _req: web::Json<UpdateIncidentStatusRequest>,
 ) -> Result<HttpResponse, ApiError> {
     // TODO: Implement actual incident status update in database
     // This is a placeholder that returns a not found error

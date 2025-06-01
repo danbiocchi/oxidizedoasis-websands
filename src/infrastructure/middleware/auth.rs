@@ -1,7 +1,7 @@
 use actix_web::{
     dev::{Service, ServiceRequest, ServiceResponse, Transform},
     web::{self}, 
-    Error, HttpMessage, HttpResponse,
+    Error, HttpMessage, HttpResponse, body::BoxBody
 };
 use actix_web::error::ResponseError;
 use actix_web::http::StatusCode;
@@ -20,7 +20,7 @@ use std::task::{Context, Poll};
 
 use crate::core::auth::jwt::{validate_jwt, TokenType};
 use crate::core::auth::token_revocation::TokenRevocationServiceTrait;
-use crate::infrastructure::config::app_config::AppConfig; // Added import
+use crate::infrastructure::config::AppConfig;
 
 #[derive(Debug)]
 pub struct AuthError {
@@ -610,13 +610,12 @@ impl CookieAuth {
     }
 }
 
-impl<S, B> Transform<S, ServiceRequest> for CookieAuth
+impl<S> Transform<S, ServiceRequest> for CookieAuth
 where
-    S: Service<ServiceRequest, Response = ServiceResponse<B>, Error = Error> + 'static,
+    S: Service<ServiceRequest, Response = ServiceResponse<BoxBody>, Error = Error> + 'static,
     S::Future: 'static,
-    B: 'static,
 {
-    type Response = ServiceResponse<B>;
+    type Response = ServiceResponse<BoxBody>;
     type Error = Error;
     type Transform = CookieAuthMiddleware<S>;
     type InitError = ();
@@ -633,13 +632,12 @@ pub struct CookieAuthMiddleware<S> {
     service: Rc<S>,
 }
 
-impl<S, B> Service<ServiceRequest> for CookieAuthMiddleware<S>
+impl<S> Service<ServiceRequest> for CookieAuthMiddleware<S>
 where
-    S: Service<ServiceRequest, Response = ServiceResponse<B>, Error = Error> + 'static,
+    S: Service<ServiceRequest, Response = ServiceResponse<BoxBody>, Error = Error> + 'static,
     S::Future: 'static,
-    B: 'static,
 {
-    type Response = ServiceResponse<B>;
+    type Response = ServiceResponse<BoxBody>;
     type Error = Error;
     type Future = LocalBoxFuture<'static, Result<Self::Response, Self::Error>>;
 
@@ -655,21 +653,21 @@ where
         
         if req.method() != actix_web::http::Method::GET {
             if csrf_header.is_none() || csrf_cookie.is_none() {
-                return Box::pin(async move {
-                    Err(Error::from(AuthError::new(
-                        "CSRF token missing".to_string(),
-                        403,
-                    )))
-                });
+                let auth_err = AuthError::new(
+                    "CSRF token missing".to_string(),
+                    403,
+                );
+                let http_response = auth_err.error_response();
+                return Box::pin(async move { Ok(req.into_response(http_response)) });
             }
             if let (Some(header), Some(cookie)) = (csrf_header, csrf_cookie) {
                 if header.to_str().unwrap_or("") != cookie.value() {
-                    return Box::pin(async move {
-                        Err(Error::from(AuthError::new(
-                            "CSRF token mismatch".to_string(),
-                            403,
-                        )))
-                    });
+                    let auth_err = AuthError::new(
+                        "CSRF token mismatch".to_string(),
+                        403,
+                    );
+                    let http_response = auth_err.error_response();
+                    return Box::pin(async move { Ok(req.into_response(http_response)) });
                 }
             }
         }
@@ -679,10 +677,12 @@ where
                 Some(cookie) => cookie.value().to_string(),
                 None => {
                     debug!("No access_token cookie found");
-                    return Err(Error::from(AuthError::new(
+                    let auth_err = AuthError::new(
                         "No access_token cookie found".to_string(),
                         401,
-                    )));
+                    );
+                    let http_response = auth_err.error_response();
+                    return Ok(req.into_response(http_response));
                 }
             };
             
@@ -692,12 +692,12 @@ where
             if app_config_data.is_none() {
                 error!("AppConfig not found in app_data for CookieAuthMiddleware");
                 // Corrected: Ensure this is part of the Box::pin for async context
-                return Box::pin(async move {
-                    Err(Error::from(AuthError::new(
-                        "Internal server configuration error (AppConfig missing in CookieAuth)".to_string(),
-                        500,
-                    )))
-                });
+                let auth_err = AuthError::new(
+                    "Internal server configuration error (AppConfig missing in CookieAuth)".to_string(),
+                    500,
+                );
+                let http_response = auth_err.error_response();
+                return Ok(req.into_response(http_response));
             }
             // Corrected: Ensure get_ref() is used if app_config_data is Data<AppConfig>
             let expected_audience = Some(app_config_data.as_ref().unwrap().get_ref().jwt.audience.clone());
@@ -708,10 +708,12 @@ where
                 Some(service_data) => service_data.into_inner(),
                 None => {
                     error!("TokenRevocationService not found in app_data for CookieAuthMiddleware");
-                    return Err(Error::from(AuthError::new(
+                    let auth_err = AuthError::new(
                         "Internal server configuration error".to_string(),
                         500,
-                    )));
+                    );
+                    let http_response = auth_err.error_response();
+                    return Ok(req.into_response(http_response));
                 }
             };
 
@@ -726,14 +728,16 @@ where
                 Ok(claims) => {
                     debug!("Token validated successfully for user: {}", claims.sub);
                     req.extensions_mut().insert(claims);
-                    service.call(req).await
+                    service.call(req).await.map(|res| res.map_into_boxed_body())
                 },
                 Err(e) => {
                     error!("Token validation failed: {:?}", e);
-                    Err(Error::from(AuthError::new(
+                    let auth_err = AuthError::new(
                         "Invalid or expired token".to_string(),
                         401,
-                    )))
+                    );
+                    let http_response = auth_err.error_response();
+                    Ok(req.into_response(http_response))
                 }
             }
         })
