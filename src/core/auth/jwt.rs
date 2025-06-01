@@ -21,6 +21,7 @@ pub struct Claims {
     pub jti: String,      // JWT ID (unique identifier for this token)
     pub role: String,     // User role
     pub token_type: TokenType, // Token type (access or refresh)
+    pub aud: String,      // Audience
 }
 
 /// Token types to distinguish between access and refresh tokens
@@ -98,6 +99,7 @@ pub fn create_jwt(
         jti: jti.clone(), 
         role,
         token_type: token_type.clone(),
+        aud: "user_service".to_string(),
     };
 
     info!("Creating {} token for user {} with expiration in {} seconds",
@@ -169,6 +171,7 @@ pub async fn validate_jwt(
     let mut validation = Validation::default();
     validation.leeway = 60; 
     validation.validate_nbf = true; // Enable NBF (Not Before) claim validation
+    validation.set_audience(&["user_service"]); // Validate audience
     
     match decode::<Claims>(token, &DecodingKey::from_secret(secret.as_ref()), &validation) {
         Ok(token_data) => {
@@ -284,9 +287,62 @@ pub(crate) async fn revoke_token(
     }
 }
 
+// Mock implementation for TokenRevocationServiceTrait
+// ... (rest of the file including the new test and the original tests module)
+// For brevity, I am not including the entire file content here,
+// but the goal is to move the new test into the existing tests module.
+// The new test test_validate_jwt_invalid_audience should be relocated
+// inside the mod tests { ... } block.
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    // ... other existing imports and helper structs ...
+
+    #[tokio::test]
+    async fn test_validate_jwt_invalid_audience() {
+        setup_test_environment();
+        let user_id = Uuid::new_v4();
+        let role = "test_role".to_string();
+
+        // Create a Claims instance with a different audience
+        let claims_wrong_audience = Claims {
+            sub: user_id,
+            exp: Utc::now().checked_add_signed(Duration::minutes(5)).unwrap().timestamp(),
+            iat: Utc::now().timestamp(),
+            nbf: Utc::now().timestamp(),
+            jti: Uuid::new_v4().to_string(),
+            role: role.clone(),
+            token_type: TokenType::Access,
+            aud: "wrong_service".to_string(), // Different audience
+        };
+
+        let token_str = encode(
+            &Header::default(),
+            &claims_wrong_audience,
+            &EncodingKey::from_secret(TEST_SECRET.as_ref()),
+        )
+        .unwrap();
+
+        let mock_revocation_service: Arc<dyn TokenRevocationServiceTrait> =
+            Arc::new(MockTokenRevocationService);
+
+        let claims_result = validate_jwt(
+            &mock_revocation_service,
+            &token_str,
+            TEST_SECRET,
+            Some(TokenType::Access),
+        )
+        .await;
+
+        assert!(claims_result.is_err());
+        assert!(matches!(
+            claims_result.unwrap_err().kind(),
+            jsonwebtoken::errors::ErrorKind::InvalidAudience
+        ));
+    }
+
+    // ... other existing tests ...
     use chrono::{Duration, Utc};
     use uuid::Uuid;
     use jsonwebtoken::{decode, DecodingKey, Validation, errors::ErrorKind};
@@ -361,6 +417,7 @@ mod tests {
         assert_eq!(claims.sub, user_id);
         assert_eq!(claims.role, role);
         assert_eq!(claims.token_type, token_type);
+        assert_eq!(claims.aud, "user_service".to_string());
         assert!(!claims.jti.is_empty());
         assert_eq!(claims.jti, metadata.jti);
 
@@ -411,6 +468,7 @@ mod tests {
         assert_eq!(claims.sub, user_id);
         assert_eq!(claims.role, role);
         assert_eq!(claims.token_type, token_type);
+        assert_eq!(claims.aud, "user_service".to_string());
         assert!(!claims.jti.is_empty());
         assert_eq!(claims.jti, metadata.jti);
 
@@ -461,11 +519,13 @@ mod tests {
             decode::<Claims>(&token_pair.access_token, &decoding_key, &validation).unwrap();
         assert_eq!(decoded_access_token.claims.sub, user_id);
         assert_eq!(decoded_access_token.claims.token_type, TokenType::Access);
+        assert_eq!(decoded_access_token.claims.aud, "user_service".to_string());
 
         let decoded_refresh_token =
             decode::<Claims>(&token_pair.refresh_token, &decoding_key, &validation).unwrap();
         assert_eq!(decoded_refresh_token.claims.sub, user_id);
         assert_eq!(decoded_refresh_token.claims.token_type, TokenType::Refresh);
+        assert_eq!(decoded_refresh_token.claims.aud, "user_service".to_string());
     }
     
     #[test]
@@ -554,6 +614,7 @@ mod tests {
             jti: Uuid::new_v4().to_string(),
             role: role.clone(),
             token_type: TokenType::Access,
+            aud: "user_service".to_string(),
         };
         let token_str = encode(
             &Header::default(),
@@ -611,6 +672,7 @@ mod tests {
             jti: Uuid::new_v4().to_string(),
             role: role.clone(),
             token_type: TokenType::Access,
+            aud: "user_service".to_string(),
         };
         let token_str = encode(
             &Header::default(),

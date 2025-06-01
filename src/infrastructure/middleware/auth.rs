@@ -211,6 +211,7 @@ mod tests {
             nbf: iat_ts,
             jti: Uuid::new_v4().to_string(),
             token_type: JwtTokenType::Access,
+            aud: "user_service".to_string(),
         };
         jsonwebtoken::encode(
             &jsonwebtoken::Header::default(),
@@ -271,6 +272,7 @@ mod tests {
             let claims = validated_req.extensions().get::<Claims>().unwrap().clone();
             assert_eq!(claims.sub, user_id);
             assert_eq!(claims.role, "user");
+            assert_eq!(claims.aud, "user_service".to_string());
         }).await;
     }
 
@@ -294,6 +296,7 @@ mod tests {
             let validated_req = result.unwrap();
             let claims = validated_req.extensions().get::<Claims>().unwrap().clone();
             assert_eq!(claims.sub, user_id);
+            assert_eq!(claims.aud, "user_service".to_string());
         }).await;
     }
 
@@ -371,6 +374,7 @@ mod tests {
             let validated_req = result.unwrap();
             let claims = validated_req.extensions().get::<Claims>().unwrap().clone();
             assert_eq!(claims.sub, user_id);
+            assert_eq!(claims.aud, "user_service".to_string());
         }).await;
     }
 
@@ -394,6 +398,7 @@ mod tests {
             let validated_req = result.unwrap();
             let claims = validated_req.extensions().get::<Claims>().unwrap().clone();
             assert_eq!(claims.sub, user_id);
+            assert_eq!(claims.aud, "user_service".to_string());
         }).await;
     }
 
