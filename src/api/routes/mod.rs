@@ -1,18 +1,20 @@
 
 pub mod user_routes;
 pub mod admin;
+pub mod health; // Added health module
 
 pub use admin::configure as configure_admin_routes;
 
 pub mod route_config {
     use actix_web::web;
     use log::debug;
-    use super::{user_routes, configure_admin_routes};
+    use super::{user_routes, health, configure_admin_routes}; // Added health module to use statement
 
     pub fn configure_all(cfg: &mut web::ServiceConfig) {
         debug!("Configuring all routes");
         user_routes::configure(cfg);
-        debug!("User routes configured, now configuring admin routes");
+        health::configure(cfg); // Added health route configuration
+        debug!("User and health routes configured, now configuring admin routes");
         configure_admin_routes(cfg);
         debug!("All routes configured");
     }
