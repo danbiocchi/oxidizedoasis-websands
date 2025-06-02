@@ -6,6 +6,7 @@ pub mod cors;
 pub mod logger;
 pub mod rate_limit;
 pub mod csrf;
+pub mod metrics;
 
 pub use admin::admin_validator;
 

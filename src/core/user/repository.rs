@@ -94,7 +94,7 @@ impl UserRepositoryTrait for UserRepository {
         .await;
 
         match &user {
-            Ok(u) => info!("Successfully created user with details, id: {}", &u.id),
+            Ok(u) => info!("Successfully created user with details, id: {}", u.id),
             Err(e) => error!("Failed to create user with details: {}", e),
         }
         user
@@ -139,7 +139,7 @@ impl UserRepositoryTrait for UserRepository {
         .await;
 
         match &user {
-            Ok(u) => info!("Successfully created user from NewUser, id: {}", &u.id),
+            Ok(u) => info!("Successfully created user from NewUser, id: {}", u.id),
             Err(e) => error!("Failed to create user from NewUser: {}", e),
         }
         user
@@ -161,7 +161,7 @@ impl UserRepositoryTrait for UserRepository {
         .await;
 
         if let Ok(Some(ref u)) = user {
-            debug!("Found user: {}", &u.id);
+            debug!("Found user: {}", u.id);
         }
         user
     }
@@ -182,7 +182,7 @@ impl UserRepositoryTrait for UserRepository {
         .await;
 
         if let Ok(Some(ref u)) = user {
-            debug!("Found user: {}", &u.username);
+            debug!("Found user: {}", u.username);
         }
         user
     }
@@ -206,7 +206,7 @@ impl UserRepositoryTrait for UserRepository {
         .await;
 
         if let Ok(Some(ref u)) = user {
-            debug!("Found user: {}", &u.id);
+            debug!("Found user: {}", u.id);
         }
         user
     }
@@ -227,7 +227,7 @@ impl UserRepositoryTrait for UserRepository {
         .await;
 
         if let Ok(Some(ref u)) = user {
-            debug!("Found user by verification token: {}", &u.id);
+            debug!("Found user by verification token: {}", u.id);
         }
         user
     }
@@ -253,7 +253,7 @@ impl UserRepositoryTrait for UserRepository {
         .await?;
 
         if let Some(ref r) = result {
-            info!("Successfully verified email for user: {}", &r.id);
+            info!("Successfully verified email for user: {}", r.id);
         } else {
             debug!("No user found with the provided verification token or token expired");
         }
@@ -300,7 +300,7 @@ impl UserRepositoryTrait for UserRepository {
         .await;
 
         if let Ok(ref u) = user {
-            info!("Successfully updated user: {}", &u.id);
+            info!("Successfully updated user: {}", u.id);
         } else if let Err(ref e) = user {
             error!("Failed to update user {}: {}", id, e);
         }
@@ -650,7 +650,7 @@ impl UserRepositoryTrait for UserRepository {
         .await;
 
         if let Ok(Some(ref u)) = user {
-            debug!("Found verified user by email: {}", &u.id);
+            debug!("Found verified user by email: {}", u.id);
         }
         user
     }

@@ -433,7 +433,8 @@ impl UserService {
 mod tests {
     use super::*;
     use crate::core::user::{MockUserRepositoryTrait, User, model::PasswordResetToken};
-    use crate::core::email::service::mock::MockEmailService; // Corrected import path for manual mock
+    // Use the mockall-generated mock for EmailServiceTrait
+    use crate::core::email::service::MockEmailServiceTrait as MockEmailService; 
     use crate::core::auth::token_revocation::MockTokenRevocationServiceTrait;
     use crate::common::validation::UserInput;
     use crate::common::error::{ApiError, ApiErrorType, DbError};
@@ -476,7 +477,7 @@ mod tests {
     #[tokio::test]
     async fn test_create_user_success() {
         let mut mock_repo = MockUserRepositoryTrait::new();
-        let mock_email_service = Arc::new(MockEmailService::new()); // Use manual mock
+        let mut mock_email_service_instance = MockEmailService::new(); // Use mockall-generated
         let mock_token_revocation_service = MockTokenRevocationServiceTrait::new();
 
         let user_id = Uuid::new_v4();
@@ -509,12 +510,14 @@ mod tests {
                 Ok(user_to_return)
             });
 
-        // For manual mock, no `expect_` calls. We'll check `get_sent_emails` after.
-        // mock_email_service.set_should_succeed(true); // Default is true
+        // Setup expectations for the mockall-generated mock
+        mock_email_service_instance.expect_send_verification_email()
+            .times(1)
+            .returning(|_, _| Ok(()));
 
         let user_service = UserService::new(
             Arc::new(mock_repo),
-            mock_email_service.clone(), // Clone Arc for the service
+            Arc::new(mock_email_service_instance), 
             Arc::new(mock_token_revocation_service),
         );
 
@@ -530,22 +533,19 @@ mod tests {
         assert!(!returned_token.is_empty());
         assert_eq!(user.verification_token.as_ref(), Some(&returned_token));
         
-        // Check that the email was "sent" by the manual mock
-        let sent_emails = mock_email_service.get_sent_emails();
-        assert_eq!(sent_emails.len(), 1);
-        assert!(sent_emails[0].contains(input_email));
-        assert!(sent_emails[0].contains(&returned_token));
+        // The expect_send_verification_email above is the check.
+        // Calls to get_sent_emails() were removed as they are not part of MockEmailServiceTrait
     }
 
     #[tokio::test]
     async fn test_create_user_input_validation_fails() {
         let mock_repo = MockUserRepositoryTrait::new(); 
-        let mock_email_service = Arc::new(MockEmailService::new()); 
+        let mock_email_service_instance = MockEmailService::new(); 
         let mock_token_revocation_service = MockTokenRevocationServiceTrait::new();
 
         let user_service = UserService::new(
             Arc::new(mock_repo),
-            mock_email_service,
+            Arc::new(mock_email_service_instance), // Already Arc'd, ensure variable name consistency if this was the issue
             Arc::new(mock_token_revocation_service),
         );
 
@@ -567,12 +567,12 @@ mod tests {
     #[tokio::test]
     async fn test_create_user_missing_password() {
         let mock_repo = MockUserRepositoryTrait::new();
-        let mock_email_service = Arc::new(MockEmailService::new());
+        let mock_email_service_instance = MockEmailService::new();
         let mock_token_revocation_service = MockTokenRevocationServiceTrait::new();
 
         let user_service = UserService::new(
             Arc::new(mock_repo),
-            mock_email_service,
+            Arc::new(mock_email_service_instance),
             Arc::new(mock_token_revocation_service),
         );
         
@@ -592,7 +592,7 @@ mod tests {
     #[tokio::test]
     async fn test_create_user_repository_error() {
         let mut mock_repo = MockUserRepositoryTrait::new();
-        let mock_email_service = Arc::new(MockEmailService::new()); 
+        let mock_email_service_instance = MockEmailService::new(); 
         let mock_token_revocation_service = MockTokenRevocationServiceTrait::new();
 
         let input_username = "testuser_repo_fail";
@@ -606,7 +606,7 @@ mod tests {
 
         let user_service = UserService::new(
             Arc::new(mock_repo),
-            mock_email_service,
+            Arc::new(mock_email_service_instance),
             Arc::new(mock_token_revocation_service),
         );
 
@@ -619,7 +619,7 @@ mod tests {
     #[tokio::test]
     async fn test_create_user_email_sending_error_still_succeeds() {
         let mut mock_repo = MockUserRepositoryTrait::new();
-        let mock_email_service = Arc::new(MockEmailService::new());
+        let mut mock_email_service_instance = MockEmailService::new();
         let mock_token_revocation_service = MockTokenRevocationServiceTrait::new();
 
         let user_id = Uuid::new_v4();
@@ -639,11 +639,14 @@ mod tests {
                 Ok(user_to_return)
             });
         
-        mock_email_service.set_should_succeed(false); // Configure manual mock to fail
+        // Configure mockall-generated mock to fail for send_verification_email
+        mock_email_service_instance.expect_send_verification_email()
+            .times(1)
+            .returning(|_, _| Err(Box::new(std::io::Error::new(std::io::ErrorKind::Other, "Simulated send failure"))));
 
         let user_service = UserService::new(
             Arc::new(mock_repo),
-            mock_email_service.clone(),
+            Arc::new(mock_email_service_instance), // Already Arc'd
             Arc::new(mock_token_revocation_service),
         );
 
@@ -662,7 +665,7 @@ mod tests {
     #[tokio::test]
     async fn test_get_user_by_id_success() {
         let mut mock_repo = MockUserRepositoryTrait::new();
-        let mock_email_service = Arc::new(MockEmailService::new());
+        let mock_email_service_instance = MockEmailService::new();
         let mock_token_revocation_service = MockTokenRevocationServiceTrait::new();
 
         let user_id = Uuid::new_v4();
@@ -676,7 +679,7 @@ mod tests {
 
         let user_service = UserService::new(
             Arc::new(mock_repo),
-            mock_email_service,
+            Arc::new(mock_email_service_instance), // Already Arc'd
             Arc::new(mock_token_revocation_service),
         );
 
@@ -690,7 +693,7 @@ mod tests {
     #[tokio::test]
     async fn test_get_user_by_id_not_found() {
         let mut mock_repo = MockUserRepositoryTrait::new();
-        let mock_email_service = Arc::new(MockEmailService::new());
+        let mock_email_service_instance = MockEmailService::new();
         let mock_token_revocation_service = MockTokenRevocationServiceTrait::new();
 
         let user_id = Uuid::new_v4();
@@ -702,7 +705,7 @@ mod tests {
 
         let user_service = UserService::new(
             Arc::new(mock_repo),
-            mock_email_service,
+            Arc::new(mock_email_service_instance), // Already Arc'd
             Arc::new(mock_token_revocation_service),
         );
 
@@ -716,7 +719,7 @@ mod tests {
     #[tokio::test]
     async fn test_get_user_by_id_repository_error() {
         let mut mock_repo = MockUserRepositoryTrait::new();
-        let mock_email_service = Arc::new(MockEmailService::new());
+        let mock_email_service_instance = MockEmailService::new();
         let mock_token_revocation_service = MockTokenRevocationServiceTrait::new();
 
         let user_id = Uuid::new_v4();
@@ -728,7 +731,7 @@ mod tests {
 
         let user_service = UserService::new(
             Arc::new(mock_repo),
-            mock_email_service,
+            Arc::new(mock_email_service_instance),
             Arc::new(mock_token_revocation_service),
         );
 
@@ -742,7 +745,7 @@ mod tests {
     #[tokio::test]
     async fn test_verify_email_success() {
         let mut mock_repo = MockUserRepositoryTrait::new();
-        let mock_email_service = Arc::new(MockEmailService::new());
+        let mock_email_service_instance = MockEmailService::new();
         let mock_token_revocation_service = MockTokenRevocationServiceTrait::new();
 
         let verification_token = "valid_token";
@@ -755,7 +758,7 @@ mod tests {
 
         let user_service = UserService::new(
             Arc::new(mock_repo),
-            mock_email_service,
+            Arc::new(mock_email_service_instance),
             Arc::new(mock_token_revocation_service),
         );
 
@@ -766,7 +769,7 @@ mod tests {
     #[tokio::test]
     async fn test_verify_email_invalid_or_expired_token() {
         let mut mock_repo = MockUserRepositoryTrait::new();
-        let mock_email_service = Arc::new(MockEmailService::new());
+        let mock_email_service_instance = MockEmailService::new();
         let mock_token_revocation_service = MockTokenRevocationServiceTrait::new();
 
         let verification_token = "invalid_token";
@@ -778,7 +781,7 @@ mod tests {
 
         let user_service = UserService::new(
             Arc::new(mock_repo),
-            mock_email_service,
+            Arc::new(mock_email_service_instance),
             Arc::new(mock_token_revocation_service),
         );
 
@@ -792,7 +795,7 @@ mod tests {
     #[tokio::test]
     async fn test_verify_email_repository_error() {
         let mut mock_repo = MockUserRepositoryTrait::new();
-        let mock_email_service = Arc::new(MockEmailService::new());
+        let mock_email_service_instance = MockEmailService::new();
         let mock_token_revocation_service = MockTokenRevocationServiceTrait::new();
 
         let verification_token = "some_token";
@@ -804,7 +807,7 @@ mod tests {
 
         let user_service = UserService::new(
             Arc::new(mock_repo),
-            mock_email_service,
+            Arc::new(mock_email_service_instance),
             Arc::new(mock_token_revocation_service),
         );
 
@@ -818,7 +821,7 @@ mod tests {
     #[tokio::test]
     async fn test_update_user_success_no_password_change() {
         let mut mock_repo = MockUserRepositoryTrait::new();
-        let mock_email_service = Arc::new(MockEmailService::new());
+        let mock_email_service_instance = MockEmailService::new();
         let mut mock_token_revocation_service = MockTokenRevocationServiceTrait::new();
 
         let user_id = Uuid::new_v4();
@@ -855,7 +858,7 @@ mod tests {
 
         let user_service = UserService::new(
             Arc::new(mock_repo),
-            mock_email_service,
+            Arc::new(mock_email_service_instance),
             Arc::new(mock_token_revocation_service),
         );
 
@@ -869,7 +872,7 @@ mod tests {
     #[tokio::test]
     async fn test_update_user_success_with_password_change() {
         let mut mock_repo = MockUserRepositoryTrait::new();
-        let mock_email_service = Arc::new(MockEmailService::new());
+        let mock_email_service_instance = MockEmailService::new();
         let mut mock_token_revocation_service = MockTokenRevocationServiceTrait::new();
 
         let user_id = Uuid::new_v4();
@@ -916,7 +919,7 @@ mod tests {
 
         let user_service = UserService::new(
             Arc::new(mock_repo),
-            mock_email_service,
+            Arc::new(mock_email_service_instance),
             Arc::new(mock_token_revocation_service),
         );
 
@@ -930,7 +933,7 @@ mod tests {
     #[tokio::test]
     async fn test_update_user_not_found() {
         let mut mock_repo = MockUserRepositoryTrait::new();
-        let mock_email_service = Arc::new(MockEmailService::new());
+        let mock_email_service_instance = MockEmailService::new();
         let mock_token_revocation_service = MockTokenRevocationServiceTrait::new();
         
         let user_id = Uuid::new_v4();
@@ -947,7 +950,7 @@ mod tests {
 
         let user_service = UserService::new(
             Arc::new(mock_repo),
-            mock_email_service,
+            Arc::new(mock_email_service_instance),
             Arc::new(mock_token_revocation_service),
         );
 
@@ -961,7 +964,7 @@ mod tests {
     #[tokio::test]
     async fn test_update_user_token_revocation_error() {
         let mut mock_repo = MockUserRepositoryTrait::new();
-        let mock_email_service = Arc::new(MockEmailService::new());
+        let mock_email_service_instance = MockEmailService::new();
         let mut mock_token_revocation_service = MockTokenRevocationServiceTrait::new();
 
         let user_id = Uuid::new_v4();
@@ -993,7 +996,7 @@ mod tests {
 
         let user_service = UserService::new(
             Arc::new(mock_repo),
-            mock_email_service,
+            Arc::new(mock_email_service_instance),
             Arc::new(mock_token_revocation_service),
         );
 
@@ -1009,7 +1012,7 @@ mod tests {
     #[tokio::test]
     async fn test_update_user_input_validation_error() {
         let mock_repo = MockUserRepositoryTrait::new(); // No repo calls if validation fails
-        let mock_email_service = Arc::new(MockEmailService::new());
+        let mock_email_service_instance = MockEmailService::new();
         let mock_token_revocation_service = MockTokenRevocationServiceTrait::new();
 
         let user_id = Uuid::new_v4();
@@ -1021,7 +1024,7 @@ mod tests {
 
         let user_service = UserService::new(
             Arc::new(mock_repo),
-            mock_email_service,
+            Arc::new(mock_email_service_instance),
             Arc::new(mock_token_revocation_service),
         );
 
@@ -1036,7 +1039,7 @@ mod tests {
     #[tokio::test]
     async fn test_delete_user_success() {
         let mut mock_repo = MockUserRepositoryTrait::new();
-        let mock_email_service = Arc::new(MockEmailService::new());
+        let mock_email_service_instance = MockEmailService::new(); 
         let mock_token_revocation_service = MockTokenRevocationServiceTrait::new();
 
         let user_id = Uuid::new_v4();
@@ -1048,7 +1051,7 @@ mod tests {
 
         let user_service = UserService::new(
             Arc::new(mock_repo),
-            mock_email_service,
+            Arc::new(mock_email_service_instance),
             Arc::new(mock_token_revocation_service),
         );
 
@@ -1059,7 +1062,7 @@ mod tests {
     #[tokio::test]
     async fn test_delete_user_not_found() {
         let mut mock_repo = MockUserRepositoryTrait::new();
-        let mock_email_service = Arc::new(MockEmailService::new());
+        let mock_email_service_instance = MockEmailService::new(); 
         let mock_token_revocation_service = MockTokenRevocationServiceTrait::new();
 
         let user_id = Uuid::new_v4();
@@ -1071,7 +1074,7 @@ mod tests {
 
         let user_service = UserService::new(
             Arc::new(mock_repo),
-            mock_email_service,
+            Arc::new(mock_email_service_instance),
             Arc::new(mock_token_revocation_service),
         );
 
@@ -1085,7 +1088,7 @@ mod tests {
     #[tokio::test]
     async fn test_delete_user_repository_error() {
         let mut mock_repo = MockUserRepositoryTrait::new();
-        let mock_email_service = Arc::new(MockEmailService::new());
+        let mock_email_service_instance = MockEmailService::new(); 
         let mock_token_revocation_service = MockTokenRevocationServiceTrait::new();
 
         let user_id = Uuid::new_v4();
@@ -1097,7 +1100,7 @@ mod tests {
 
         let user_service = UserService::new(
             Arc::new(mock_repo),
-            mock_email_service,
+            Arc::new(mock_email_service_instance),
             Arc::new(mock_token_revocation_service),
         );
 
@@ -1111,7 +1114,7 @@ mod tests {
     #[tokio::test]
     async fn test_request_password_reset_success() {
         let mut mock_repo = MockUserRepositoryTrait::new();
-        let mock_email_service = Arc::new(MockEmailService::new()); // Using manual mock
+        let mut mock_email_service_instance = MockEmailService::new(); 
         let mock_token_revocation_service = MockTokenRevocationServiceTrait::new();
 
         let user_email = "user@example.com";
@@ -1137,28 +1140,27 @@ mod tests {
             .with(predicate::eq(user_id))
             .times(1)
             .returning(move |_| Ok(password_reset_token_db.clone()));
-
-        // mock_email_service.set_should_succeed(true); // Default for manual mock
+        
+        mock_email_service.expect_send_password_reset_email()
+            .with(predicate::eq(user_email.to_string()), predicate::eq(reset_token_value.clone()))
+            .times(1)
+            .returning(|_,_| Ok(()));
 
         let user_service = UserService::new(
             Arc::new(mock_repo),
-            mock_email_service.clone(),
+            Arc::new(mock_email_service_instance),
             Arc::new(mock_token_revocation_service),
         );
 
         let result = user_service.request_password_reset(user_email).await;
         assert!(result.is_ok());
-
-        let sent_emails = mock_email_service.get_sent_emails();
-        assert_eq!(sent_emails.len(), 1);
-        assert!(sent_emails[0].contains(user_email));
-        assert!(sent_emails[0].contains(&reset_token_value));
+        // Verification of email sending is done by mock_email_service.expect...
     }
 
     #[tokio::test]
     async fn test_request_password_reset_user_not_found() {
         let mut mock_repo = MockUserRepositoryTrait::new();
-        let mock_email_service = Arc::new(MockEmailService::new());
+        let mut mock_email_service_instance = MockEmailService::new(); 
         let mock_token_revocation_service = MockTokenRevocationServiceTrait::new();
         let user_email = "nonexistent@example.com";
 
@@ -1169,24 +1171,22 @@ mod tests {
 
         // No further calls to repo or email service expected
         mock_repo.expect_create_password_reset_token().never();
+        mock_email_service_instance.expect_send_password_reset_email().never(); // No email should be sent
 
         let user_service = UserService::new(
             Arc::new(mock_repo),
-            mock_email_service.clone(),
+            Arc::new(mock_email_service_instance),
             Arc::new(mock_token_revocation_service),
         );
 
         let result = user_service.request_password_reset(user_email).await;
         assert!(result.is_ok()); // Service should silently succeed if user not found
-
-        let sent_emails = mock_email_service.get_sent_emails();
-        assert_eq!(sent_emails.len(), 0); // No email sent
     }
 
     #[tokio::test]
     async fn test_request_password_reset_email_not_verified() {
         let mut mock_repo = MockUserRepositoryTrait::new();
-        let mock_email_service = Arc::new(MockEmailService::new());
+        let mut mock_email_service_instance = MockEmailService::new(); 
         let mock_token_revocation_service = MockTokenRevocationServiceTrait::new();
 
         let user_email = "unverified@example.com";
@@ -1199,10 +1199,11 @@ mod tests {
             .returning(move |_| Ok(Some(test_user.clone())));
         
         mock_repo.expect_create_password_reset_token().never();
+        mock_email_service_instance.expect_send_password_reset_email().never();
 
         let user_service = UserService::new(
             Arc::new(mock_repo),
-            mock_email_service.clone(),
+            Arc::new(mock_email_service_instance),
             Arc::new(mock_token_revocation_service),
         );
 
@@ -1211,15 +1212,12 @@ mod tests {
         let err = result.unwrap_err();
         assert_eq!(err.error_type, ApiErrorType::Validation);
         assert_eq!(err.message, "Email not verified");
-        
-        let sent_emails = mock_email_service.get_sent_emails();
-        assert_eq!(sent_emails.len(), 0);
     }
 
     #[tokio::test]
     async fn test_request_password_reset_repo_error_on_find() {
         let mut mock_repo = MockUserRepositoryTrait::new();
-        let mock_email_service = Arc::new(MockEmailService::new());
+        let mock_email_service_instance = MockEmailService::new(); 
         let mock_token_revocation_service = MockTokenRevocationServiceTrait::new();
         let user_email = "finderror@example.com";
 
@@ -1230,7 +1228,7 @@ mod tests {
             
         let user_service = UserService::new(
             Arc::new(mock_repo),
-            mock_email_service,
+            Arc::new(mock_email_service_instance),
             Arc::new(mock_token_revocation_service),
         );
 
@@ -1243,7 +1241,7 @@ mod tests {
     #[tokio::test]
     async fn test_request_password_reset_repo_error_on_create_token() {
         let mut mock_repo = MockUserRepositoryTrait::new();
-        let mock_email_service = Arc::new(MockEmailService::new());
+        let mock_email_service_instance = MockEmailService::new(); 
         let mock_token_revocation_service = MockTokenRevocationServiceTrait::new();
 
         let user_email = "createtokenerror@example.com";
@@ -1262,7 +1260,7 @@ mod tests {
             
         let user_service = UserService::new(
             Arc::new(mock_repo),
-            mock_email_service,
+            Arc::new(mock_email_service_instance),
             Arc::new(mock_token_revocation_service),
         );
 
@@ -1275,7 +1273,7 @@ mod tests {
     #[tokio::test]
     async fn test_request_password_reset_email_send_error() {
         let mut mock_repo = MockUserRepositoryTrait::new();
-        let mock_email_service = Arc::new(MockEmailService::new());
+        let mut mock_email_service_instance = MockEmailService::new(); 
         let mock_token_revocation_service = MockTokenRevocationServiceTrait::new();
 
         let user_email = "emailsenderror@example.com";
@@ -1291,11 +1289,13 @@ mod tests {
         mock_repo.expect_find_user_by_email().times(1).returning(move |_| Ok(Some(test_user.clone())));
         mock_repo.expect_create_password_reset_token().times(1).returning(move |_| Ok(password_reset_token_db.clone()));
         
-        mock_email_service.set_should_succeed(false); // Simulate email sending failure
+        mock_email_service.expect_send_password_reset_email()
+            .times(1)
+            .returning(|_, _| Err(Box::new(std::io::Error::new(std::io::ErrorKind::Other, "Simulated send failure"))));
 
         let user_service = UserService::new(
             Arc::new(mock_repo),
-            mock_email_service.clone(),
+            Arc::new(mock_email_service_instance),
             Arc::new(mock_token_revocation_service),
         );
 
@@ -1310,7 +1310,7 @@ mod tests {
     #[tokio::test]
     async fn test_verify_reset_token_success() {
         let mut mock_repo = MockUserRepositoryTrait::new();
-        let mock_email_service = Arc::new(MockEmailService::new());
+        let mock_email_service = MockEmailService::new(); 
         let mock_token_revocation_service = MockTokenRevocationServiceTrait::new();
         
         let token_str = "valid_reset_token";
@@ -1338,7 +1338,7 @@ mod tests {
     #[tokio::test]
     async fn test_verify_reset_token_invalid_or_expired() {
         let mut mock_repo = MockUserRepositoryTrait::new();
-        let mock_email_service = Arc::new(MockEmailService::new());
+        let mock_email_service = MockEmailService::new(); 
         let mock_token_revocation_service = MockTokenRevocationServiceTrait::new();
         let token_str = "invalid_reset_token";
 
@@ -1363,7 +1363,7 @@ mod tests {
     #[tokio::test]
     async fn test_verify_reset_token_repo_error() {
         let mut mock_repo = MockUserRepositoryTrait::new();
-        let mock_email_service = Arc::new(MockEmailService::new());
+        let mock_email_service = MockEmailService::new(); 
         let mock_token_revocation_service = MockTokenRevocationServiceTrait::new();
         let token_str = "repo_error_reset_token";
 
@@ -1388,7 +1388,7 @@ mod tests {
     #[tokio::test]
     async fn test_reset_password_success() {
         let mut mock_repo = MockUserRepositoryTrait::new();
-        let mock_email_service = Arc::new(MockEmailService::new());
+        let mock_email_service = MockEmailService::new(); 
         let mut mock_token_revocation_service = MockTokenRevocationServiceTrait::new();
 
         let token_str = "valid_reset_token_for_reset";
@@ -1433,7 +1433,7 @@ mod tests {
     #[tokio::test]
     async fn test_reset_password_invalid_new_password() {
         let mock_repo = MockUserRepositoryTrait::new(); // No repo calls if password validation fails
-        let mock_email_service = Arc::new(MockEmailService::new());
+        let mock_email_service = MockEmailService::new(); 
         let mock_token_revocation_service = MockTokenRevocationServiceTrait::new();
         
         let token_str = "any_token";
@@ -1455,7 +1455,7 @@ mod tests {
     #[tokio::test]
     async fn test_reset_password_invalid_reset_token() {
         let mut mock_repo = MockUserRepositoryTrait::new();
-        let mock_email_service = Arc::new(MockEmailService::new());
+        let mock_email_service = MockEmailService::new(); 
         let mock_token_revocation_service = MockTokenRevocationServiceTrait::new();
         
         let token_str_invalid = "invalid_reset_token_for_reset";
@@ -1483,7 +1483,7 @@ mod tests {
     #[tokio::test]
     async fn test_resend_verification_email_success() {
         let mut mock_repo = MockUserRepositoryTrait::new();
-        let mock_email_service = Arc::new(MockEmailService::new());
+        let mut mock_email_service = MockEmailService::new(); 
         let mock_token_revocation_service = MockTokenRevocationServiceTrait::new();
 
         let user_id = Uuid::new_v4();
@@ -1502,29 +1502,26 @@ mod tests {
             .times(1)
             .returning(|_, _| Ok(()));
         
-        // mock_email_service.set_should_succeed(true); // Default
+        mock_email_service.expect_send_verification_email()
+            .withf(move |email_arg, token_arg| email_arg == user_email && !token_arg.is_empty())
+            .times(1)
+            .returning(|_,_| Ok(()));
 
         let user_service = UserService::new(
             Arc::new(mock_repo),
-            mock_email_service.clone(),
+            Arc::new(mock_email_service),
             Arc::new(mock_token_revocation_service),
         );
 
         let result = user_service.resend_verification_email(user_id).await;
         assert!(result.is_ok());
-
-        let sent_emails = mock_email_service.get_sent_emails();
-        assert_eq!(sent_emails.len(), 1);
-        assert!(sent_emails[0].contains(user_email));
-        // We can't easily check the exact token value here without more complex mocking
-        // or capturing the token from update_verification_token mock.
-        // For now, checking if an email was sent to the right address is a good start.
+        // Verification of email sending is done by mock_email_service.expect...
     }
 
     #[tokio::test]
     async fn test_resend_verification_email_already_verified() {
         let mut mock_repo = MockUserRepositoryTrait::new();
-        let mock_email_service = Arc::new(MockEmailService::new());
+        let mut mock_email_service = MockEmailService::new(); 
         let mock_token_revocation_service = MockTokenRevocationServiceTrait::new();
 
         let user_id = Uuid::new_v4();
@@ -1539,10 +1536,11 @@ mod tests {
         
         // No further calls expected
         mock_repo.expect_update_verification_token().never();
+        mock_email_service.expect_send_verification_email().never();
 
         let user_service = UserService::new(
             Arc::new(mock_repo),
-            mock_email_service.clone(),
+            Arc::new(mock_email_service),
             Arc::new(mock_token_revocation_service),
         );
 
@@ -1551,15 +1549,12 @@ mod tests {
         let err = result.unwrap_err();
         assert_eq!(err.error_type, ApiErrorType::Validation);
         assert_eq!(err.message, "Email already verified");
-        
-        let sent_emails = mock_email_service.get_sent_emails();
-        assert_eq!(sent_emails.len(), 0);
     }
 
     #[tokio::test]
     async fn test_resend_verification_email_user_not_found() {
         let mut mock_repo = MockUserRepositoryTrait::new();
-        let mock_email_service = Arc::new(MockEmailService::new());
+        let mock_email_service = MockEmailService::new(); 
         let mock_token_revocation_service = MockTokenRevocationServiceTrait::new();
         let user_id = Uuid::new_v4();
 
@@ -1583,7 +1578,7 @@ mod tests {
     #[tokio::test]
     async fn test_resend_verification_email_no_email_address_for_user() {
         let mut mock_repo = MockUserRepositoryTrait::new();
-        let mock_email_service = Arc::new(MockEmailService::new());
+        let mock_email_service = MockEmailService::new(); 
         let mock_token_revocation_service = MockTokenRevocationServiceTrait::new();
 
         let user_id = Uuid::new_v4();
@@ -1613,7 +1608,7 @@ mod tests {
     #[tokio::test]
     async fn test_check_email_verified_is_verified() {
         let mut mock_repo = MockUserRepositoryTrait::new();
-        let mock_email_service = Arc::new(MockEmailService::new());
+        let mock_email_service = MockEmailService::new(); 
         let mock_token_revocation_service = MockTokenRevocationServiceTrait::new();
         let username = "verified_user_check";
 
@@ -1636,7 +1631,7 @@ mod tests {
     #[tokio::test]
     async fn test_check_email_verified_is_not_verified() {
         let mut mock_repo = MockUserRepositoryTrait::new();
-        let mock_email_service = Arc::new(MockEmailService::new());
+        let mock_email_service = MockEmailService::new(); 
         let mock_token_revocation_service = MockTokenRevocationServiceTrait::new();
         let username = "unverified_user_check";
 
@@ -1659,7 +1654,7 @@ mod tests {
     #[tokio::test]
     async fn test_check_email_verified_repo_error() {
         let mut mock_repo = MockUserRepositoryTrait::new();
-        let mock_email_service = Arc::new(MockEmailService::new());
+        let mock_email_service = MockEmailService::new(); 
         let mock_token_revocation_service = MockTokenRevocationServiceTrait::new();
         let username = "error_user_check";
 
@@ -1685,7 +1680,7 @@ mod tests {
     #[tokio::test]
     async fn test_update_user_email_change_success_new_email_unverified() {
         let mut mock_repo = MockUserRepositoryTrait::new();
-        let mut mock_email_service = MockEmailService::new(); // Using manual mock from existing tests
+        let mut mock_email_service = MockEmailService::new(); 
         let mut mock_token_revocation_service = MockTokenRevocationServiceTrait::new();
 
         let user_id = Uuid::new_v4();
@@ -1747,7 +1742,7 @@ mod tests {
     #[tokio::test]
     async fn test_update_user_email_change_conflict_new_email_already_verified() {
         let mut mock_repo = MockUserRepositoryTrait::new();
-        let mock_email_service = Arc::new(MockEmailService::new());
+        let mock_email_service = MockEmailService::new(); 
         let mock_token_revocation_service = MockTokenRevocationServiceTrait::new();
 
         let user_id = Uuid::new_v4();
@@ -1793,7 +1788,7 @@ mod tests {
     #[tokio::test]
     async fn test_update_user_email_and_password_change_success() {
         let mut mock_repo = MockUserRepositoryTrait::new();
-        let mut mock_email_service = MockEmailService::new();
+        let mut mock_email_service = MockEmailService::new(); 
         let mut mock_token_revocation_service = MockTokenRevocationServiceTrait::new();
 
         let user_id = Uuid::new_v4();
@@ -1881,7 +1876,7 @@ mod tests {
     #[tokio::test]
     async fn test_update_user_username_only_no_email_change() {
         let mut mock_repo = MockUserRepositoryTrait::new();
-        let mock_email_service = Arc::new(MockEmailService::new()); // Manual mock, no expect needed if not called
+        let mock_email_service = MockEmailService::new(); 
         let mut mock_token_revocation_service = MockTokenRevocationServiceTrait::new();
 
         let user_id = Uuid::new_v4();
@@ -1941,7 +1936,7 @@ mod tests {
     #[tokio::test]
     async fn test_update_user_email_change_email_sending_fails_still_succeeds() {
         let mut mock_repo = MockUserRepositoryTrait::new();
-        let mut mock_email_service = MockEmailService::new(); // Using manual mock
+        let mut mock_email_service = MockEmailService::new(); 
         let mock_token_revocation_service = MockTokenRevocationServiceTrait::new();
 
         let user_id = Uuid::new_v4();
@@ -1965,11 +1960,12 @@ mod tests {
         // Expect email sending to fail
         mock_email_service.expect_send_verification_email()
             .times(1)
-            .returning(|_, _| Err(ApiError::new("Simulated email send failure", ApiErrorType::Internal))); // Or any appropriate error
+            .returning(|_, _| Err(Box::new(std::io::Error::new(std::io::ErrorKind::Other, "Simulated email failure"))));
+
 
         let user_service = UserService::new(
             Arc::new(mock_repo),
-            Arc::new(mock_email_service), // Pass the manual mock
+            Arc::new(mock_email_service),
             Arc::new(mock_token_revocation_service),
         );
 

@@ -4,7 +4,7 @@ use crate::common::{
     error::{AuthError, AuthErrorType},
     validation::{LoginInput, RegisterInput},
 };
-use crate::core::user::{User, UserRepositoryTrait, NewUser, UserUpdate, PasswordResetToken}; // Added PasswordResetToken
+use crate::core::user::{User, UserRepositoryTrait, NewUser}; 
 use std::sync::Arc;
 use super::jwt::{self, Claims, TokenType, TokenPair, create_token_pair, TokenMetadata};
 use crate::core::auth::token_revocation::TokenRevocationServiceTrait;

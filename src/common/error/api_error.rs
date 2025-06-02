@@ -81,6 +81,8 @@ impl ResponseError for ApiError {
     }
 }
 
+impl std::error::Error for ApiError {}
+
 #[cfg(test)]
 mod tests {
     use super::*;
