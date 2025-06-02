@@ -64,7 +64,8 @@ impl UserHandler {
                             "username": user.username,
                             "email": user.email,
                             "is_email_verified": user.is_email_verified,
-                            "created_at": user.created_at
+                            "created_at": user.created_at,
+                            "is_active": user.is_active
                         }
                     }
                 }))
@@ -138,8 +139,8 @@ impl UserHandler {
                             "email": user.email,
                             "is_email_verified": user.is_email_verified,
                             "created_at": user.created_at,
-                            "role": user.role
-,
+                            "role": user.role,
+                            "is_active": user.is_active,
                             "csrf_token": csrf_token.token // Include CSRF token in response for frontend to use
                         }
                     }
@@ -218,7 +219,8 @@ impl UserHandler {
                                 "email": user.email,
                                 "is_email_verified": user.is_email_verified,
                                 "created_at": user.created_at,
-                                "role": user.role
+                                "role": user.role,
+                                "is_active": user.is_active
                             }
                         }
                     })),
@@ -259,7 +261,8 @@ impl UserHandler {
                                 "email": user.email,
                                 "is_email_verified": user.is_email_verified,
                                 "created_at": user.created_at,
-                                "role": user.role
+                                "role": user.role,
+                                "is_active": user.is_active
                             }
                         }
                     })),
@@ -303,10 +306,10 @@ impl UserHandler {
                             "email": user.email,
                             "is_email_verified": user.is_email_verified,
                             "created_at": user.created_at,
-                            "role": user.role
+                            "role": user.role,
+                            "is_active": user.is_active
                         }
-                    }
-,
+                    },
                     "csrf_token": req.cookie("csrf_token").map(|c| c.value().to_string())
                 })),
                 Err(e) => {
@@ -354,7 +357,8 @@ impl UserHandler {
                                 "email": updated_user.email,
                                 "is_email_verified": updated_user.is_email_verified,
                                 "created_at": updated_user.created_at,
-                                "role": updated_user.role
+                                "role": updated_user.role,
+                                "is_active": updated_user.is_active
                             }
                         }
                     })),
