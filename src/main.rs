@@ -21,6 +21,7 @@ use crate::infrastructure::middleware::cors::configure_cors;
 use crate::infrastructure::database::create_pool; // Use re-exported path
 use crate::infrastructure::middleware::logger::RequestLogger; 
 use crate::infrastructure::middleware::rate_limit::RateLimiter; 
+use crate::infrastructure::middleware::metrics::RequestMetrics;
 
 mod api;
 mod common;
@@ -174,6 +175,7 @@ async fn main() -> std::io::Result<()> {
     HttpServer::new(move || {
         let app_config_clone = config_clone.clone(); 
         App::new()
+            .wrap(RequestMetrics) // Added RequestMetrics middleware
             .wrap(RateLimiter::new()) // Assuming RateLimiter is correctly in scope via use statement
             .wrap(configure_cors()) // Assuming configure_cors is correctly in scope via use statement
             .wrap(
