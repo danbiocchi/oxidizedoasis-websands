@@ -1,13 +1,11 @@
 use yew::prelude::*;
 use serde::Deserialize;
 use wasm_bindgen_futures::spawn_local;
-use crate::services::auth;
 use crate::services::request::{RequestInterceptor, RequestBuilderExt};
 use chrono::{DateTime, Utc};
 use gloo::console::log;
 
 // Import necessary types for event handling
-use wasm_bindgen::JsCast;
 use wasm_bindgen::JsValue;
 use web_sys::{CustomEvent, Event, HtmlInputElement, HtmlSelectElement};
 
@@ -796,8 +794,5 @@ async fn fetch_current_user_id() -> Result<String, String> {
     }
     
     // Extract user ID from the response
-    match data.data {
-        Some(user_data) => Ok(user_data.user.id),
-        None => Err("No user data in response".into()),
-    }
+    Ok(data.data.id)
 }
