@@ -9,6 +9,7 @@ pub struct AppConfig {
 pub struct JwtConfig {
     pub secret: String,
     pub audience: String,
+    pub issuer: String, // Add the issuer field
 }
 
 #[derive(Clone)]
@@ -40,6 +41,8 @@ impl AppConfig {
                 secret: std::env::var("JWT_SECRET")?,
                 audience: std::env::var("JWT_AUDIENCE")
                     .unwrap_or_else(|_| "oxidizedoasis".to_string()),
+                issuer: std::env::var("JWT_ISSUER") // Add the issuer field
+                    .unwrap_or_else(|_| "oxidizedoasis".to_string()), // Default value for issuer
             },
         })
     }
@@ -119,6 +122,7 @@ mod tests {
             ("DB_MAX_CONNECTIONS", Some("10")),
             ("JWT_SECRET", Some("supersecretjwtkey")),
             ("JWT_AUDIENCE", Some("test_audience")),
+            ("JWT_ISSUER", Some("test_issuer")), // Add test for issuer
         ];
         with_env_vars(vars, || {
             let config_result = AppConfig::from_env();
@@ -130,6 +134,7 @@ mod tests {
             assert_eq!(config.database.max_connections, 10);
             assert_eq!(config.jwt.secret, "supersecretjwtkey");
             assert_eq!(config.jwt.audience, "test_audience");
+            assert_eq!(config.jwt.issuer, "test_issuer"); // Assert issuer value
         });
     }
 
@@ -152,6 +157,7 @@ mod tests {
             // JWT_SECRET is required, so it must be set even for default tests
             assert_eq!(config.jwt.secret, "test_default_secret");
             assert_eq!(config.jwt.audience, "oxidizedoasis");
+            assert_eq!(config.jwt.issuer, "oxidizedoasis"); // Assert default issuer value
         });
     }
 
