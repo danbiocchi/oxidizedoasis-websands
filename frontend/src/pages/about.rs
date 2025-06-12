@@ -1,9 +1,11 @@
 use yew::prelude::*;
+use crate::components::navigation::Breadcrumb; // Adjust path if necessary
 
 #[function_component(About)]
 pub fn about() -> Html {
     html! {
         <main class="p-about">
+            <Breadcrumb /> // Added Breadcrumb component
             <div class="p-about__hero">
                 <div class="p-about__hero-content">
                     <h1 class="p-about__hero-title">{"About OxidizedOasis"}</h1>
