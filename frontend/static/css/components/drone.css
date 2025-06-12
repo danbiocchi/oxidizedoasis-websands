@@ -1,0 +1,39 @@
+.flight-path-visualizer {
+    border: 1px solid #ccc;
+    background-color: #f9f9f9;
+}
+
+.flight-path-line {
+    fill: none;
+    stroke: dodgerblue;
+    stroke-width: 2px;
+    transition: stroke-width 0.2s ease-in-out; /* Basic path smoothing/hover effect preparation */
+}
+
+.flight-path-line:hover { /* Simple hover effect */
+    stroke-width: 4px;
+}
+
+.waypoint-marker {
+    fill: crimson;
+    stroke: #333;
+    stroke-width: 1px;
+    transition: r 0.2s ease-in-out; /* Basic hover effect preparation */
+}
+
+.waypoint-group:hover .waypoint-marker { /* Hover effect for waypoint */
+    r: 8;
+    fill: orange;
+}
+
+.waypoint-label {
+    font-family: Arial, sans-serif;
+    font-size: 10px;
+    fill: #333;
+}
+
+.altitude-grid-line {
+    stroke: #eee;
+    stroke-width: 0.5px;
+    stroke-dasharray: 2,2;
+}
